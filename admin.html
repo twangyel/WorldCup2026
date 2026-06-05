@@ -313,7 +313,7 @@
     // ============== STATE ==============
     let allFixtures = []
     let allUsers = []
-    let prizeSettings = { currency: '$', entry_fee: 0, manual_override: false, manual_amount: 0 }
+    let prizeSettings = { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0 }
     const pendingScores = {}
     const pendingKickoffs = {}
 
@@ -367,7 +367,7 @@
       }
       if (typeof getPrizeSettings === 'function') {
         const ps = await getPrizeSettings()
-        if (ps?.data) prizeSettings = { ...prizeSettings, ...ps.data }
+        if (ps?.data) prizeSettings = { ...prizeSettings, ...ps.data, currency: 'Nu.' }
       }
       renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
@@ -628,7 +628,7 @@
     }
 
     function renderPrize() {
-      document.getElementById('prize-currency').value = prizeSettings.currency || 'Nu.'
+      document.getElementById('prize-currency').value = 'Nu.'
       document.getElementById('prize-entry-fee').value = prizeSettings.entry_fee || ''
       document.getElementById('prize-switch').classList.toggle('on', !!prizeSettings.manual_override)
       document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
@@ -637,7 +637,7 @@
       const paidCount = allUsers.filter(u => u.fee_paid).length
       const autoPool = paidCount * (Number(prizeSettings.entry_fee) || 0)
       const pool = prizeSettings.manual_override ? Number(prizeSettings.manual_amount) || 0 : autoPool
-      const cur = prizeSettings.currency || 'Nu.'
+      const cur = 'Nu.'
 
       document.getElementById('prize-current').textContent = cur + pool.toLocaleString()
       document.getElementById('prize-meta').textContent = prizeSettings.manual_override
@@ -663,7 +663,7 @@
 
     async function savePrizeSettings() {
       const payload = {
-        currency: document.getElementById('prize-currency').value || 'Nu.',
+        currency: 'Nu.',
         entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
         manual_override: document.getElementById('prize-switch').classList.contains('on'),
         manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0
