@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#059669">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>World Cup Prediction League</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -580,6 +584,22 @@
 
     // Start
     init()
+
+    // Pull to refresh
+let touchStartY = 0
+let touchEndY = 0
+
+document.addEventListener('touchstart', e => {
+    touchStartY = e.changedTouches[0].screenY
+})
+
+document.addEventListener('touchend', e => {
+    touchEndY = e.changedTouches[0].screenY
+    if (touchEndY - touchStartY > 150 && window.scrollY === 0) {
+        showToast('Refreshing...', 'info')
+        location.reload()
+    }
+})
   </script>
 </body>
 </html>
