@@ -94,6 +94,7 @@
     .switch.on::after { transform: translateX(20px); }
   </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -275,7 +276,7 @@
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-1">
                 <label class="fld-label">Currency</label>
-                <input type="text" id="prize-currency" maxlength="3" placeholder="$" class="fld text-center">
+                <input type="text" id="prize-currency" maxlength="3" placeholder="Nu." class="fld text-center">
               </div>
               <div class="col-span-2">
                 <label class="fld-label">Entry Fee</label>
@@ -627,7 +628,7 @@
     }
 
     function renderPrize() {
-      document.getElementById('prize-currency').value = prizeSettings.currency || '$'
+      document.getElementById('prize-currency').value = prizeSettings.currency || 'Nu.'
       document.getElementById('prize-entry-fee').value = prizeSettings.entry_fee || ''
       document.getElementById('prize-switch').classList.toggle('on', !!prizeSettings.manual_override)
       document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
@@ -636,7 +637,7 @@
       const paidCount = allUsers.filter(u => u.fee_paid).length
       const autoPool = paidCount * (Number(prizeSettings.entry_fee) || 0)
       const pool = prizeSettings.manual_override ? Number(prizeSettings.manual_amount) || 0 : autoPool
-      const cur = prizeSettings.currency || '$'
+      const cur = prizeSettings.currency || 'Nu.'
 
       document.getElementById('prize-current').textContent = cur + pool.toLocaleString()
       document.getElementById('prize-meta').textContent = prizeSettings.manual_override
@@ -662,7 +663,7 @@
 
     async function savePrizeSettings() {
       const payload = {
-        currency: document.getElementById('prize-currency').value || '$',
+        currency: document.getElementById('prize-currency').value || 'Nu.',
         entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
         manual_override: document.getElementById('prize-switch').classList.contains('on'),
         manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0
@@ -673,6 +674,21 @@
       prizeSettings = { ...prizeSettings, ...payload }
       renderPrize()
       showToast('Settings saved', 'success')
+    }
+
+
+    // Fallback prize settings helpers if auth.js doesn't provide them
+    if (typeof setPrizeSettings !== 'function') {
+      window.setPrizeSettings = async function(payload) {
+        const { data, error } = await supabase.from('prize_settings').upsert({ id: 1, ...payload }, { onConflict: 'id' })
+        return { data, error }
+      }
+    }
+    if (typeof getPrizeSettings !== 'function') {
+      window.getPrizeSettings = async function() {
+        const { data, error } = await supabase.from('prize_settings').select('*').eq('id', 1).single()
+        return { data, error }
+      }
     }
 
     init()
