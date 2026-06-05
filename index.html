@@ -600,6 +600,14 @@ document.addEventListener('touchend', e => {
         location.reload()
     }
 })
+
+// In showApp(), after loadLeaderboard():
+supabaseClient
+    .channel('leaderboard')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => {
+        loadLeaderboard()
+    })
+    .subscribe()
   </script>
 </body>
 </html>
