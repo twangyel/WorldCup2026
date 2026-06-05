@@ -680,14 +680,23 @@
     // Fallback prize settings helpers if auth.js doesn't provide them
     if (typeof setPrizeSettings !== 'function') {
       window.setPrizeSettings = async function(payload) {
-        const { data, error } = await supabase.from('prize_settings').upsert({ id: 1, ...payload }, { onConflict: 'id' })
-        return { data, error }
+        try {
+          localStorage.setItem('wc_prize_settings', JSON.stringify({ id: 1, ...payload }))
+          return { data: payload, error: null }
+        } catch (e) {
+          return { data: null, error: e }
+        }
       }
     }
     if (typeof getPrizeSettings !== 'function') {
       window.getPrizeSettings = async function() {
-        const { data, error } = await supabase.from('prize_settings').select('*').eq('id', 1).single()
-        return { data, error }
+        try {
+          const raw = localStorage.getItem('wc_prize_settings')
+          const data = raw ? JSON.parse(raw) : null
+          return { data, error: null }
+        } catch (e) {
+          return { data: null, error: e }
+        }
       }
     }
 
