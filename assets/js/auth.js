@@ -13,17 +13,32 @@ let currentProfile = null
 // =====================
 async function initAuth() {
     const { data: { session } } = await supabaseClient.auth.getSession()
-    
+
     if (session) {
         currentUser = session.user
         await loadProfile()
+        // Payment gate: block if fee not paid
+        if (!currentProfile?.fee_paid) {
+            await supabaseClient.auth.signOut()
+            currentUser = null
+            currentProfile = null
+            return null
+        }
         return { user: currentUser, profile: currentProfile }
     }
-    
+
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
             currentUser = session.user
             await loadProfile()
+            // Payment gate on fresh sign-in too
+            if (!currentProfile?.fee_paid) {
+                await supabaseClient.auth.signOut()
+                currentUser = null
+                currentProfile = null
+                window.location.reload()
+                return
+            }
             window.location.reload()
         }
         if (event === 'SIGNED_OUT') {
@@ -31,19 +46,19 @@ async function initAuth() {
             currentProfile = null
         }
     })
-    
+
     return null
 }
 
 async function loadProfile() {
     if (!currentUser) return null
-    
+
     const { data, error } = await supabaseClient
         .from('profiles')
         .select('*')
         .eq('id', currentUser.id)
         .single()
-    
+
     if (data) currentProfile = data
     return currentProfile
 }
@@ -51,21 +66,32 @@ async function loadProfile() {
 async function signInOrSignUp(email, password) {
     // 1. Try to sign in
     const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password })
-    
+
     if (signInData?.session) {
+        currentUser = signInData.user
+        await loadProfile()
+        // Payment gate: must have paid entry fee
+        if (!currentProfile?.fee_paid) {
+            await supabaseClient.auth.signOut()
+            currentUser = null
+            currentProfile = null
+            return { 
+                data: null, 
+                error: { message: 'Payment required: Nu. 500 entry fee not received. Contact admin to activate your account.' } 
+            }
+        }
         return { data: signInData, error: null }
     }
-    
-    // 2. If sign-in failed, try sign up
+
+    // 2. If sign-in failed, try sign up (registration allowed, but login blocked until paid)
     if (signInError) {
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
             email,
             password,
             options: { data: { name: email.split('@')[0] } }
         })
-        
+
         if (signUpError) {
-            // User might already exist from OTP/magic link
             if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
                 return { 
                     data: null, 
@@ -74,18 +100,17 @@ async function signInOrSignUp(email, password) {
             }
             return { data: null, error: signUpError }
         }
-        
-        // If signUp succeeded but no session, email confirmation is likely enabled
+
         if (!signUpData.session) {
             return { 
                 data: null, 
                 error: { message: 'Sign up succeeded but login blocked. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' } 
             }
         }
-        
+
         return { data: signUpData, error: null }
     }
-    
+
     return { data: null, error: signInError }
 }
 
@@ -108,14 +133,14 @@ function isAdmin() { return currentProfile?.role === 'admin' }
 
 async function updateProfile(updates) {
     if (!currentUser) return { error: new Error('Not authenticated') }
-    
+
     const { data, error } = await supabaseClient
         .from('profiles')
         .update(updates)
         .eq('id', currentUser.id)
         .select()
         .single()
-    
+
     if (!error && data) currentProfile = { ...currentProfile, ...data }
     return { data, error }
 }
@@ -135,7 +160,7 @@ async function getFixtures() {
 
 async function getMyPredictions() {
     if (!currentUser) return { data: [], error: new Error('Not authenticated') }
-    
+
     const { data, error } = await supabaseClient
         .from('predictions')
         .select('*')
@@ -145,14 +170,14 @@ async function getMyPredictions() {
 
 async function savePrediction(fixtureId, home, away) {
     if (!currentUser) return { error: new Error('Not authenticated') }
-    
+
     const { data: existing } = await supabaseClient
         .from('predictions')
         .select('id')
         .eq('user_id', currentUser.id)
         .eq('fixture_id', fixtureId)
         .single()
-    
+
     if (existing) {
         const { error } = await supabaseClient
             .from('predictions')
@@ -175,32 +200,74 @@ async function savePrediction(fixtureId, home, away) {
 async function getLeaderboard() {
     const { data: profiles } = await supabaseClient.from('profiles').select('*')
     const { data: allPredictions } = await supabaseClient.from('predictions').select('*')
-    
+
     if (!profiles) return { data: [], error: new Error('No profiles') }
-    
+
     const stats = profiles.map(p => {
         const userPreds = allPredictions?.filter(pred => pred.user_id === p.id) || []
         const points = userPreds.reduce((sum, pred) => sum + (pred.points_awarded || 0), 0)
         const exact = userPreds.filter(pred => pred.points_awarded === 5).length
         const gd = userPreds.filter(pred => pred.points_awarded === 3).length
         const result = userPreds.filter(pred => pred.points_awarded === 2).length
-        
+
         return { ...p, points, exact, gd, result }
     })
-    
+
     stats.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points
         if (b.exact !== a.exact) return b.exact - a.exact
         if (b.gd !== a.gd) return b.gd - a.gd
         return b.result - a.result
     })
-    
+
     return { data: stats, error: null }
+}
+
+async function getPrizePool() {
+    const { data: settings } = await supabaseClient.from('prize_settings').select('*').eq('id', 1).single()
+    const entryFee = settings?.entry_fee || 500
+    const currency = settings?.currency || 'Nu.'
+
+    const { data: paidUsers } = await supabaseClient.from('profiles').select('id').eq('fee_paid', true)
+    const count = paidUsers?.length || 0
+    const amount = count * entryFee
+
+    return { data: { amount, currency, paid_count: count }, error: null }
 }
 
 // =====================
 // ADMIN
 // =====================
+async function getAllUsers() {
+    const { data, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false })
+    return { data: data || [], error }
+}
+
+async function setFeePaid(userId, paid) {
+    const { data, error } = await supabaseClient.from('profiles').update({ fee_paid: paid }).eq('id', userId).select().single()
+    return { data, error }
+}
+
+async function removeUser(userId) {
+    // Delete predictions first, then profile (auth user deletion requires service role or admin API)
+    await supabaseClient.from('predictions').delete().eq('user_id', userId)
+    const { error } = await supabaseClient.from('profiles').delete().eq('id', userId)
+    return { error }
+}
+
+async function inviteUser(payload) {
+    // Insert a profile row; actual auth invite would need admin API or magic link
+    const { data, error } = await supabaseClient.from('profiles').insert({
+        name: payload.name,
+        email: payload.email,
+        department: payload.department || null,
+        phone: payload.phone || null,
+        fee_paid: false,
+        role: 'user'
+    }).select().single()
+    return { data, error }
+}
+
 async function addFixture(fixture) {
     const { data, error } = await supabaseClient
         .from('fixtures')
@@ -213,10 +280,31 @@ async function updateFixtureScore(id, homeScore, awayScore) {
     const updates = {}
     if (homeScore !== undefined) updates.home_score = homeScore
     if (awayScore !== undefined) updates.away_score = awayScore
-    
+
     const { error } = await supabaseClient
         .from('fixtures')
         .update(updates)
         .eq('id', id)
     return { error }
+}
+
+async function updateFixtureKickoff(id, kickoff) {
+    const { error } = await supabaseClient.from('fixtures').update({ kickoff }).eq('id', id)
+    return { error }
+}
+
+async function deleteFixture(id) {
+    await supabaseClient.from('predictions').delete().eq('fixture_id', id)
+    const { error } = await supabaseClient.from('fixtures').delete().eq('id', id)
+    return { error }
+}
+
+async function getPrizeSettings() {
+    const { data, error } = await supabaseClient.from('prize_settings').select('*').eq('id', 1).single()
+    return { data, error }
+}
+
+async function setPrizeSettings(payload) {
+    const { data, error } = await supabaseClient.from('prize_settings').upsert({ id: 1, ...payload }, { onConflict: 'id' }).select().single()
+    return { data, error }
 }
