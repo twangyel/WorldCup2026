@@ -537,6 +537,12 @@
           loadAll()
         }).subscribe()
 
+              supabaseClient.channel('admin-notifications')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
+          loadNotifications()
+        })
+        .subscribe()
+
       supabaseClient.channel('admin-fixtures')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, (payload) => {
           playChime()
@@ -565,7 +571,8 @@
       if (!isAdmin()) { document.getElementById('access-denied').classList.remove('hidden'); return }
       document.getElementById('admin-content').classList.remove('hidden')
       requestNotificationPermission()
-      await loadAll()
+            await loadAll()
+      await loadNotifications()
       setupAdminRealtime()
     }
 
@@ -582,6 +589,30 @@
       }
       renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
+
+    async function loadNotifications() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) throw error
+    notifications = (data || []).map(n => ({
+      id: n.id,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      time: new Date(n.created_at),
+      read: n.read || false
+    }))
+    unreadCount = notifications.filter(n => !n.read).length
+    updateNotifBadge()
+    renderNotifications()
+  } catch (e) {
+    console.error('loadNotifications error:', e)
+  }
+}
 
     function adminTab(name) {
       document.querySelectorAll('.atab').forEach(el => el.classList.add('hidden'))
