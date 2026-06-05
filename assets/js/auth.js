@@ -12,18 +12,6 @@ let currentProfile = null
 // AUTH
 // =====================
 async function initAuth() {
-    // Handle magic link / OAuth callback (PKCE flow)
-    const query = new URLSearchParams(window.location.search)
-    const code = query.get('code')
-    
-    if (code) {
-        const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code)
-        if (!error && data.session) {
-            // Clean the URL so refresh doesn't re-exchange
-            window.history.replaceState({}, document.title, window.location.pathname)
-        }
-    }
-    
     const { data: { session } } = await supabaseClient.auth.getSession()
     
     if (session) {
@@ -60,12 +48,45 @@ async function loadProfile() {
     return currentProfile
 }
 
-async function signInWithMagicLink(email) {
-    const { error } = await supabaseClient.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true }
-    })
-    return { error }
+async function signInOrSignUp(email, password) {
+    // 1. Try to sign in
+    const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password })
+    
+    if (signInData?.session) {
+        return { data: signInData, error: null }
+    }
+    
+    // 2. If sign-in failed, try sign up
+    if (signInError) {
+        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { name: email.split('@')[0] } }
+        })
+        
+        if (signUpError) {
+            // User might already exist from OTP/magic link
+            if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
+                return { 
+                    data: null, 
+                    error: { message: 'Account exists but has no password. Ask admin to reset it, or use a different email.' } 
+                }
+            }
+            return { data: null, error: signUpError }
+        }
+        
+        // If signUp succeeded but no session, email confirmation is likely enabled
+        if (!signUpData.session) {
+            return { 
+                data: null, 
+                error: { message: 'Sign up succeeded but login blocked. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' } 
+            }
+        }
+        
+        return { data: signUpData, error: null }
+    }
+    
+    return { data: null, error: signInError }
 }
 
 async function signOut() {
@@ -199,24 +220,3 @@ async function updateFixtureScore(id, homeScore, awayScore) {
         .eq('id', id)
     return { error }
 }
-
-// =====================
-// EXPOSE TO WINDOW (guarantees global access)
-// =====================
-window.supabaseClient = supabaseClient
-window.initAuth = initAuth
-window.signInWithMagicLink = signInWithMagicLink
-window.signOut = signOut
-window.getUser = getUser
-window.getProfile = getProfile
-window.isAdmin = isAdmin
-window.updateProfile = updateProfile
-window.getSupabase = getSupabase
-window.getFixtures = getFixtures
-window.getMyPredictions = getMyPredictions
-window.savePrediction = savePrediction
-window.getLeaderboard = getLeaderboard
-window.addFixture = addFixture
-window.updateFixtureScore = updateFixtureScore
-
-console.log('✅ auth.js loaded, functions exposed to window')
