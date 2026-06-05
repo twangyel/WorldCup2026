@@ -1,17 +1,16 @@
-// js/auth.js
-// Supabase Auth Module - Shared across all pages
+// js/auth.js — Shared Supabase Auth & Data Layer
 
 const SUPABASE_URL = 'https://ftgfbyfhuhpbwrevcsve.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0Z2ZieWZodWhwYndyZXZjc3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NTYzNjUsImV4cCI6MjA5NjIzMjM2NX0.UJ2HDtmFpXwAz3pZERKsv0Mi_kFDFJG3SKemikq5rW8'
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-// =====================
-// AUTH STATE
-// =====================
 let currentUser = null
 let currentProfile = null
 
+// =====================
+// AUTH
+// =====================
 async function initAuth() {
     const { data: { session } } = await supabaseClient.auth.getSession()
     
@@ -21,7 +20,6 @@ async function initAuth() {
         return { user: currentUser, profile: currentProfile }
     }
     
-    // Listen for auth changes
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
             currentUser = session.user
@@ -46,9 +44,7 @@ async function loadProfile() {
         .eq('id', currentUser.id)
         .single()
     
-    if (data) {
-        currentProfile = data
-    }
+    if (data) currentProfile = data
     return currentProfile
 }
 
@@ -71,7 +67,7 @@ async function signOut() {
 }
 
 // =====================
-// PROFILE HELPERS
+// PROFILE
 // =====================
 function getUser() { return currentUser }
 function getProfile() { return currentProfile }
@@ -87,14 +83,12 @@ async function updateProfile(updates) {
         .select()
         .single()
     
-    if (!error && data) {
-        currentProfile = { ...currentProfile, ...data }
-    }
+    if (!error && data) currentProfile = { ...currentProfile, ...data }
     return { data, error }
 }
 
 // =====================
-// DATABASE HELPERS
+// DATA
 // =====================
 function getSupabase() { return supabaseClient }
 
@@ -119,7 +113,6 @@ async function getMyPredictions() {
 async function savePrediction(fixtureId, home, away) {
     if (!currentUser) return { error: new Error('Not authenticated') }
     
-    // Check if prediction exists
     const { data: existing } = await supabaseClient
         .from('predictions')
         .select('id')
@@ -173,7 +166,7 @@ async function getLeaderboard() {
 }
 
 // =====================
-// ADMIN HELPERS
+// ADMIN
 // =====================
 async function addFixture(fixture) {
     const { data, error } = await supabaseClient
@@ -196,13 +189,22 @@ async function updateFixtureScore(id, homeScore, awayScore) {
 }
 
 // =====================
-// EXPORTS (for module usage if needed later)
+// EXPOSE TO WINDOW (guarantees global access)
 // =====================
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        supabaseClient, initAuth, signInWithMagicLink, signOut,
-        getUser, getProfile, isAdmin, updateProfile,
-        getSupabase, getFixtures, getMyPredictions, savePrediction,
-        getLeaderboard, addFixture, updateFixtureScore
-    }
-}
+window.supabaseClient = supabaseClient
+window.initAuth = initAuth
+window.signInWithMagicLink = signInWithMagicLink
+window.signOut = signOut
+window.getUser = getUser
+window.getProfile = getProfile
+window.isAdmin = isAdmin
+window.updateProfile = updateProfile
+window.getSupabase = getSupabase
+window.getFixtures = getFixtures
+window.getMyPredictions = getMyPredictions
+window.savePrediction = savePrediction
+window.getLeaderboard = getLeaderboard
+window.addFixture = addFixture
+window.updateFixtureScore = updateFixtureScore
+
+console.log('✅ auth.js loaded, functions exposed to window')

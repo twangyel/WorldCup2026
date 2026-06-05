@@ -6,7 +6,7 @@
   <title>World Cup Prediction League</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/auth.js"></script>
+  <script src="/assets/js/auth.js"></script>
   <style>
     .tab-active { color: #059669; }
     .tab-inactive { color: #9CA3AF; }
@@ -174,7 +174,6 @@
     // =====================
     async function init() {
       const auth = await initAuth()
-      
       if (auth) {
         showApp()
       } else {
@@ -203,7 +202,7 @@
     })
 
     async function handleLogout() {
-      await signOut()
+      if (confirm('Log out?')) await signOut()
     }
 
     // =====================
