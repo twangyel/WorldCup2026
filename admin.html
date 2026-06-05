@@ -95,6 +95,7 @@
   </style>
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -123,7 +124,13 @@
           <p class="text-xs text-ink-500">Manage everything</p>
         </div>
       </div>
+      <div class="flex items-center gap-2">
+      <button id="notif-btn" class="w-10 h-10 rounded-xl bg-paper-card border border-paper-border flex items-center justify-center text-ink-500 tap relative" onclick="showToast('Notifications — coming soon','info')">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        <span id="notif-badge" class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full hidden"></span>
+      </button>
       <div class="text-xs font-semibold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full">⚙️ Admin</div>
+    </div>
     </div>
   </header>
 
@@ -317,14 +324,44 @@
     const pendingScores = {}
     const pendingKickoffs = {}
 
+    // ============== CHIME ==============
+    let chimeCtx = null
+    function playChime() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext
+        if (!AudioContext) return
+        if (!chimeCtx) chimeCtx = new AudioContext()
+        if (chimeCtx.state === 'suspended') chimeCtx.resume()
+        const osc = chimeCtx.createOscillator()
+        const gain = chimeCtx.createGain()
+        osc.connect(gain)
+        gain.connect(chimeCtx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(523.25, chimeCtx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(1046.5, chimeCtx.currentTime + 0.1)
+        gain.gain.setValueAtTime(0.12, chimeCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, chimeCtx.currentTime + 0.5)
+        osc.start(chimeCtx.currentTime)
+        osc.stop(chimeCtx.currentTime + 0.5)
+      } catch (e) {}
+    }
+
     // ============== TOAST + MODAL ==============
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container')
       const toast = document.createElement('div')
-      const icons = { success: '✓', error: '✕', info: 'i', warning: '!' }
-      const colors = { success: 'bg-brand-900', error: 'bg-red-600', info: 'bg-ink-900', warning: 'bg-amber-600' }
-      toast.className = `toast-enter ${colors[type]} text-white px-5 py-3.5 rounded-2xl shadow-lifted flex items-center gap-3 text-sm font-medium pointer-events-auto max-w-sm w-full`
-      toast.innerHTML = `<span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0">${icons[type]}</span><span class="flex-1">${message}</span>`
+      const icons = {
+        success: '✓', error: '✕', info: 'i', warning: '!',
+        payment: '$', member: '👤', fixture: '⚽', result: '🏁', general: '🔔'
+      }
+      const colors = {
+        success: 'bg-brand-900', error: 'bg-red-600', info: 'bg-ink-900', warning: 'bg-amber-600',
+        payment: 'bg-emerald-600', member: 'bg-blue-600', fixture: 'bg-violet-600', result: 'bg-orange-600', general: 'bg-slate-700'
+      }
+      const icon = icons[type] || icons.general
+      const color = colors[type] || colors.general
+      toast.className = `toast-enter ${color} text-white px-5 py-3.5 rounded-2xl shadow-lifted flex items-center gap-3 text-sm font-medium pointer-events-auto max-w-sm w-full`
+      toast.innerHTML = `<span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0">${icon}</span><span class="flex-1">${message}</span>`
       container.appendChild(toast)
       requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
       setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
@@ -348,6 +385,43 @@
     }
     document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') hideModal() })
 
+    // ============== REALTIME ==============
+    function setupAdminRealtime() {
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) return
+
+      supabaseClient.channel('admin-profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+          playChime()
+          if (payload.eventType === 'INSERT') {
+            showToast(`New member joined: ${payload.new.name || payload.new.email || 'Unknown'}`, 'member')
+          } else if (payload.eventType === 'UPDATE' && payload.new.fee_paid === true && payload.old?.fee_paid !== true) {
+            showToast(`Payment received: ${payload.new.name || 'Unknown'}`, 'payment')
+          } else {
+            showToast('Member profile updated', 'member')
+          }
+          loadAll()
+        }).subscribe()
+
+      supabaseClient.channel('admin-fixtures')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, (payload) => {
+          playChime()
+          if (payload.eventType === 'UPDATE' && payload.new.home_score !== null && (payload.new.home_score !== payload.old?.home_score || payload.new.away_score !== payload.old?.away_score)) {
+            showToast(`Result entered: ${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`, 'result')
+          } else if (payload.eventType === 'INSERT') {
+            showToast(`Fixture added: ${payload.new.home_team} vs ${payload.new.away_team}`, 'fixture')
+          } else {
+            showToast('Fixture schedule updated', 'fixture')
+          }
+          loadAll()
+        }).subscribe()
+
+      supabaseClient.channel('admin-predictions')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, (payload) => {
+          playChime()
+          showToast('New prediction submitted', 'general')
+        }).subscribe()
+    }
+
     // ============== INIT ==============
     async function init() {
       await initAuth()
@@ -356,6 +430,7 @@
       if (!isAdmin()) { document.getElementById('access-denied').classList.remove('hidden'); return }
       document.getElementById('admin-content').classList.remove('hidden')
       await loadAll()
+      setupAdminRealtime()
     }
 
     async function loadAll() {
@@ -421,8 +496,9 @@
     }
 
     function confirmRemoveUser(id, name) {
+      const safeName = name.replace(/</g, '&lt;').replace(/>/g, '&gt;')
       showModal({
-        icon: '⚠️', title: 'Remove user?', message: `${name} and all their predictions will be deleted permanently.`,
+        icon: '⚠️', title: 'Remove user?', message: `${safeName} and all their predictions will be deleted permanently.`,
         actions: [
           { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
           { text: 'Remove', onclick: `hideModal(); doRemoveUser('${id}')`, class: 'bg-red-600 text-white' }
@@ -694,6 +770,24 @@
           const raw = localStorage.getItem('wc_prize_settings')
           const data = raw ? JSON.parse(raw) : null
           return { data, error: null }
+        } catch (e) {
+          return { data: null, error: e }
+        }
+      }
+    }
+
+    // Robust fallback removeUser — deletes predictions first, then profile row
+    if (typeof removeUser !== 'function') {
+      window.removeUser = async function(id) {
+        try {
+          if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+            return { data: null, error: new Error('Supabase client not available') }
+          }
+          // Delete predictions first to avoid FK constraint issues
+          const { error: predErr } = await supabaseClient.from('predictions').delete().eq('user_id', id)
+          if (predErr) console.warn('Predictions delete warning:', predErr)
+          const { error } = await supabaseClient.from('profiles').delete().eq('id', id)
+          return { data: null, error }
         } catch (e) {
           return { data: null, error: e }
         }
