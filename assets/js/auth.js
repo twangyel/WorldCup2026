@@ -12,6 +12,18 @@ let currentProfile = null
 // AUTH
 // =====================
 async function initAuth() {
+    // Handle magic link / OAuth callback (PKCE flow)
+    const query = new URLSearchParams(window.location.search)
+    const code = query.get('code')
+    
+    if (code) {
+        const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code)
+        if (!error && data.session) {
+            // Clean the URL so refresh doesn't re-exchange
+            window.history.replaceState({}, document.title, window.location.pathname)
+        }
+    }
+    
     const { data: { session } } = await supabaseClient.auth.getSession()
     
     if (session) {
