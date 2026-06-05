@@ -17,8 +17,8 @@ async function initAuth() {
     if (session) {
         currentUser = session.user
         await loadProfile()
-        // Payment gate: block if fee not paid
-        if (!currentProfile?.fee_paid) {
+        // Payment gate: block if fee not paid (admins bypass)
+        if (!currentProfile?.fee_paid && !isAdmin()) {
             await supabaseClient.auth.signOut()
             currentUser = null
             currentProfile = null
@@ -31,8 +31,8 @@ async function initAuth() {
         if (event === 'SIGNED_IN' && session) {
             currentUser = session.user
             await loadProfile()
-            // Payment gate on fresh sign-in too
-            if (!currentProfile?.fee_paid) {
+            // Payment gate on fresh sign-in too (admins bypass)
+            if (!currentProfile?.fee_paid && !isAdmin()) {
                 await supabaseClient.auth.signOut()
                 currentUser = null
                 currentProfile = null
@@ -70,8 +70,8 @@ async function signInOrSignUp(email, password) {
     if (signInData?.session) {
         currentUser = signInData.user
         await loadProfile()
-        // Payment gate: must have paid entry fee
-        if (!currentProfile?.fee_paid) {
+        // Payment gate: must have paid entry fee (admins bypass)
+        if (!currentProfile?.fee_paid && !isAdmin()) {
             await supabaseClient.auth.signOut()
             currentUser = null
             currentProfile = null
