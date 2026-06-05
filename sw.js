@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wc-predictions-v1'
+const CACHE_NAME = 'wc-predictions-v2'  // bump this on every deploy
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,19 +9,36 @@ const urlsToCache = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   )
   self.skipWaiting()
 })
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
   )
+  self.clients.claim()
 })
 
-self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim())
+self.addEventListener('fetch', event => {
+  // Network-first for HTML and JS so updates show immediately
+  if (event.request.mode === 'navigate' || event.request.url.match(/\.(html|js)$/)) {
+    event.respondWith(
+      fetch(event.request)
+        .then(res => {
+          const clone = res.clone()
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
+          return res
+        })
+        .catch(() => caches.match(event.request))
+    )
+    return
+  }
+  // Cache-first for everything else (images, manifest)
+  event.respondWith(
+    caches.match(event.request).then(res => res || fetch(event.request))
+  )
 })
