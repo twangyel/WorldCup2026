@@ -506,12 +506,21 @@
       })
     }
     async function doRemoveUser(id) {
-      if (typeof removeUser !== 'function') { showToast('removeUser helper missing', 'error'); return }
-      const { error } = await removeUser(id)
-      if (error) return showToast(error.message, 'error')
+      const { error, data } = await removeUser(id)
+      if (error) {
+        console.error('[ADMIN] doRemoveUser failed:', error)
+        showToast(error.message || 'Delete failed — check console', 'error')
+        return
+      }
+      // Force reload from server to confirm
+      const { data: remaining } = await supabaseClient.from('profiles').select('id').eq('id', id)
+      if (remaining && remaining.length > 0) {
+        showToast('Delete blocked by database — check RLS policy', 'error')
+        return
+      }
       allUsers = allUsers.filter(u => u.id !== id)
       renderUsers(); renderPrize()
-      showToast('User removed', 'success')
+      showToast('User removed permanently', 'success')
     }
 
     document.getElementById('add-user-form').addEventListener('submit', async (e) => {
@@ -776,21 +785,55 @@
       }
     }
 
-    // Robust fallback removeUser — deletes predictions first, then profile row
-    if (typeof removeUser !== 'function') {
-      window.removeUser = async function(id) {
-        try {
-          if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-            return { data: null, error: new Error('Supabase client not available') }
-          }
-          // Delete predictions first to avoid FK constraint issues
-          const { error: predErr } = await supabaseClient.from('predictions').delete().eq('user_id', id)
-          if (predErr) console.warn('Predictions delete warning:', predErr)
-          const { error } = await supabaseClient.from('profiles').delete().eq('id', id)
-          return { data: null, error }
-        } catch (e) {
-          return { data: null, error: e }
+    // FORCE override removeUser — direct Supabase delete with verification
+    window.removeUser = async function(id) {
+      try {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+          console.error('[ADMIN] Supabase client not available')
+          return { data: null, error: new Error('Supabase client not available') }
         }
+        console.log('[ADMIN] Deleting user:', id)
+
+        // Step 1: Delete predictions first (FK safety)
+        const { error: predErr, data: predData } = await supabaseClient
+          .from('predictions')
+          .delete()
+          .eq('user_id', id)
+          .select()
+        if (predErr) {
+          console.error('[ADMIN] Predictions delete error:', predErr)
+        } else {
+          console.log('[ADMIN] Deleted predictions:', predData?.length || 0)
+        }
+
+        // Step 2: Delete profile row
+        const { error: delErr, data: delData } = await supabaseClient
+          .from('profiles')
+          .delete()
+          .eq('id', id)
+          .select()
+        if (delErr) {
+          console.error('[ADMIN] Profile delete error:', delErr)
+          return { data: null, error: delErr }
+        }
+        console.log('[ADMIN] Profile delete result:', delData)
+
+        // Step 3: VERIFY the row is actually gone
+        const { data: verify, error: verifyErr } = await supabaseClient
+          .from('profiles')
+          .select('id')
+          .eq('id', id)
+          .maybeSingle()
+        if (verifyErr) console.error('[ADMIN] Verify error:', verifyErr)
+        if (verify) {
+          console.error('[ADMIN] ROW STILL EXISTS AFTER DELETE:', verify)
+          return { data: null, error: new Error('Row still exists after delete — check RLS policies') }
+        }
+        console.log('[ADMIN] Verified: row is gone')
+        return { data: delData, error: null }
+      } catch (e) {
+        console.error('[ADMIN] removeUser exception:', e)
+        return { data: null, error: e }
       }
     }
 
