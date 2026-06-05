@@ -5,7 +5,7 @@ const urlsToCache = [
   '/admin.html',
   '/assets/js/auth.js',
   '/manifest.json',
-  '/assets/logo.svg'  // <-- add this
+  '/image/logo.svg'  // <-- add this
 ]
 // ... rest of your sw.js stays the same
 
