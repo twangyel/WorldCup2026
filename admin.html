@@ -457,7 +457,7 @@
     }
 
     // ============== USERS ==============
-    function renderUsers() {
+        function renderUsers() {
       const list = document.getElementById('users-list')
       const paidCount = allUsers.filter(u => u.fee_paid).length
       document.getElementById('user-stats').textContent = `${allUsers.length} total · ${paidCount} paid`
@@ -475,6 +475,7 @@
             <div class="flex items-center gap-2">
               <span class="font-semibold text-sm truncate">${u.name || '(no name)'}</span>
               ${u.is_admin ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>' : ''}
+              ${u.payment_proof_url && !u.fee_paid ? `<a href="${u.payment_proof_url}" target="_blank" class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider tap">View Proof</a>` : ''}
             </div>
             <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
           </div>
@@ -504,15 +505,23 @@
         }
         console.log('[ADMIN] Deleting user:', id)
 
-        // Step 1: Delete auth user via Edge Function (requires Service Role)
-        const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('delete-auth-user', {
-          body: { user_id: id }
-        })
-        if (fnError) {
-          console.error('[ADMIN] Auth delete error:', fnError)
-          return { data: null, error: new Error('Auth delete failed: ' + (fnError.message || fnError)) }
+        // Step 1: Try to delete auth user via Edge Function (requires Service Role).
+        // If the function isn't deployed or fails, continue anyway — we'll still
+        // remove the profile + predictions so the user disappears from the app.
+        let authDeleted = false
+        try {
+          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('hyper-service', {
+            body: { user_id: id }
+          })
+          if (fnError) {
+            console.warn('[ADMIN] Auth delete skipped (edge function failed):', fnError.message || fnError)
+          } else {
+            console.log('[ADMIN] Auth user deleted via edge function:', fnData)
+            authDeleted = true
+          }
+        } catch (e) {
+          console.warn('[ADMIN] Auth delete skipped (edge function unreachable):', e.message || e)
         }
-        console.log('[ADMIN] Auth user deleted via edge function:', fnData)
 
         // Step 2: Delete predictions first (FK safety)
         const { error: predErr, data: predData } = await supabaseClient
@@ -545,6 +554,18 @@
       }
     }
 
+    function confirmRemoveUser(id, name) {
+      showModal({
+        icon: '🗑️',
+        title: 'Remove user?',
+        message: `${name || 'This user'} will be permanently deleted along with all their predictions. This cannot be undone.`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Remove', onclick: `hideModal(); doRemoveUser('${id}')`, class: 'bg-red-600 text-white' }
+        ]
+      })
+    }
+
     async function doRemoveUser(id) {
       const { error, data } = await removeUser(id)
       if (error) {
@@ -552,16 +573,14 @@
         showToast(error.message || 'Delete failed — check console', 'error')
         return
       }
-      allUsers = allUsers.filter(u => u.id !== id)
-      renderUsers(); renderPrize()
-      showToast('User removed permanently', 'success')
-    
-      // Force reload from server to confirm
+
+      // Verify the row is actually gone (RLS could silently block the delete)
       const { data: remaining } = await supabaseClient.from('profiles').select('id').eq('id', id)
       if (remaining && remaining.length > 0) {
         showToast('Delete blocked by database — check RLS policy', 'error')
         return
       }
+
       allUsers = allUsers.filter(u => u.id !== id)
       renderUsers(); renderPrize()
       showToast('User removed permanently', 'success')
@@ -826,58 +845,6 @@
         } catch (e) {
           return { data: null, error: e }
         }
-      }
-    }
-
-    // FORCE override removeUser — direct Supabase delete with verification
-    window.removeUser = async function(id) {
-      try {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-          console.error('[ADMIN] Supabase client not available')
-          return { data: null, error: new Error('Supabase client not available') }
-        }
-        console.log('[ADMIN] Deleting user:', id)
-
-        // Step 1: Delete predictions first (FK safety)
-        const { error: predErr, data: predData } = await supabaseClient
-          .from('predictions')
-          .delete()
-          .eq('user_id', id)
-          .select()
-        if (predErr) {
-          console.error('[ADMIN] Predictions delete error:', predErr)
-        } else {
-          console.log('[ADMIN] Deleted predictions:', predData?.length || 0)
-        }
-
-        // Step 2: Delete profile row
-        const { error: delErr, data: delData } = await supabaseClient
-          .from('profiles')
-          .delete()
-          .eq('id', id)
-          .select()
-        if (delErr) {
-          console.error('[ADMIN] Profile delete error:', delErr)
-          return { data: null, error: delErr }
-        }
-        console.log('[ADMIN] Profile delete result:', delData)
-
-        // Step 3: VERIFY the row is actually gone
-        const { data: verify, error: verifyErr } = await supabaseClient
-          .from('profiles')
-          .select('id')
-          .eq('id', id)
-          .maybeSingle()
-        if (verifyErr) console.error('[ADMIN] Verify error:', verifyErr)
-        if (verify) {
-          console.error('[ADMIN] ROW STILL EXISTS AFTER DELETE:', verify)
-          return { data: null, error: new Error('Row still exists after delete — check RLS policies') }
-        }
-        console.log('[ADMIN] Verified: row is gone')
-        return { data: delData, error: null }
-      } catch (e) {
-        console.error('[ADMIN] removeUser exception:', e)
-        return { data: null, error: e }
       }
     }
 

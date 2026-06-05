@@ -114,6 +114,8 @@
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+<base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -235,7 +237,7 @@
       </div>
     </header>
 
-    <main class="flex-1 max-w-lg mx-auto w-full px-5 pt-5 pb-32">
+    <main id="app-main" class="flex-1 max-w-lg mx-auto w-full px-5 pt-5 pb-32">
 
       <!-- HOME -->
       <div id="tab-home" class="tab-content space-y-5">
@@ -379,7 +381,7 @@
     </main>
 
     <!-- Bottom Nav -->
-    <nav class="fixed bottom-0 inset-x-0 z-30 bg-white/90 border-t border-paper-border safe-bottom" style="backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);">
+    <nav id="app-nav" class="fixed bottom-0 inset-x-0 z-30 bg-white/90 border-t border-paper-border safe-bottom" style="backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);">
       <div class="max-w-lg mx-auto grid grid-cols-4 px-2 py-2">
         <button onclick="switchTab('home')" data-tab="home" class="nav-btn active flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -403,6 +405,123 @@
         </button>
       </div>
     </nav>
+
+    <!-- Payment Gate -->
+    <div id="payment-gate" class="hidden flex-1 flex-col overflow-y-auto">
+      <div class="flex-1 max-w-lg mx-auto w-full px-5 pt-8 pb-32">
+        <div class="text-center mb-8">
+          <div class="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center text-4xl mx-auto mb-4">🔒</div>
+          <h2 class="text-2xl font-bold tracking-tight">Payment Required</h2>
+          <p class="text-sm text-ink-500 mt-2">Complete your entry fee to unlock predictions and leaderboard.</p>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-6 mb-5">
+          <div class="text-center mb-5">
+            <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-1">Entry Fee</div>
+            <div class="text-4xl font-bold text-brand-700" id="gate-fee-amount">Nu. 500</div>
+          </div>
+          
+          <!-- Payment Methods -->
+          <div class="space-y-4 mb-5">
+            <div class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Payment Methods</div>
+
+            <!-- Bank Transfer -->
+            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg">🏦</div>
+                <div>
+                  <div class="font-semibold text-sm">Bank Transfer</div>
+                  <div class="text-xs text-ink-500">DK Bank</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
+                <!-- Replace src with your actual QR code image -->
+                <img src="/image/dk.png" alt="DK Bank QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
+                  <span>📷<br>Upload your QR code<br>to /image/dkqrcode.jpeg/</span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div>
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Name</div>
+                    <div class="text-sm font-semibold text-ink-900">Tandin Wangyel</div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div class="min-w-0">
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
+                    <div class="text-sm font-semibold text-ink-900 truncate" id="acct-bnb">110148910019</div>
+                  </div>
+                  <button onclick="copyToClipboard('110148910019', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobile Wallet -->
+            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg">📱</div>
+                <div>
+                  <div class="font-semibold text-sm">Bank Transfer</div>
+                  <div class="text-xs text-ink-500">BOB</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
+                <!-- Replace src with your actual QR code image -->
+                <img src="/image/bob.png" alt="BOB QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
+                  <span>📷<br>Upload your QR code<br>to /image/qr-bob.png</span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div>
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
+                    <div class="text-sm font-semibold text-ink-900">203149951</div>
+                  </div>
+                  <button onclick="copyToClipboard('203149951', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="upload-section">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Upload Proof</label>
+            <div class="relative">
+              <input type="file" id="payment-screenshot" accept="image/*" class="hidden" onchange="handlePaymentFile(this)">
+              <label for="payment-screenshot" id="upload-label" class="flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed border-paper-border bg-paper hover:bg-white hover:border-brand-500 transition cursor-pointer tap overflow-hidden relative">
+                <div id="upload-placeholder" class="flex flex-col items-center pointer-events-none">
+                  <svg class="w-8 h-8 text-ink-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  <span class="text-sm text-ink-500 font-medium">Tap to upload screenshot</span>
+                  <span class="text-xs text-ink-400 mt-1">JPG, PNG up to 5MB</span>
+                </div>
+                <img id="upload-preview" class="hidden max-w-full max-h-full object-contain rounded-2xl pointer-events-none p-2" />
+              </label>
+              <button id="upload-clear" onclick="clearPaymentFile(event)" class="hidden absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-ink-500 hover:text-red-500 tap z-10">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <button onclick="submitPaymentProof()" id="submit-payment-btn" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
+              Submit Payment Proof
+            </button>
+          </div>
+
+          <div id="pending-state" class="hidden text-center py-4">
+            <div class="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center text-3xl mx-auto mb-3">⏳</div>
+            <div class="font-bold text-ink-900">Verification Pending</div>
+            <p class="text-sm text-ink-500 mt-1">An admin will review your payment and activate your account.</p>
+            <button onclick="checkPaymentStatus()" class="mt-4 text-sm font-semibold text-brand-700 tap">Refresh Status</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -492,15 +611,19 @@
       auth ? showApp() : showAuth()
     }
 
-    document.getElementById('auth-form').addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const email = document.getElementById('email').value.trim()
-      const password = document.getElementById('password').value
-      const remember = document.getElementById('remember-me').checked
-      const { error } = await signInOrSignUp(email, password)
-      if (error) { showToast(error.message, 'error') }
-      else { saveRememberMe(email, remember) }
-    })
+   document.getElementById('auth-form').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const email = document.getElementById('email').value.trim()
+  const password = document.getElementById('password').value
+  const remember = document.getElementById('remember-me').checked
+  const { error } = await signInOrSignUp(email, password)
+  if (error) {
+    showToast(error.message, 'error')
+    return
+  }
+  saveRememberMe(email, remember)
+  await showApp()
+})
 
     function confirmLogout() {
       showModal({
@@ -521,6 +644,169 @@
       const { error } = await updateProfile(updates)
       if (error) showToast('Could not save', 'error')
       else { showToast('Profile saved', 'success'); document.getElementById('user-name').textContent = updates.name || 'Player' }
+    }
+
+    // ============== PAYMENT GATE ==============
+    let pendingPaymentFile = null
+
+    function showPaymentGate() {
+      document.getElementById('app-main').classList.add('hidden')
+      document.getElementById('app-nav').classList.add('hidden')
+      const gate = document.getElementById('payment-gate')
+      gate.classList.remove('hidden')
+      gate.classList.add('flex')
+      loadGateFee()
+      const profile = getProfile()
+      if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
+        document.getElementById('upload-section').classList.add('hidden')
+        document.getElementById('pending-state').classList.remove('hidden')
+      }
+    }
+
+    async function showNormalApp() {
+      document.getElementById('app-main').classList.remove('hidden')
+      document.getElementById('app-nav').classList.remove('hidden')
+      const gate = document.getElementById('payment-gate')
+      gate.classList.add('hidden')
+      gate.classList.remove('flex')
+      const profile = getProfile()
+      document.getElementById('profile-name').value = profile?.name || ''
+      document.getElementById('profile-dept').value = profile?.department || ''
+      document.getElementById('profile-phone').value = profile?.phone || ''
+      if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
+      await loadFixtures()
+      await loadLeaderboard()
+      await loadHome()
+      setupRealtime()
+    }
+
+    async function loadGateFee() {
+      try {
+        let fee = 500
+        let currency = 'Nu.'
+        if (typeof getPrizeSettings === 'function') {
+          const { data } = await getPrizeSettings()
+          if (data?.entry_fee) fee = data.entry_fee
+          if (data?.currency) currency = data.currency
+        }
+        document.getElementById('gate-fee-amount').textContent = `${currency}${Number(fee).toLocaleString()}`
+        document.getElementById('gate-instructions').innerHTML = `Transfer <b>${currency}${Number(fee).toLocaleString()}</b> to the admin and upload your screenshot below. Your account will be activated once verified.`
+      } catch (e) {
+        console.error('loadGateFee error', e)
+      }
+    }
+
+    function handlePaymentFile(input) {
+      const file = input.files[0]
+      if (!file) return
+      if (!file.type.startsWith('image/')) {
+        showToast('Please upload an image file', 'error')
+        input.value = ''
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('File too large. Max 5MB.', 'error')
+        input.value = ''
+        return
+      }
+      pendingPaymentFile = file
+      const preview = document.getElementById('upload-preview')
+      const placeholder = document.getElementById('upload-placeholder')
+      preview.src = URL.createObjectURL(file)
+      preview.classList.remove('hidden')
+      placeholder.classList.add('hidden')
+      document.getElementById('upload-clear').classList.remove('hidden')
+    }
+
+    function clearPaymentFile(e) {
+      if (e) e.preventDefault()
+      pendingPaymentFile = null
+      document.getElementById('payment-screenshot').value = ''
+      const preview = document.getElementById('upload-preview')
+      preview.src = ''
+      preview.classList.add('hidden')
+      document.getElementById('upload-placeholder').classList.remove('hidden')
+      document.getElementById('upload-clear').classList.add('hidden')
+    }
+
+    async function submitPaymentProof() {
+      if (!pendingPaymentFile) {
+        showToast('Please select a screenshot first', 'warning')
+        return
+      }
+      const btn = document.getElementById('submit-payment-btn')
+      const originalText = btn.textContent
+      btn.disabled = true
+      btn.textContent = 'Uploading...'
+
+      try {
+        const user = getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        const fileExt = pendingPaymentFile.name.split('.').pop()
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`
+
+        const { error: uploadError } = await supabaseClient
+          .storage
+          .from('payment-proofs')
+          .upload(fileName, pendingPaymentFile, { cacheControl: '3600', upsert: false })
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError)
+          showToast('Upload failed: ' + uploadError.message, 'error')
+          btn.disabled = false
+          btn.textContent = originalText
+          return
+        }
+
+        const { data: urlData } = supabaseClient
+          .storage
+          .from('payment-proofs')
+          .getPublicUrl(fileName)
+
+        const publicUrl = urlData?.publicUrl
+
+        // Try updating profile with both fields; fallback to just URL if columns are missing
+        let { error: updateError } = await supabaseClient
+          .from('profiles')
+          .update({ payment_proof_url: publicUrl, payment_status: 'pending' })
+          .eq('id', user.id)
+
+        if (updateError) {
+          console.warn('Profile update with payment_status failed, trying URL only:', updateError)
+          await supabaseClient.from('profiles').update({ payment_proof_url: publicUrl }).eq('id', user.id)
+        }
+
+        showToast('Payment proof submitted!', 'success')
+        document.getElementById('upload-section').classList.add('hidden')
+        document.getElementById('pending-state').classList.remove('hidden')
+      } catch (e) {
+        console.error(e)
+        showToast('Something went wrong', 'error')
+        btn.disabled = false
+        btn.textContent = originalText
+      }
+    }
+
+    async function checkPaymentStatus() {
+      const user = getUser()
+      if (!user) return
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('fee_paid, payment_proof_url, payment_status')
+        .eq('id', user.id)
+        .single()
+      if (error) {
+        showToast('Could not check status', 'error')
+        return
+      }
+      if (data?.fee_paid) {
+        showToast('Payment verified! Welcome aboard.', 'success')
+        await showNormalApp()
+        switchTab('home')
+      } else {
+        showToast('Still pending admin verification.', 'info')
+      }
     }
 
     // ============== FIXTURES ==============
@@ -782,20 +1068,25 @@
       document.getElementById('auth-screen').classList.remove('hidden')
       document.getElementById('app-shell').classList.add('hidden')
     }
-    async function showApp() {
-      document.getElementById('auth-screen').classList.add('hidden')
-      document.getElementById('app-shell').classList.remove('hidden')
-      const profile = getProfile()
-      document.getElementById('user-name').textContent = profile?.name || 'Player'
-      document.getElementById('profile-name').value = profile?.name || ''
-      document.getElementById('profile-dept').value = profile?.department || ''
-      document.getElementById('profile-phone').value = profile?.phone || ''
-      if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
-      await loadFixtures()
-      await loadLeaderboard()
-      await loadHome()
-      setupRealtime()
+async function showApp() {
+  try {
+    document.getElementById('auth-screen').classList.add('hidden')
+    document.getElementById('app-shell').classList.remove('hidden')
+
+    const profile = getProfile()
+    document.getElementById('user-name').textContent = profile?.name || 'Player'
+
+    if (!profile?.fee_paid && !isAdmin()) {
+      showPaymentGate()
+      return
     }
+
+    await showNormalApp()
+  } catch (err) {
+    console.error('showApp error:', err)
+    showToast('Something went wrong loading the app. Please refresh.', 'error')
+  }
+}
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
       const target = document.getElementById(`tab-${tab}`)
@@ -807,6 +1098,36 @@
       if (tab === 'leaderboard') loadLeaderboard()
       if (tab === 'predictions') loadFixtures()
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    // ============== COPY TO CLIPBOARD ==============
+    async function copyToClipboard(text, btn) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text)
+        } else {
+          const ta = document.createElement('textarea')
+          ta.value = text
+          ta.style.position = 'fixed'
+          ta.style.opacity = '0'
+          document.body.appendChild(ta)
+          ta.select()
+          document.execCommand('copy')
+          document.body.removeChild(ta)
+        }
+        const label = btn.querySelector('.copy-label')
+        const original = label.textContent
+        label.textContent = 'Copied!'
+        btn.classList.add('bg-emerald-600')
+        btn.classList.remove('bg-ink-900')
+        setTimeout(() => {
+          label.textContent = original
+          btn.classList.remove('bg-emerald-600')
+          btn.classList.add('bg-ink-900')
+        }, 1800)
+      } catch (e) {
+        showToast('Copy failed', 'error')
+      }
     }
 
     init()

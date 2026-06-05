@@ -17,30 +17,12 @@ async function initAuth() {
     if (session) {
         currentUser = session.user
         await loadProfile()
-        // Payment gate: block if fee not paid (admins bypass)
-        if (!currentProfile?.fee_paid && !isAdmin()) {
-            await supabaseClient.auth.signOut()
-            currentUser = null
-            currentProfile = null
-            return null
-        }
+        // Let the UI decide whether to show the payment gate.
+        // Do NOT sign the user out just because they haven't paid yet.
         return { user: currentUser, profile: currentProfile }
     }
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            currentUser = session.user
-            await loadProfile()
-            // Payment gate on fresh sign-in too (admins bypass)
-            if (!currentProfile?.fee_paid && !isAdmin()) {
-                await supabaseClient.auth.signOut()
-                currentUser = null
-                currentProfile = null
-                window.location.reload()
-                return
-            }
-            window.location.reload()
-        }
         if (event === 'SIGNED_OUT') {
             currentUser = null
             currentProfile = null
@@ -70,20 +52,11 @@ async function signInOrSignUp(email, password) {
     if (signInData?.session) {
         currentUser = signInData.user
         await loadProfile()
-        // Payment gate: must have paid entry fee (admins bypass)
-        if (!currentProfile?.fee_paid && !isAdmin()) {
-            await supabaseClient.auth.signOut()
-            currentUser = null
-            currentProfile = null
-            return { 
-                data: null, 
-                error: { message: 'Payment required: Nu. 500 entry fee not received. Contact admin to activate your account.' } 
-            }
-        }
+        // Let showApp() route unpaid users to the payment gate.
         return { data: signInData, error: null }
     }
 
-    // 2. If sign-in failed, try sign up (registration allowed, but login blocked until paid)
+    // 2. If sign-in failed, try sign up
     if (signInError) {
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
             email,
@@ -93,19 +66,38 @@ async function signInOrSignUp(email, password) {
 
         if (signUpError) {
             if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
-                return { 
-                    data: null, 
-                    error: { message: 'Account exists but has no password. Ask admin to reset it, or use a different email.' } 
+                return {
+                    data: null,
+                    error: { message: 'Account exists but password is wrong. Try again or ask admin to reset it.' }
                 }
             }
             return { data: null, error: signUpError }
         }
 
         if (!signUpData.session) {
-            return { 
-                data: null, 
-                error: { message: 'Sign up succeeded but login blocked. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' } 
+            return {
+                data: null,
+                error: { message: 'Sign up succeeded but no session was returned. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' }
             }
+        }
+
+        // Successful signup with session — set user and make sure a profile row exists.
+        currentUser = signUpData.user
+        await loadProfile()
+        if (!currentProfile) {
+            // Create the profile row so the payment gate has something to read/update.
+            const { data: newProfile } = await supabaseClient
+                .from('profiles')
+                .insert({
+                    id: signUpData.user.id,
+                    email,
+                    name: email.split('@')[0],
+                    fee_paid: false,
+                    role: 'user'
+                })
+                .select()
+                .single()
+            if (newProfile) currentProfile = newProfile
         }
 
         return { data: signUpData, error: null }
