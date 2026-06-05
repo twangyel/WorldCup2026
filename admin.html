@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#059669">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Admin - WC Predictions</title>
+  <meta name="theme-color" content="#059669">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Admin · WC Predictions</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
@@ -17,14 +17,14 @@
     .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     .toast-exit-active { transform: translateY(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+    .admin-tab-active { color: #059669; border-color: #059669; }
+    .admin-tab-inactive { color: #6B7280; border-color: transparent; }
   </style>
 </head>
-<body class="bg-gray-50 p-4">
-  
-  <!-- TOAST CONTAINER -->
+<body class="bg-gray-50 p-4 pb-12">
+
   <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- MODAL -->
   <div id="modal-overlay" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
     <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-95 opacity-0 transition-all duration-200">
       <div id="modal-icon" class="text-4xl text-center mb-4"></div>
@@ -34,151 +34,414 @@
     </div>
   </div>
 
-  <div class="max-w-2xl mx-auto">
+  <div class="max-w-3xl mx-auto">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
       <a href="index.html" class="text-emerald-600 hover:underline text-sm">← Back to App</a>
     </div>
-    
-    <div id="admin-content" class="hidden space-y-6">
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h2 class="font-bold mb-4 text-lg">Add Fixture</h2>
-        <form id="add-fixture-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input type="text" id="home-team" placeholder="Home Team (e.g. Brazil)" required 
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-          <input type="text" id="away-team" placeholder="Away Team (e.g. Argentina)" required 
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-          <input type="datetime-local" id="kickoff" required 
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-          <input type="text" id="stage" placeholder="Stage (e.g. Group A, Round of 16)" required 
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-          <button type="submit" 
-            class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 active:scale-95 transition tap-active">
-            Add Fixture
-          </button>
-        </form>
+
+    <div id="admin-content" class="hidden">
+      <!-- Tabs -->
+      <div class="bg-white rounded-xl shadow-sm mb-4 flex overflow-x-auto">
+        <button onclick="adminTab('users')" data-atab="users" class="admin-tab admin-tab-active flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">👥 Users</button>
+        <button onclick="adminTab('fixtures')" data-atab="fixtures" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">⚽ Fixtures</button>
+        <button onclick="adminTab('results')" data-atab="results" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">🏁 Results</button>
+        <button onclick="adminTab('prize')" data-atab="prize" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">💰 Prize Pool</button>
       </div>
-      
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h2 class="font-bold mb-4 text-lg">Enter Final Scores</h2>
-        <div id="admin-fixtures" class="space-y-3"></div>
+
+      <!-- USERS TAB -->
+      <div id="atab-users" class="atab space-y-4">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-4 text-lg">Add User</h2>
+          <form id="add-user-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="text" id="new-user-name" placeholder="Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="email" id="new-user-email" placeholder="Email" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="text" id="new-user-dept" placeholder="Department (optional)" class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="text" id="new-user-phone" placeholder="Phone (optional)" class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <button type="submit" class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Add User</button>
+          </form>
+          <p class="text-xs text-gray-400 mt-2">User will receive a magic-link email to set their password.</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg">Users <span id="user-count" class="text-sm font-normal text-gray-500"></span></h2>
+            <div class="text-xs">
+              <span class="inline-block w-3 h-3 rounded-full bg-emerald-500 align-middle"></span> Paid
+              <span class="inline-block w-3 h-3 rounded-full bg-gray-300 align-middle ml-3"></span> Unpaid
+            </div>
+          </div>
+          <div id="users-list" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <!-- FIXTURES TAB -->
+      <div id="atab-fixtures" class="atab hidden space-y-4">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-3 text-lg">Import Schedule</h2>
+          <p class="text-sm text-gray-500 mb-4">Bulk-load fixtures. Existing fixtures with the same teams + kickoff are skipped.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <button onclick="importWC2026()" class="bg-emerald-600 text-white font-semibold py-3 rounded-lg hover:bg-emerald-700 tap-active">🌎 Import WC 2026 Group Stage</button>
+            <button onclick="document.getElementById('csv-area').classList.toggle('hidden')" class="bg-gray-900 text-white font-semibold py-3 rounded-lg hover:bg-gray-800 tap-active">📋 Paste CSV</button>
+          </div>
+          <div id="csv-area" class="hidden">
+            <p class="text-xs text-gray-500 mb-2">Format: <code class="bg-gray-100 px-1 rounded">home_team, away_team, kickoff_iso, stage</code> — one per line.</p>
+            <textarea id="csv-input" rows="6" placeholder="Brazil, Argentina, 2026-06-12T20:00:00Z, Group A&#10;France, Germany, 2026-06-13T18:00:00Z, Group B" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:border-emerald-500 outline-none"></textarea>
+            <button onclick="importCSV()" class="mt-2 bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 tap-active">Import</button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-4 text-lg">Add Fixture Manually</h2>
+          <form id="add-fixture-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="text" id="home-team" placeholder="Home Team" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="text" id="away-team" placeholder="Away Team" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="datetime-local" id="kickoff" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <input type="text" id="stage" placeholder="Stage (e.g. Group A)" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            <button type="submit" class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Add Fixture</button>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-4 text-lg">Manage Kickoffs <span id="fix-count" class="text-sm font-normal text-gray-500"></span></h2>
+          <div id="fixtures-manage-list" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <!-- RESULTS TAB -->
+      <div id="atab-results" class="atab hidden">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-4 text-lg">Enter Final Scores</h2>
+          <div id="admin-fixtures" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- PRIZE POOL TAB -->
+      <div id="atab-prize" class="atab hidden space-y-4">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="font-bold mb-4 text-lg">Prize Pool Settings</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Currency Symbol</label>
+              <input type="text" id="prize-currency" placeholder="$" maxlength="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Entry Fee (per user)</label>
+              <input type="number" id="prize-entry-fee" min="0" step="0.01" placeholder="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mb-3">
+            <input type="checkbox" id="prize-manual-toggle" class="w-4 h-4 rounded border-gray-300 text-emerald-600">
+            <label for="prize-manual-toggle" class="text-sm text-gray-700">Manual override (ignore entry fee × paid users)</label>
+          </div>
+          <div id="prize-manual-field" class="hidden mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Manual Pool Amount</label>
+            <input type="number" id="prize-manual-amount" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+          </div>
+          <button onclick="savePrizeSettings()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Save Settings</button>
+        </div>
+
+        <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-6">
+          <div class="text-xs uppercase tracking-wider text-amber-700 font-semibold mb-1">Current Pool</div>
+          <div class="text-4xl font-bold text-amber-900 mb-2" id="prize-current">—</div>
+          <div class="text-sm text-amber-800" id="prize-meta">—</div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h3 class="font-bold mb-3">Suggested Distribution</h3>
+          <div id="prize-distribution" class="space-y-2 text-sm"></div>
+        </div>
       </div>
     </div>
-    
+
     <div id="access-denied" class="hidden text-center py-12">
       <div class="text-4xl mb-4">🚫</div>
       <h2 class="text-xl font-bold text-gray-800">Access Denied</h2>
       <p class="text-gray-500 mt-2">You are not an admin.</p>
     </div>
-    
+
     <div id="loading" class="text-center py-12 text-gray-500">Loading...</div>
   </div>
 
   <script>
+    // ============== STATE ==============
+    let allFixtures = []
+    let allUsers = []
+    let prizeSettings = { currency: '$', entry_fee: 0, manual_override: false, manual_amount: 0 }
     const pendingScores = {}
+    const pendingKickoffs = {}
 
-    // Toast system
+    // ============== TOAST + MODAL ==============
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container')
       const toast = document.createElement('div')
-      
       const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' }
       const colors = { success: 'bg-emerald-600', error: 'bg-red-500', info: 'bg-blue-500', warning: 'bg-amber-500' }
-      
       toast.className = `toast-enter ${colors[type]} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium pointer-events-auto`
       toast.innerHTML = `<span class="text-lg">${icons[type]}</span><span>${message}</span>`
-      
       container.appendChild(toast)
-      requestAnimationFrame(() => {
-        toast.classList.remove('toast-enter')
-        toast.classList.add('toast-enter-active')
-      })
-      
-      setTimeout(() => {
-        toast.classList.remove('toast-enter-active')
-        toast.classList.add('toast-exit-active')
-        setTimeout(() => toast.remove(), 300)
-      }, 3000)
+      requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-enter-active') })
+      setTimeout(() => { toast.classList.remove('toast-enter-active'); toast.classList.add('toast-exit-active'); setTimeout(() => toast.remove(), 300) }, 3000)
     }
 
-    // Modal system
     function showModal({ icon, title, message, actions }) {
       const overlay = document.getElementById('modal-overlay')
       const content = document.getElementById('modal-content')
-      
       document.getElementById('modal-icon').textContent = icon
       document.getElementById('modal-title').textContent = title
       document.getElementById('modal-message').textContent = message
-      document.getElementById('modal-actions').innerHTML = actions.map(btn => `
-        <button onclick="${btn.onclick}" 
-          class="flex-1 py-3 rounded-xl font-semibold text-sm transition active:scale-95 ${btn.class}">
-          ${btn.text}
-        </button>
-      `).join('')
-      
+      document.getElementById('modal-actions').innerHTML = actions.map(btn => `<button onclick="${btn.onclick}" class="flex-1 py-3 rounded-xl font-semibold text-sm transition active:scale-95 ${btn.class}">${btn.text}</button>`).join('')
       overlay.classList.remove('hidden')
-      requestAnimationFrame(() => {
-        content.classList.remove('scale-95', 'opacity-0')
-        content.classList.add('scale-100', 'opacity-100')
-      })
+      requestAnimationFrame(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100') })
     }
-
     function hideModal() {
       const overlay = document.getElementById('modal-overlay')
       const content = document.getElementById('modal-content')
-      content.classList.remove('scale-100', 'opacity-100')
-      content.classList.add('scale-95', 'opacity-0')
+      content.classList.remove('scale-100', 'opacity-100'); content.classList.add('scale-95', 'opacity-0')
       setTimeout(() => overlay.classList.add('hidden'), 200)
     }
 
+    // ============== INIT ==============
     async function init() {
-      const auth = await initAuth()
-      
-      if (!getUser()) {
-        window.location.href = 'index.html'
+      await initAuth()
+      if (!getUser()) { window.location.href = 'index.html'; return }
+      document.getElementById('loading').classList.add('hidden')
+      if (!isAdmin()) {
+        document.getElementById('access-denied').classList.remove('hidden')
         return
       }
-      
-      document.getElementById('loading').classList.add('hidden')
-      
-      if (isAdmin()) {
-        document.getElementById('admin-content').classList.remove('hidden')
-        loadFixtures()
-      } else {
-        document.getElementById('access-denied').classList.remove('hidden')
-      }
+      document.getElementById('admin-content').classList.remove('hidden')
+      await loadAll()
     }
 
-    async function loadFixtures() {
-      const { data } = await getFixtures()
-      const container = document.getElementById('admin-fixtures')
-      
-      if (!data?.length) {
-        container.innerHTML = '<p class="text-gray-500 py-4">No fixtures yet.</p>'
+    async function loadAll() {
+      const fx = await getFixtures()
+      allFixtures = fx.data || []
+      if (typeof getAllUsers === 'function') {
+        const us = await getAllUsers()
+        allUsers = us.data || []
+      }
+      if (typeof getPrizeSettings === 'function') {
+        const ps = await getPrizeSettings()
+        if (ps?.data) prizeSettings = { ...prizeSettings, ...ps.data }
+      }
+      renderUsers()
+      renderFixturesManage()
+      renderResults()
+      renderPrize()
+    }
+
+    function adminTab(name) {
+      document.querySelectorAll('.atab').forEach(el => el.classList.add('hidden'))
+      document.getElementById(`atab-${name}`).classList.remove('hidden')
+      document.querySelectorAll('.admin-tab').forEach(btn => {
+        if (btn.dataset.atab === name) { btn.classList.remove('admin-tab-inactive'); btn.classList.add('admin-tab-active') }
+        else { btn.classList.remove('admin-tab-active'); btn.classList.add('admin-tab-inactive') }
+      })
+    }
+
+    // ============== USERS ==============
+    function renderUsers() {
+      const list = document.getElementById('users-list')
+      document.getElementById('user-count').textContent = `(${allUsers.length})`
+      if (!allUsers.length) {
+        list.innerHTML = '<p class="text-gray-500 text-sm py-2">No users yet — they\'ll appear here after signing up.</p>'
         return
       }
-      
-      container.innerHTML = data.map(f => `
-        <div class="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center gap-4">
+      list.innerHTML = allUsers.map(u => {
+        const paid = u.fee_paid === true
+        return `
+        <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3">
+          <div class="w-3 h-3 rounded-full shrink-0 ${paid ? 'bg-emerald-500' : 'bg-gray-300'}"></div>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm truncate">${u.name || '(no name)'} ${u.is_admin ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">admin</span>' : ''}</div>
+            <div class="text-xs text-gray-500 truncate">${u.email || ''} ${u.department ? '· ' + u.department : ''}</div>
+          </div>
+          <button onclick="toggleFee('${u.id}', ${!paid})" class="text-xs font-semibold px-3 py-1.5 rounded-lg tap-active ${paid ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">${paid ? 'Paid ✓' : 'Mark Paid'}</button>
+          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-xs text-red-500 hover:text-red-700 px-2 tap-active">Remove</button>
+        </div>
+        `
+      }).join('')
+    }
+
+    async function toggleFee(userId, paid) {
+      if (typeof setFeePaid !== 'function') { showToast('setFeePaid helper not implemented', 'error'); return }
+      const { error } = await setFeePaid(userId, paid)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      const u = allUsers.find(x => x.id === userId); if (u) u.fee_paid = paid
+      renderUsers(); renderPrize()
+      showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
+    }
+
+    function confirmRemoveUser(id, name) {
+      showModal({
+        icon: '⚠️', title: 'Remove user?', message: `${name} and all their predictions will be deleted.`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+          { text: 'Remove', onclick: `hideModal(); doRemoveUser('${id}')`, class: 'bg-red-500 text-white hover:bg-red-600' }
+        ]
+      })
+    }
+    async function doRemoveUser(id) {
+      if (typeof removeUser !== 'function') { showToast('removeUser helper not implemented', 'error'); return }
+      const { error } = await removeUser(id)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      allUsers = allUsers.filter(u => u.id !== id)
+      renderUsers(); renderPrize()
+      showToast('User removed', 'success')
+    }
+
+    document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (typeof inviteUser !== 'function') { showToast('inviteUser helper not implemented', 'error'); return }
+      const payload = {
+        name: document.getElementById('new-user-name').value,
+        email: document.getElementById('new-user-email').value,
+        department: document.getElementById('new-user-dept').value,
+        phone: document.getElementById('new-user-phone').value
+      }
+      const { data, error } = await inviteUser(payload)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      showToast('User invited — magic link sent', 'success')
+      e.target.reset()
+      if (data) allUsers.push(data)
+      renderUsers()
+    })
+
+    // ============== FIXTURES MANAGE ==============
+    function renderFixturesManage() {
+      const list = document.getElementById('fixtures-manage-list')
+      document.getElementById('fix-count').textContent = `(${allFixtures.length})`
+      if (!allFixtures.length) { list.innerHTML = '<p class="text-gray-500 text-sm">No fixtures yet.</p>'; return }
+      list.innerHTML = allFixtures.map(f => {
+        const localIso = new Date(f.kickoff).toISOString().slice(0, 16)
+        const locked = f.home_score !== null
+        return `
+        <div class="border border-gray-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm truncate">${f.home_team} vs ${f.away_team}</div>
+            <div class="text-xs text-gray-500">${f.stage}${locked ? ' · FT ' + f.home_score + '–' + f.away_score : ''}</div>
+          </div>
+          <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''}
+            onchange="pendingKickoffs['${f.id}']=this.value"
+            class="text-xs px-2 py-1.5 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none ${locked ? 'bg-gray-100' : ''}">
+          <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-300 tap-active">Save</button>
+          <button onclick="confirmDeleteFixture('${f.id}')" class="text-xs text-red-500 hover:text-red-700 px-2 tap-active">Delete</button>
+        </div>
+        `
+      }).join('')
+    }
+
+    async function saveKickoff(id) {
+      const val = pendingKickoffs[id]; if (!val) { showToast('No change', 'warning'); return }
+      if (typeof updateFixtureKickoff !== 'function') { showToast('updateFixtureKickoff helper not implemented', 'error'); return }
+      const iso = new Date(val).toISOString()
+      const { error } = await updateFixtureKickoff(id, iso)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      const f = allFixtures.find(x => x.id === id); if (f) f.kickoff = iso
+      delete pendingKickoffs[id]
+      showToast('Kickoff updated', 'success')
+      renderFixturesManage()
+    }
+
+    function confirmDeleteFixture(id) {
+      const f = allFixtures.find(x => x.id === id)
+      showModal({
+        icon: '🗑️', title: 'Delete fixture?', message: `${f?.home_team} vs ${f?.away_team} and all related predictions will be removed.`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+          { text: 'Delete', onclick: `hideModal(); doDeleteFixture('${id}')`, class: 'bg-red-500 text-white hover:bg-red-600' }
+        ]
+      })
+    }
+    async function doDeleteFixture(id) {
+      if (typeof deleteFixture !== 'function') { showToast('deleteFixture helper not implemented', 'error'); return }
+      const { error } = await deleteFixture(id)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      allFixtures = allFixtures.filter(f => f.id !== id)
+      renderFixturesManage(); renderResults()
+      showToast('Fixture deleted', 'success')
+    }
+
+    document.getElementById('add-fixture-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const payload = {
+        home_team: document.getElementById('home-team').value,
+        away_team: document.getElementById('away-team').value,
+        kickoff: new Date(document.getElementById('kickoff').value).toISOString(),
+        stage: document.getElementById('stage').value
+      }
+      const { data, error } = await addFixture(payload)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      showToast('Fixture added', 'success')
+      e.target.reset()
+      if (data) allFixtures.push(data); else { const fx = await getFixtures(); allFixtures = fx.data || [] }
+      renderFixturesManage(); renderResults()
+    })
+
+    // ============== IMPORT ==============
+    // Hardcoded WC 2026 group stage opener fixtures (sample — edit as final schedule confirms)
+    const WC2026 = [
+      { home_team: 'Mexico',       away_team: 'TBD',         kickoff: '2026-06-11T20:00:00Z', stage: 'Group A' },
+      { home_team: 'Canada',       away_team: 'TBD',         kickoff: '2026-06-12T19:00:00Z', stage: 'Group B' },
+      { home_team: 'USA',          away_team: 'TBD',         kickoff: '2026-06-12T23:00:00Z', stage: 'Group D' },
+      { home_team: 'Argentina',    away_team: 'TBD',         kickoff: '2026-06-13T20:00:00Z', stage: 'Group ?' },
+      { home_team: 'Brazil',       away_team: 'TBD',         kickoff: '2026-06-14T20:00:00Z', stage: 'Group ?' },
+      { home_team: 'France',       away_team: 'TBD',         kickoff: '2026-06-15T18:00:00Z', stage: 'Group ?' },
+      { home_team: 'Germany',      away_team: 'TBD',         kickoff: '2026-06-15T21:00:00Z', stage: 'Group ?' },
+      { home_team: 'England',      away_team: 'TBD',         kickoff: '2026-06-16T18:00:00Z', stage: 'Group ?' },
+      { home_team: 'Spain',        away_team: 'TBD',         kickoff: '2026-06-16T21:00:00Z', stage: 'Group ?' },
+      { home_team: 'Portugal',     away_team: 'TBD',         kickoff: '2026-06-17T18:00:00Z', stage: 'Group ?' }
+    ]
+
+    async function importWC2026() {
+      await bulkImport(WC2026, 'WC 2026 sample')
+    }
+
+    async function importCSV() {
+      const raw = document.getElementById('csv-input').value.trim()
+      if (!raw) return showToast('Paste some rows first', 'warning')
+      const rows = raw.split('\n').map(line => {
+        const parts = line.split(',').map(s => s.trim())
+        if (parts.length < 4) return null
+        return { home_team: parts[0], away_team: parts[1], kickoff: new Date(parts[2]).toISOString(), stage: parts[3] }
+      }).filter(Boolean)
+      if (!rows.length) return showToast('No valid rows parsed', 'error')
+      await bulkImport(rows, 'CSV')
+      document.getElementById('csv-input').value = ''
+    }
+
+    async function bulkImport(rows, label) {
+      let added = 0, skipped = 0, failed = 0
+      for (const r of rows) {
+        const dup = allFixtures.find(f => f.home_team === r.home_team && f.away_team === r.away_team && new Date(f.kickoff).getTime() === new Date(r.kickoff).getTime())
+        if (dup) { skipped++; continue }
+        const { data, error } = await addFixture(r)
+        if (error) { failed++; continue }
+        added++
+        if (data) allFixtures.push(data)
+      }
+      const fx = await getFixtures(); allFixtures = fx.data || []
+      renderFixturesManage(); renderResults()
+      showToast(`${label}: +${added} added, ${skipped} dupes, ${failed} failed`, added ? 'success' : 'info')
+    }
+
+    // ============== RESULTS ==============
+    function renderResults() {
+      const list = document.getElementById('admin-fixtures')
+      if (!allFixtures.length) { list.innerHTML = '<p class="text-gray-500 text-sm">No fixtures yet.</p>'; return }
+      list.innerHTML = allFixtures.map(f => `
+        <div class="border border-gray-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
           <div class="flex-1">
-            <div class="font-bold text-lg">${f.home_team} vs ${f.away_team}</div>
-            <div class="text-sm text-gray-500">${f.stage} • ${new Date(f.kickoff).toLocaleString()}</div>
+            <div class="font-bold text-sm">${f.home_team} vs ${f.away_team}</div>
+            <div class="text-xs text-gray-500">${f.stage} · ${new Date(f.kickoff).toLocaleString()}</div>
           </div>
           <div class="flex items-center gap-2">
-            <input type="number" min="0" placeholder="H" 
-              class="w-16 text-center border border-gray-300 rounded-lg py-2 font-bold" 
-              value="${f.home_score !== null ? f.home_score : ''}" 
-              onchange="updateScore('${f.id}', 'home', this.value)">
+            <input type="number" min="0" placeholder="H" class="w-14 text-center border border-gray-300 rounded-lg py-1.5 font-bold" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}', 'home', this.value)">
             <span class="text-gray-400 font-bold">-</span>
-            <input type="number" min="0" placeholder="A" 
-              class="w-16 text-center border border-gray-300 rounded-lg py-2 font-bold" 
-              value="${f.away_score !== null ? f.away_score : ''}" 
-              onchange="updateScore('${f.id}', 'away', this.value)">
+            <input type="number" min="0" placeholder="A" class="w-14 text-center border border-gray-300 rounded-lg py-1.5 font-bold" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}', 'away', this.value)">
           </div>
-          <button onclick="confirmSaveScore('${f.id}')" 
-            class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 active:scale-95 transition tap-active">
-            Save
-          </button>
+          <button onclick="confirmSaveScore('${f.id}')" class="bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-800 tap-active">Save</button>
         </div>
       `).join('')
     }
@@ -187,59 +450,77 @@
       if (!pendingScores[id]) pendingScores[id] = {}
       pendingScores[id][side] = val === '' ? null : parseInt(val)
     }
-
     function confirmSaveScore(id) {
       const s = pendingScores[id] || {}
-      if (s.home === undefined && s.away === undefined) {
-        showToast('No score changes to save', 'warning')
-        return
-      }
-      
+      if (s.home === undefined && s.away === undefined) return showToast('No score changes', 'warning')
       showModal({
-        icon: '⚽',
-        title: 'Confirm Score',
-        message: `Save final score for this match?`,
+        icon: '⚽', title: 'Confirm Score', message: 'Save final score? Points will be calculated.',
         actions: [
           { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
           { text: 'Confirm', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-emerald-600 text-white hover:bg-emerald-700' }
         ]
       })
     }
-
     async function executeSaveScore(id) {
       const s = pendingScores[id] || {}
-      const homeScore = s.home
-      const awayScore = s.away
-      
-      const { error } = await updateFixtureScore(id, homeScore, awayScore)
-      
-      if (error) {
-        showToast('Error: ' + error.message, 'error')
-      } else {
-        showToast('Score saved! Points calculated.', 'success')
-        pendingScores[id] = {}
-        loadFixtures()
-      }
+      const { error } = await updateFixtureScore(id, s.home, s.away)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      const f = allFixtures.find(x => x.id === id); if (f) { f.home_score = s.home; f.away_score = s.away }
+      pendingScores[id] = {}
+      renderResults(); renderFixturesManage()
+      showToast('Score saved, points calculated', 'success')
     }
 
-    document.getElementById('add-fixture-form').addEventListener('submit', async (e) => {
-      e.preventDefault()
-      
-      const { error } = await addFixture({
-        home_team: document.getElementById('home-team').value,
-        away_team: document.getElementById('away-team').value,
-        kickoff: new Date(document.getElementById('kickoff').value).toISOString(),
-        stage: document.getElementById('stage').value
-      })
-      
-      if (error) {
-        showToast('Error: ' + error.message, 'error')
-      } else {
-        showToast('Fixture added!', 'success')
-        e.target.reset()
-        loadFixtures()
-      }
+    // ============== PRIZE POOL ==============
+    document.getElementById('prize-manual-toggle').addEventListener('change', e => {
+      document.getElementById('prize-manual-field').classList.toggle('hidden', !e.target.checked)
     })
+
+    function renderPrize() {
+      document.getElementById('prize-currency').value = prizeSettings.currency || '$'
+      document.getElementById('prize-entry-fee').value = prizeSettings.entry_fee || ''
+      document.getElementById('prize-manual-toggle').checked = !!prizeSettings.manual_override
+      document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
+      document.getElementById('prize-manual-amount').value = prizeSettings.manual_amount || ''
+
+      const paidCount = allUsers.filter(u => u.fee_paid).length
+      const autoPool = paidCount * (Number(prizeSettings.entry_fee) || 0)
+      const pool = prizeSettings.manual_override ? Number(prizeSettings.manual_amount) || 0 : autoPool
+      const cur = prizeSettings.currency || '$'
+
+      document.getElementById('prize-current').textContent = cur + pool.toLocaleString()
+      document.getElementById('prize-meta').textContent = prizeSettings.manual_override
+        ? `Manual override · ${paidCount} of ${allUsers.length} users paid`
+        : `${paidCount} paid × ${cur}${prizeSettings.entry_fee || 0} entry fee`
+
+      // Suggested distribution: 50 / 30 / 20
+      const splits = [
+        { place: '🥇 1st', pct: 0.5 },
+        { place: '🥈 2nd', pct: 0.3 },
+        { place: '🥉 3rd', pct: 0.2 }
+      ]
+      document.getElementById('prize-distribution').innerHTML = splits.map(s => `
+        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+          <span>${s.place} <span class="text-xs text-gray-400">(${s.pct * 100}%)</span></span>
+          <span class="font-bold text-emerald-600">${cur}${(pool * s.pct).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        </div>
+      `).join('')
+    }
+
+    async function savePrizeSettings() {
+      const payload = {
+        currency: document.getElementById('prize-currency').value || '$',
+        entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
+        manual_override: document.getElementById('prize-manual-toggle').checked,
+        manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0
+      }
+      if (typeof setPrizeSettings !== 'function') { showToast('setPrizeSettings helper not implemented', 'error'); return }
+      const { error } = await setPrizeSettings(payload)
+      if (error) return showToast('Error: ' + error.message, 'error')
+      prizeSettings = { ...prizeSettings, ...payload }
+      renderPrize()
+      showToast('Prize settings saved', 'success')
+    }
 
     init()
   </script>

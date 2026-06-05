@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -162,8 +162,53 @@
     <!-- Main Content -->
     <main class="flex-1 max-w-lg mx-auto w-full p-4">
       
+      <!-- Home / Dashboard Tab -->
+      <div id="tab-home" class="tab-content space-y-4">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-sm p-4 text-white">
+            <div class="text-xs uppercase tracking-wider opacity-80 font-semibold">Your Rank</div>
+            <div class="mt-1 flex items-baseline gap-1">
+              <span class="text-3xl font-bold" id="home-rank">—</span>
+              <span class="text-sm opacity-80" id="home-rank-total"></span>
+            </div>
+            <div class="text-xs mt-1 opacity-80" id="home-rank-medal"></div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
+            <div class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Total Points</div>
+            <div class="mt-1 flex items-baseline gap-1">
+              <span class="text-3xl font-bold text-gray-900" id="home-points">0</span>
+              <span class="text-sm text-gray-400">pts</span>
+            </div>
+            <div class="text-xs mt-1 text-gray-500" id="home-points-breakdown">0 exact · 0 correct</div>
+          </div>
+        </div>
+
+        <!-- Prize Pool Card -->
+        <div id="home-prize-card" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+          <div class="text-3xl">💰</div>
+          <div class="flex-1">
+            <div class="text-xs uppercase tracking-wider text-amber-700 font-semibold">Prize Pool</div>
+            <div class="text-xl font-bold text-amber-900" id="home-prize-amount">—</div>
+          </div>
+          <div class="text-xs text-amber-700" id="home-prize-players"></div>
+        </div>
+
+        <!-- Upcoming Match -->
+        <div>
+          <h2 class="text-lg font-bold mb-2">Next Up</h2>
+          <div id="home-next-match" class="text-center py-8 text-gray-400 bg-white rounded-xl shadow-sm">Loading...</div>
+        </div>
+
+        <!-- Recent Results -->
+        <div>
+          <h2 class="text-lg font-bold mb-2">Recent Results</h2>
+          <div id="home-recent" class="space-y-2"></div>
+        </div>
+      </div>
+
       <!-- Predictions Tab -->
-      <div id="tab-predictions" class="tab-content space-y-4">
+      <div id="tab-predictions" class="tab-content hidden space-y-4">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-bold">Your Predictions</h2>
           <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full" id="prediction-count">0/0</span>
@@ -237,9 +282,13 @@
     <!-- Bottom Navigation -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
       <div class="max-w-lg mx-auto flex justify-around py-2">
-        <button onclick="switchTab('predictions')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-active tap-active" data-tab="predictions">
+        <button onclick="switchTab('home')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-active tap-active" data-tab="home">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span class="text-xs font-medium">Home</span>
+        </button>
+        <button onclick="switchTab('predictions')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-inactive tap-active" data-tab="predictions">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-          <span class="text-xs font-medium">Predictions</span>
+          <span class="text-xs font-medium">Predict</span>
         </button>
         <button onclick="switchTab('leaderboard')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-inactive tap-active" data-tab="leaderboard">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
@@ -648,25 +697,145 @@
     }
 
     // =====================
+    // HOME / DASHBOARD
+    // =====================
+    async function loadHome() {
+      const myId = getUser()?.id
+      
+      // Stats + rank from leaderboard
+      const { data: stats } = await getLeaderboard()
+      const total = stats.length
+      const myIdx = stats.findIndex(s => s.user_id === myId)
+      const me = myIdx >= 0 ? stats[myIdx] : null
+      
+      if (me) {
+        const rank = myIdx + 1
+        document.getElementById('home-rank').textContent = `#${rank}`
+        document.getElementById('home-rank-total').textContent = `of ${total}`
+        const medals = { 1: '🥇 Leading the pack', 2: '🥈 So close', 3: '🥉 Podium spot' }
+        document.getElementById('home-rank-medal').textContent = medals[rank] || ''
+        document.getElementById('home-points').textContent = me.points || 0
+        const correct = (me.exact || 0) + (me.gd || 0) + (me.result || 0)
+        document.getElementById('home-points-breakdown').textContent = `${me.exact || 0} exact · ${correct} correct`
+      } else {
+        document.getElementById('home-rank').textContent = '—'
+        document.getElementById('home-rank-total').textContent = total ? `of ${total}` : ''
+        document.getElementById('home-points').textContent = '0'
+        document.getElementById('home-points-breakdown').textContent = 'No predictions yet'
+      }
+      
+      // Prize pool (optional — gracefully skip if helper missing)
+      try {
+        if (typeof getPrizePool === 'function') {
+          const { data: pool } = await getPrizePool()
+          if (pool && pool.amount > 0) {
+            document.getElementById('home-prize-card').classList.remove('hidden')
+            document.getElementById('home-prize-amount').textContent = (pool.currency || '$') + Number(pool.amount).toLocaleString()
+            document.getElementById('home-prize-players').textContent = pool.paid_count ? `${pool.paid_count} players` : ''
+          }
+        }
+      } catch (e) { /* no prize pool yet */ }
+      
+      // Upcoming + recent matches
+      const now = new Date()
+      const upcoming = fixtures
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const finished = fixtures
+        .filter(f => f.home_score !== null && f.away_score !== null)
+        .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
+        .slice(0, 3)
+      
+      const nextEl = document.getElementById('home-next-match')
+      if (!upcoming.length) {
+        nextEl.innerHTML = '<div class="py-8 text-gray-400">No upcoming matches.</div>'
+      } else {
+        const f = upcoming[0]
+        const pred = getPrediction(f.id)
+        const kickoff = new Date(f.kickoff)
+        const diffMs = kickoff - now
+        const hours = Math.floor(diffMs / 3.6e6)
+        const days = Math.floor(hours / 24)
+        const countdown = days > 0 ? `in ${days}d ${hours % 24}h` : hours > 0 ? `in ${hours}h` : 'starting soon'
+        
+        nextEl.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm p-5 text-left">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">${f.stage}</span>
+              <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">${countdown}</span>
+            </div>
+            <div class="flex items-center gap-3 mb-4">
+              <div class="flex-1 text-center min-w-0">
+                <div class="font-bold text-lg truncate">${f.home_team}</div>
+              </div>
+              <div class="text-gray-300 font-bold text-xl">vs</div>
+              <div class="flex-1 text-center min-w-0">
+                <div class="font-bold text-lg truncate">${f.away_team}</div>
+              </div>
+            </div>
+            <div class="text-center text-xs text-gray-400 mb-3">${kickoff.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="border-t border-gray-100 pt-3 text-center">
+              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Your Prediction</div>
+              ${pred ? `
+                <div class="text-2xl font-bold text-emerald-600">${pred.home_prediction} – ${pred.away_prediction}</div>
+                <button onclick="switchTab('predictions')" class="mt-2 text-xs text-gray-500 underline">Change</button>
+              ` : `
+                <div class="text-gray-400 text-sm mb-2">Not predicted yet</div>
+                <button onclick="switchTab('predictions')" class="bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-emerald-700 tap-active">Make Prediction</button>
+              `}
+            </div>
+          </div>
+        `
+      }
+      
+      const recentEl = document.getElementById('home-recent')
+      if (!finished.length) {
+        recentEl.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No completed matches yet.</div>'
+      } else {
+        recentEl.innerHTML = finished.map(f => {
+          const pred = getPrediction(f.id)
+          const pts = pred?.points_awarded || 0
+          return `
+            <div class="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold truncate">${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team}</div>
+                <div class="text-xs text-gray-500">${pred ? `Predicted ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="${pts > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'} text-xs font-bold px-2 py-1 rounded-full">+${pts}</span>
+              </div>
+            </div>
+          `
+        }).join('')
+      }
+    }
+
+    // =====================
     // LEADERBOARD (Real-time)
     // =====================
     async function loadLeaderboard() {
       const { data: stats } = await getLeaderboard()
       
       const container = document.getElementById('leaderboard-list')
+      const myId = getUser()?.id
       container.innerHTML = stats.map((stat, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `<span class="w-6 text-center inline-block text-gray-400 font-bold">${index + 1}</span>`
+        const rank = index + 1
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+        const rankDisplay = medal || `<span class="text-gray-400 font-bold">#${rank}</span>`
+        const isMe = stat.user_id === myId
+        const correct = (stat.exact || 0) + (stat.gd || 0) + (stat.result || 0)
         
         return `
-        <div class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3">
-          <div class="text-2xl shrink-0">${medal}</div>
+        <div class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3 ${isMe ? 'ring-2 ring-emerald-500' : ''}">
+          <div class="w-10 text-center text-2xl shrink-0">${rankDisplay}</div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <span class="font-bold text-gray-900 truncate">${stat.name || 'Anonymous'}</span>
+              <span class="font-bold text-gray-900 truncate">${stat.name || 'Anonymous'}${isMe ? ' (you)' : ''}</span>
               ${stat.department ? `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate">${stat.department}</span>` : ''}
             </div>
-            <div class="text-xs text-gray-500 mt-0.5">
-              ${stat.exact} exact • ${stat.gd} GD • ${stat.result} result
+            <div class="text-xs text-gray-500 mt-0.5 flex gap-3">
+              <span><b class="text-gray-700">${correct}</b> correct</span>
+              <span><b class="text-emerald-600">${stat.exact || 0}</b> exact</span>
             </div>
           </div>
           <div class="text-right shrink-0">
@@ -691,8 +860,8 @@
           table: 'predictions' 
         }, () => {
           loadLeaderboard()
-          // Also refresh fixtures to show updated points badges
           loadFixtures()
+          loadHome()
         })
         .subscribe()
       
@@ -706,6 +875,7 @@
         }, () => {
           loadFixtures()
           loadLeaderboard()
+          loadHome()
         })
         .subscribe()
     }
@@ -734,6 +904,7 @@
       
       await loadFixtures()
       await loadLeaderboard()
+      await loadHome()
       setupRealtime()
     }
 
@@ -751,6 +922,7 @@
         }
       })
       
+      if (tab === 'home') loadHome()
       if (tab === 'leaderboard') loadLeaderboard()
       if (tab === 'predictions') loadFixtures()
     }
@@ -759,4 +931,4 @@
     init()
   </script>
 </body>
-</html>
+</html> -->
