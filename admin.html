@@ -2,165 +2,309 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Admin · WC Predictions</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#059669">
+  <meta name="theme-color" content="#064E3B">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Admin · WC Predictions</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+          colors: {
+            ink: { 900: '#0A0F0D', 700: '#1F2A26', 500: '#5C6B66', 400: '#8A9590', 300: '#B5BDB9' },
+            paper: { DEFAULT: '#FAFAF7', card: '#FFFFFF', border: '#EEEDE7' },
+            brand: { 900: '#064E3B', 700: '#047857', 500: '#10B981', 100: '#D1FAE5', 50: '#ECFDF5' },
+            gold: '#D4A24C'
+          },
+          boxShadow: {
+            soft: '0 1px 2px rgba(10,15,13,0.04), 0 4px 12px rgba(10,15,13,0.04)',
+            card: '0 1px 3px rgba(10,15,13,0.06)',
+            lifted: '0 8px 24px rgba(10,15,13,0.08)'
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    .tap-active:active { transform: scale(0.96); }
-    .toast-enter { transform: translateY(100%); opacity: 0; }
-    .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .toast-exit-active { transform: translateY(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-    .admin-tab-active { color: #059669; border-color: #059669; }
-    .admin-tab-inactive { color: #6B7280; border-color: transparent; }
+    html, body { background: #FAFAF7; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
+    * { -webkit-font-smoothing: antialiased; }
+    .tap { transition: transform 120ms ease, opacity 120ms ease; }
+    .tap:active { transform: scale(0.97); opacity: 0.85; }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* Toast */
+    .toast-enter { transform: translateY(-100%); opacity: 0; }
+    .toast-shown { transform: translateY(0); opacity: 1; transition: all 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+    .toast-exit { transform: translateY(-100%); opacity: 0; transition: all 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+
+    /* Sheet modal */
+    .sheet-backdrop { background: rgba(10,15,13,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .sheet-panel { transform: translateY(100%); transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1); padding-bottom: env(safe-area-inset-bottom); }
+    .sheet-panel.shown { transform: translateY(0); }
+
+    /* Segmented control */
+    .seg-btn { color: #5C6B66; transition: all 200ms ease; position: relative; }
+    .seg-btn.active { color: #fff; }
+    .seg-indicator { position: absolute; inset: 4px; background: #0A0F0D; border-radius: 12px; transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1); z-index: 0; }
+    .seg-content { position: relative; z-index: 1; }
+
+    /* Standard input */
+    .fld { width: 100%; padding: 14px 16px; border-radius: 16px; border: 1px solid #EEEDE7; background: #FAFAF7; outline: none; transition: all 150ms ease; font-size: 15px; color: #0A0F0D; }
+    .fld:focus { border-color: #10B981; background: #fff; box-shadow: 0 0 0 4px rgba(16,185,129,0.12); }
+    .fld-label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #5C6B66; margin-bottom: 8px; }
+
+    /* Button styles */
+    .btn-primary { background: #064E3B; color: #fff; font-weight: 600; padding: 14px 20px; border-radius: 16px; font-size: 15px; width: 100%; }
+    .btn-dark { background: #0A0F0D; color: #fff; font-weight: 600; padding: 14px 20px; border-radius: 16px; font-size: 15px; width: 100%; }
+    .btn-ghost { background: #FAFAF7; border: 1px solid #EEEDE7; color: #1F2A26; font-weight: 600; padding: 14px 20px; border-radius: 16px; font-size: 15px; width: 100%; }
+
+    /* Score mini-input */
+    .mini-score { width: 48px; height: 44px; text-align: center; font-weight: 700; font-size: 18px; background: #FAFAF7; border: 1.5px solid #EEEDE7; border-radius: 12px; outline: none; transition: all 150ms ease; color: #0A0F0D; }
+    .mini-score:focus { border-color: #10B981; background: #fff; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+
+    /* Card */
+    .card { background: #fff; border: 1px solid #EEEDE7; border-radius: 24px; box-shadow: 0 1px 3px rgba(10,15,13,0.04); }
+
+    .app-header { backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); background: rgba(250,250,247,0.85); }
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+
+    /* Tab anim */
+    .atab { animation: fadeIn 240ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Switch toggle */
+    .switch { position: relative; width: 48px; height: 28px; background: #EEEDE7; border-radius: 999px; transition: background 200ms ease; cursor: pointer; flex-shrink: 0; }
+    .switch.on { background: #10B981; }
+    .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; background: #fff; border-radius: 50%; transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .switch.on::after { transform: translateX(20px); }
   </style>
 </head>
-<body class="bg-gray-50 p-4 pb-12">
+<body class="text-ink-900">
 
-  <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed top-4 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none items-center safe-top"></div>
 
-  <div id="modal-overlay" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
-    <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-95 opacity-0 transition-all duration-200">
-      <div id="modal-icon" class="text-4xl text-center mb-4"></div>
-      <h3 id="modal-title" class="text-lg font-bold text-center text-gray-900 mb-2"></h3>
-      <p id="modal-message" class="text-sm text-gray-600 text-center mb-6"></p>
+  <!-- Bottom sheet modal -->
+  <div id="modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+    <div id="modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+      <div id="modal-icon" class="text-4xl text-center mb-3"></div>
+      <h3 id="modal-title" class="text-xl font-bold text-center mb-2"></h3>
+      <p id="modal-message" class="text-sm text-ink-500 text-center mb-6 leading-relaxed"></p>
       <div id="modal-actions" class="flex gap-3"></div>
     </div>
   </div>
 
-  <div class="max-w-3xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
-      <a href="index.html" class="text-emerald-600 hover:underline text-sm">← Back to App</a>
+  <!-- Header -->
+  <header class="app-header sticky top-0 z-30 border-b border-paper-border/60 safe-top">
+    <div class="max-w-lg mx-auto px-5 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="w-10 h-10 rounded-xl bg-paper-card border border-paper-border flex items-center justify-center text-ink-500 tap">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+          <h1 class="font-bold text-[15px] leading-tight">Admin</h1>
+          <p class="text-xs text-ink-500">Manage everything</p>
+        </div>
+      </div>
+      <div class="text-xs font-semibold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full">⚙️ Admin</div>
+    </div>
+  </header>
+
+  <div class="max-w-lg mx-auto px-5 pt-5 pb-12">
+
+    <!-- Access denied / loading -->
+    <div id="loading" class="text-center py-20 text-ink-500">Loading…</div>
+    <div id="access-denied" class="hidden text-center py-20">
+      <div class="text-6xl mb-4">🚫</div>
+      <h2 class="text-xl font-bold">Access Denied</h2>
+      <p class="text-ink-500 mt-2 text-sm">You're not an admin.</p>
+      <a href="index.html" class="inline-block mt-6 btn-primary tap" style="width:auto; padding: 12px 24px;">Back to App</a>
     </div>
 
     <div id="admin-content" class="hidden">
-      <!-- Tabs -->
-      <div class="bg-white rounded-xl shadow-sm mb-4 flex overflow-x-auto">
-        <button onclick="adminTab('users')" data-atab="users" class="admin-tab admin-tab-active flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">👥 Users</button>
-        <button onclick="adminTab('fixtures')" data-atab="fixtures" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">⚽ Fixtures</button>
-        <button onclick="adminTab('results')" data-atab="results" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">🏁 Results</button>
-        <button onclick="adminTab('prize')" data-atab="prize" class="admin-tab admin-tab-inactive flex-1 min-w-max font-semibold text-sm py-3 px-4 border-b-2 transition">💰 Prize Pool</button>
+
+      <!-- Segmented tab control (horizontal scroll on mobile) -->
+      <div class="card p-1 flex gap-1 mb-5 relative">
+        <button onclick="adminTab('users')" data-atab="users" class="seg-btn active flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+          <span class="seg-content">👥 Users</span>
+        </button>
+        <button onclick="adminTab('fixtures')" data-atab="fixtures" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+          <span class="seg-content">⚽ Fixtures</span>
+        </button>
+        <button onclick="adminTab('results')" data-atab="results" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+          <span class="seg-content">🏁 Results</span>
+        </button>
+        <button onclick="adminTab('prize')" data-atab="prize" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+          <span class="seg-content">💰 Prize</span>
+        </button>
       </div>
 
-      <!-- USERS TAB -->
+      <!-- USERS -->
       <div id="atab-users" class="atab space-y-4">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-4 text-lg">Add User</h2>
-          <form id="add-user-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input type="text" id="new-user-name" placeholder="Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="email" id="new-user-email" placeholder="Email" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="text" id="new-user-dept" placeholder="Department (optional)" class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="text" id="new-user-phone" placeholder="Phone (optional)" class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <button type="submit" class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Add User</button>
-          </form>
-          <p class="text-xs text-gray-400 mt-2">User will receive a magic-link email to set their password.</p>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="font-bold text-lg">Users <span id="user-count" class="text-sm font-normal text-gray-500"></span></h2>
-            <div class="text-xs">
-              <span class="inline-block w-3 h-3 rounded-full bg-emerald-500 align-middle"></span> Paid
-              <span class="inline-block w-3 h-3 rounded-full bg-gray-300 align-middle ml-3"></span> Unpaid
+            <h2 class="font-bold text-lg tracking-tight">Add User</h2>
+            <button onclick="document.getElementById('add-user-form').classList.toggle('hidden')" id="toggle-add-user" class="text-xs font-semibold text-brand-700 tap">+ New</button>
+          </div>
+          <form id="add-user-form" class="hidden space-y-3">
+            <div>
+              <label class="fld-label">Name</label>
+              <input type="text" id="new-user-name" required class="fld">
             </div>
-          </div>
-          <div id="users-list" class="space-y-2"></div>
-        </div>
-      </div>
-
-      <!-- FIXTURES TAB -->
-      <div id="atab-fixtures" class="atab hidden space-y-4">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-3 text-lg">Import Schedule</h2>
-          <p class="text-sm text-gray-500 mb-4">Bulk-load fixtures. Existing fixtures with the same teams + kickoff are skipped.</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <button onclick="importWC2026()" class="bg-emerald-600 text-white font-semibold py-3 rounded-lg hover:bg-emerald-700 tap-active">🌎 Import WC 2026 Group Stage</button>
-            <button onclick="document.getElementById('csv-area').classList.toggle('hidden')" class="bg-gray-900 text-white font-semibold py-3 rounded-lg hover:bg-gray-800 tap-active">📋 Paste CSV</button>
-          </div>
-          <div id="csv-area" class="hidden">
-            <p class="text-xs text-gray-500 mb-2">Format: <code class="bg-gray-100 px-1 rounded">home_team, away_team, kickoff_iso, stage</code> — one per line.</p>
-            <textarea id="csv-input" rows="6" placeholder="Brazil, Argentina, 2026-06-12T20:00:00Z, Group A&#10;France, Germany, 2026-06-13T18:00:00Z, Group B" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:border-emerald-500 outline-none"></textarea>
-            <button onclick="importCSV()" class="mt-2 bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 tap-active">Import</button>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-4 text-lg">Add Fixture Manually</h2>
-          <form id="add-fixture-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input type="text" id="home-team" placeholder="Home Team" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="text" id="away-team" placeholder="Away Team" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="datetime-local" id="kickoff" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <input type="text" id="stage" placeholder="Stage (e.g. Group A)" required class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            <button type="submit" class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Add Fixture</button>
+            <div>
+              <label class="fld-label">Email</label>
+              <input type="email" id="new-user-email" required class="fld">
+            </div>
+            <div>
+              <label class="fld-label">Department</label>
+              <input type="text" id="new-user-dept" class="fld">
+            </div>
+            <div>
+              <label class="fld-label">Phone</label>
+              <input type="text" id="new-user-phone" class="fld">
+            </div>
+            <button type="submit" class="btn-primary tap">Send Invite</button>
+            <p class="text-xs text-ink-400 text-center">User receives a magic-link email to set password.</p>
           </form>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-4 text-lg">Manage Kickoffs <span id="fix-count" class="text-sm font-normal text-gray-500"></span></h2>
-          <div id="fixtures-manage-list" class="space-y-2"></div>
+        <div class="card overflow-hidden">
+          <div class="p-5 pb-3 flex items-center justify-between">
+            <div>
+              <h2 class="font-bold text-lg tracking-tight">Members</h2>
+              <p class="text-xs text-ink-500 mt-0.5" id="user-stats">— total · — paid</p>
+            </div>
+          </div>
+          <div id="users-list" class="divide-y divide-paper-border"></div>
         </div>
       </div>
 
-      <!-- RESULTS TAB -->
+      <!-- FIXTURES -->
+      <div id="atab-fixtures" class="atab hidden space-y-4">
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-1">Import Schedule</h2>
+          <p class="text-xs text-ink-500 mb-4">Bulk-add fixtures. Duplicates are skipped.</p>
+          <div class="space-y-2.5">
+            <button onclick="importWC2026()" class="btn-primary tap flex items-center justify-center gap-2">
+              <span>🌎</span><span>Import WC 2026 Schedule</span>
+            </button>
+            <button onclick="toggleCSV()" class="btn-ghost tap flex items-center justify-center gap-2">
+              <span>📋</span><span>Paste CSV</span>
+            </button>
+          </div>
+          <div id="csv-area" class="hidden mt-4">
+            <label class="fld-label">CSV (one per line)</label>
+            <p class="text-[11px] text-ink-500 mb-2 font-mono bg-paper px-3 py-2 rounded-lg">home, away, kickoff_iso, stage</p>
+            <textarea id="csv-input" rows="6" placeholder="Brazil, Argentina, 2026-06-12T20:00:00Z, Group A" class="fld font-mono text-xs" style="font-family: ui-monospace, monospace;"></textarea>
+            <button onclick="importCSV()" class="btn-dark tap mt-2.5">Import</button>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-4">Add Manually</h2>
+          <form id="add-fixture-form" class="space-y-3">
+            <div>
+              <label class="fld-label">Home Team</label>
+              <input type="text" id="home-team" required class="fld">
+            </div>
+            <div>
+              <label class="fld-label">Away Team</label>
+              <input type="text" id="away-team" required class="fld">
+            </div>
+            <div>
+              <label class="fld-label">Kickoff</label>
+              <input type="datetime-local" id="kickoff" required class="fld">
+            </div>
+            <div>
+              <label class="fld-label">Stage</label>
+              <input type="text" id="stage" required class="fld" placeholder="e.g. Group A">
+            </div>
+            <button type="submit" class="btn-primary tap">Add Fixture</button>
+          </form>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="p-5 pb-3">
+            <h2 class="font-bold text-lg tracking-tight">Manage Fixtures</h2>
+            <p class="text-xs text-ink-500 mt-0.5" id="fix-count">—</p>
+          </div>
+          <div id="fixtures-manage-list" class="divide-y divide-paper-border"></div>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
       <div id="atab-results" class="atab hidden">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-4 text-lg">Enter Final Scores</h2>
-          <div id="admin-fixtures" class="space-y-3"></div>
+        <div class="card overflow-hidden">
+          <div class="p-5 pb-3">
+            <h2 class="font-bold text-lg tracking-tight">Enter Final Scores</h2>
+            <p class="text-xs text-ink-500 mt-0.5">Points calculate automatically.</p>
+          </div>
+          <div id="admin-fixtures" class="divide-y divide-paper-border"></div>
         </div>
       </div>
 
-      <!-- PRIZE POOL TAB -->
+      <!-- PRIZE -->
       <div id="atab-prize" class="atab hidden space-y-4">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h2 class="font-bold mb-4 text-lg">Prize Pool Settings</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Currency Symbol</label>
-              <input type="text" id="prize-currency" placeholder="$" maxlength="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Entry Fee (per user)</label>
-              <input type="number" id="prize-entry-fee" min="0" step="0.01" placeholder="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-            </div>
-          </div>
-          <div class="flex items-center gap-2 mb-3">
-            <input type="checkbox" id="prize-manual-toggle" class="w-4 h-4 rounded border-gray-300 text-emerald-600">
-            <label for="prize-manual-toggle" class="text-sm text-gray-700">Manual override (ignore entry fee × paid users)</label>
-          </div>
-          <div id="prize-manual-field" class="hidden mb-3">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Manual Pool Amount</label>
-            <input type="number" id="prize-manual-amount" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
-          </div>
-          <button onclick="savePrizeSettings()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 tap-active">Save Settings</button>
-        </div>
 
-        <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-6">
-          <div class="text-xs uppercase tracking-wider text-amber-700 font-semibold mb-1">Current Pool</div>
-          <div class="text-4xl font-bold text-amber-900 mb-2" id="prize-current">—</div>
+        <!-- Pool display -->
+        <div class="card p-6" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border-color: #FDE68A;">
+          <div class="text-[11px] font-bold text-amber-700 uppercase tracking-[0.15em] mb-2">Current Pool</div>
+          <div class="text-5xl font-bold tracking-tight text-amber-900 mb-2" id="prize-current">—</div>
           <div class="text-sm text-amber-800" id="prize-meta">—</div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <h3 class="font-bold mb-3">Suggested Distribution</h3>
-          <div id="prize-distribution" class="space-y-2 text-sm"></div>
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-4">Pool Settings</h2>
+          <div class="space-y-3">
+            <div class="grid grid-cols-3 gap-3">
+              <div class="col-span-1">
+                <label class="fld-label">Currency</label>
+                <input type="text" id="prize-currency" maxlength="3" placeholder="$" class="fld text-center">
+              </div>
+              <div class="col-span-2">
+                <label class="fld-label">Entry Fee</label>
+                <input type="number" id="prize-entry-fee" min="0" step="0.01" placeholder="10" class="fld">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="min-w-0 mr-3">
+                <div class="font-semibold text-sm">Manual override</div>
+                <div class="text-xs text-ink-500 mt-0.5">Set pool amount directly</div>
+              </div>
+              <div id="prize-switch" class="switch" onclick="togglePrizeOverride()"></div>
+            </div>
+
+            <div id="prize-manual-field" class="hidden">
+              <label class="fld-label">Pool Amount</label>
+              <input type="number" id="prize-manual-amount" min="0" step="0.01" class="fld">
+            </div>
+
+            <button onclick="savePrizeSettings()" class="btn-primary tap">Save Settings</button>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h3 class="font-bold mb-4 tracking-tight">Suggested Distribution</h3>
+          <div id="prize-distribution" class="space-y-3"></div>
         </div>
       </div>
     </div>
-
-    <div id="access-denied" class="hidden text-center py-12">
-      <div class="text-4xl mb-4">🚫</div>
-      <h2 class="text-xl font-bold text-gray-800">Access Denied</h2>
-      <p class="text-gray-500 mt-2">You are not an admin.</p>
-    </div>
-
-    <div id="loading" class="text-center py-12 text-gray-500">Loading...</div>
   </div>
 
   <script>
@@ -175,41 +319,39 @@
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container')
       const toast = document.createElement('div')
-      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' }
-      const colors = { success: 'bg-emerald-600', error: 'bg-red-500', info: 'bg-blue-500', warning: 'bg-amber-500' }
-      toast.className = `toast-enter ${colors[type]} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium pointer-events-auto`
-      toast.innerHTML = `<span class="text-lg">${icons[type]}</span><span>${message}</span>`
+      const icons = { success: '✓', error: '✕', info: 'i', warning: '!' }
+      const colors = { success: 'bg-brand-900', error: 'bg-red-600', info: 'bg-ink-900', warning: 'bg-amber-600' }
+      toast.className = `toast-enter ${colors[type]} text-white px-5 py-3.5 rounded-2xl shadow-lifted flex items-center gap-3 text-sm font-medium pointer-events-auto max-w-sm w-full`
+      toast.innerHTML = `<span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0">${icons[type]}</span><span class="flex-1">${message}</span>`
       container.appendChild(toast)
-      requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-enter-active') })
-      setTimeout(() => { toast.classList.remove('toast-enter-active'); toast.classList.add('toast-exit-active'); setTimeout(() => toast.remove(), 300) }, 3000)
+      requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
+      setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
     }
 
     function showModal({ icon, title, message, actions }) {
       const overlay = document.getElementById('modal-overlay')
-      const content = document.getElementById('modal-content')
+      const panel = document.getElementById('modal-content')
       document.getElementById('modal-icon').textContent = icon
       document.getElementById('modal-title').textContent = title
       document.getElementById('modal-message').textContent = message
-      document.getElementById('modal-actions').innerHTML = actions.map(btn => `<button onclick="${btn.onclick}" class="flex-1 py-3 rounded-xl font-semibold text-sm transition active:scale-95 ${btn.class}">${btn.text}</button>`).join('')
+      document.getElementById('modal-actions').innerHTML = actions.map(b => `<button onclick="${b.onclick}" class="flex-1 py-4 rounded-2xl font-semibold text-sm tap ${b.class}">${b.text}</button>`).join('')
       overlay.classList.remove('hidden')
-      requestAnimationFrame(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100') })
+      requestAnimationFrame(() => panel.classList.add('shown'))
     }
     function hideModal() {
       const overlay = document.getElementById('modal-overlay')
-      const content = document.getElementById('modal-content')
-      content.classList.remove('scale-100', 'opacity-100'); content.classList.add('scale-95', 'opacity-0')
-      setTimeout(() => overlay.classList.add('hidden'), 200)
+      const panel = document.getElementById('modal-content')
+      panel.classList.remove('shown')
+      setTimeout(() => overlay.classList.add('hidden'), 320)
     }
+    document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') hideModal() })
 
     // ============== INIT ==============
     async function init() {
       await initAuth()
       if (!getUser()) { window.location.href = 'index.html'; return }
       document.getElementById('loading').classList.add('hidden')
-      if (!isAdmin()) {
-        document.getElementById('access-denied').classList.remove('hidden')
-        return
-      }
+      if (!isAdmin()) { document.getElementById('access-denied').classList.remove('hidden'); return }
       document.getElementById('admin-content').classList.remove('hidden')
       await loadAll()
     }
@@ -225,49 +367,52 @@
         const ps = await getPrizeSettings()
         if (ps?.data) prizeSettings = { ...prizeSettings, ...ps.data }
       }
-      renderUsers()
-      renderFixturesManage()
-      renderResults()
-      renderPrize()
+      renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
 
     function adminTab(name) {
       document.querySelectorAll('.atab').forEach(el => el.classList.add('hidden'))
-      document.getElementById(`atab-${name}`).classList.remove('hidden')
-      document.querySelectorAll('.admin-tab').forEach(btn => {
-        if (btn.dataset.atab === name) { btn.classList.remove('admin-tab-inactive'); btn.classList.add('admin-tab-active') }
-        else { btn.classList.remove('admin-tab-active'); btn.classList.add('admin-tab-inactive') }
-      })
+      const target = document.getElementById(`atab-${name}`)
+      target.classList.remove('hidden')
+      target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
+      document.querySelectorAll('.seg-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.atab === name))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     // ============== USERS ==============
     function renderUsers() {
       const list = document.getElementById('users-list')
-      document.getElementById('user-count').textContent = `(${allUsers.length})`
+      const paidCount = allUsers.filter(u => u.fee_paid).length
+      document.getElementById('user-stats').textContent = `${allUsers.length} total · ${paidCount} paid`
       if (!allUsers.length) {
-        list.innerHTML = '<p class="text-gray-500 text-sm py-2">No users yet — they\'ll appear here after signing up.</p>'
+        list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No users yet</div>'
         return
       }
       list.innerHTML = allUsers.map(u => {
         const paid = u.fee_paid === true
+        const initials = (u.name || u.email || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()
         return `
-        <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3">
-          <div class="w-3 h-3 rounded-full shrink-0 ${paid ? 'bg-emerald-500' : 'bg-gray-300'}"></div>
+        <div class="px-5 py-3.5 flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl ${paid ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-500'} flex items-center justify-center font-bold text-sm shrink-0 border ${paid ? 'border-brand-100' : 'border-paper-border'}">${initials}</div>
           <div class="flex-1 min-w-0">
-            <div class="font-semibold text-sm truncate">${u.name || '(no name)'} ${u.is_admin ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">admin</span>' : ''}</div>
-            <div class="text-xs text-gray-500 truncate">${u.email || ''} ${u.department ? '· ' + u.department : ''}</div>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-sm truncate">${u.name || '(no name)'}</span>
+              ${u.is_admin ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>' : ''}
+            </div>
+            <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
           </div>
-          <button onclick="toggleFee('${u.id}', ${!paid})" class="text-xs font-semibold px-3 py-1.5 rounded-lg tap-active ${paid ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">${paid ? 'Paid ✓' : 'Mark Paid'}</button>
-          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-xs text-red-500 hover:text-red-700 px-2 tap-active">Remove</button>
-        </div>
-        `
+          <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
+          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 p-1.5 tap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>`
       }).join('')
     }
 
     async function toggleFee(userId, paid) {
-      if (typeof setFeePaid !== 'function') { showToast('setFeePaid helper not implemented', 'error'); return }
+      if (typeof setFeePaid !== 'function') { showToast('setFeePaid helper missing', 'error'); return }
       const { error } = await setFeePaid(userId, paid)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       const u = allUsers.find(x => x.id === userId); if (u) u.fee_paid = paid
       renderUsers(); renderPrize()
       showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
@@ -275,17 +420,17 @@
 
     function confirmRemoveUser(id, name) {
       showModal({
-        icon: '⚠️', title: 'Remove user?', message: `${name} and all their predictions will be deleted.`,
+        icon: '⚠️', title: 'Remove user?', message: `${name} and all their predictions will be deleted permanently.`,
         actions: [
-          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-          { text: 'Remove', onclick: `hideModal(); doRemoveUser('${id}')`, class: 'bg-red-500 text-white hover:bg-red-600' }
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Remove', onclick: `hideModal(); doRemoveUser('${id}')`, class: 'bg-red-600 text-white' }
         ]
       })
     }
     async function doRemoveUser(id) {
-      if (typeof removeUser !== 'function') { showToast('removeUser helper not implemented', 'error'); return }
+      if (typeof removeUser !== 'function') { showToast('removeUser helper missing', 'error'); return }
       const { error } = await removeUser(id)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       allUsers = allUsers.filter(u => u.id !== id)
       renderUsers(); renderPrize()
       showToast('User removed', 'success')
@@ -293,7 +438,7 @@
 
     document.getElementById('add-user-form').addEventListener('submit', async (e) => {
       e.preventDefault()
-      if (typeof inviteUser !== 'function') { showToast('inviteUser helper not implemented', 'error'); return }
+      if (typeof inviteUser !== 'function') { showToast('inviteUser helper missing', 'error'); return }
       const payload = {
         name: document.getElementById('new-user-name').value,
         email: document.getElementById('new-user-email').value,
@@ -301,9 +446,10 @@
         phone: document.getElementById('new-user-phone').value
       }
       const { data, error } = await inviteUser(payload)
-      if (error) return showToast('Error: ' + error.message, 'error')
-      showToast('User invited — magic link sent', 'success')
+      if (error) return showToast(error.message, 'error')
+      showToast('Invite sent', 'success')
       e.target.reset()
+      document.getElementById('add-user-form').classList.add('hidden')
       if (data) allUsers.push(data)
       renderUsers()
     })
@@ -311,33 +457,36 @@
     // ============== FIXTURES MANAGE ==============
     function renderFixturesManage() {
       const list = document.getElementById('fixtures-manage-list')
-      document.getElementById('fix-count').textContent = `(${allFixtures.length})`
-      if (!allFixtures.length) { list.innerHTML = '<p class="text-gray-500 text-sm">No fixtures yet.</p>'; return }
+      document.getElementById('fix-count').textContent = `${allFixtures.length} fixture${allFixtures.length === 1 ? '' : 's'}`
+      if (!allFixtures.length) { list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No fixtures</div>'; return }
       list.innerHTML = allFixtures.map(f => {
         const localIso = new Date(f.kickoff).toISOString().slice(0, 16)
         const locked = f.home_score !== null
         return `
-        <div class="border border-gray-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
-          <div class="flex-1 min-w-0">
-            <div class="font-semibold text-sm truncate">${f.home_team} vs ${f.away_team}</div>
-            <div class="text-xs text-gray-500">${f.stage}${locked ? ' · FT ' + f.home_score + '–' + f.away_score : ''}</div>
+        <div class="px-5 py-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-300">vs</span> ${f.away_team}</div>
+              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}</div>
+            </div>
+            <button onclick="confirmDeleteFixture('${f.id}')" class="text-ink-400 hover:text-red-500 p-1.5 tap shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+            </button>
           </div>
-          <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''}
-            onchange="pendingKickoffs['${f.id}']=this.value"
-            class="text-xs px-2 py-1.5 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none ${locked ? 'bg-gray-100' : ''}">
-          <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-300 tap-active">Save</button>
-          <button onclick="confirmDeleteFixture('${f.id}')" class="text-xs text-red-500 hover:text-red-700 px-2 tap-active">Delete</button>
-        </div>
-        `
+          <div class="flex items-center gap-2">
+            <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}" style="padding: 10px 12px;">
+            <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
+          </div>
+        </div>`
       }).join('')
     }
 
     async function saveKickoff(id) {
       const val = pendingKickoffs[id]; if (!val) { showToast('No change', 'warning'); return }
-      if (typeof updateFixtureKickoff !== 'function') { showToast('updateFixtureKickoff helper not implemented', 'error'); return }
+      if (typeof updateFixtureKickoff !== 'function') { showToast('updateFixtureKickoff helper missing', 'error'); return }
       const iso = new Date(val).toISOString()
       const { error } = await updateFixtureKickoff(id, iso)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       const f = allFixtures.find(x => x.id === id); if (f) f.kickoff = iso
       delete pendingKickoffs[id]
       showToast('Kickoff updated', 'success')
@@ -347,17 +496,17 @@
     function confirmDeleteFixture(id) {
       const f = allFixtures.find(x => x.id === id)
       showModal({
-        icon: '🗑️', title: 'Delete fixture?', message: `${f?.home_team} vs ${f?.away_team} and all related predictions will be removed.`,
+        icon: '🗑️', title: 'Delete fixture?', message: `${f?.home_team} vs ${f?.away_team} and all predictions for it will be removed.`,
         actions: [
-          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-          { text: 'Delete', onclick: `hideModal(); doDeleteFixture('${id}')`, class: 'bg-red-500 text-white hover:bg-red-600' }
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Delete', onclick: `hideModal(); doDeleteFixture('${id}')`, class: 'bg-red-600 text-white' }
         ]
       })
     }
     async function doDeleteFixture(id) {
-      if (typeof deleteFixture !== 'function') { showToast('deleteFixture helper not implemented', 'error'); return }
+      if (typeof deleteFixture !== 'function') { showToast('deleteFixture helper missing', 'error'); return }
       const { error } = await deleteFixture(id)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       allFixtures = allFixtures.filter(f => f.id !== id)
       renderFixturesManage(); renderResults()
       showToast('Fixture deleted', 'success')
@@ -372,7 +521,7 @@
         stage: document.getElementById('stage').value
       }
       const { data, error } = await addFixture(payload)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       showToast('Fixture added', 'success')
       e.target.reset()
       if (data) allFixtures.push(data); else { const fx = await getFixtures(); allFixtures = fx.data || [] }
@@ -380,24 +529,21 @@
     })
 
     // ============== IMPORT ==============
-    // Hardcoded WC 2026 group stage opener fixtures (sample — edit as final schedule confirms)
     const WC2026 = [
-      { home_team: 'Mexico',       away_team: 'TBD',         kickoff: '2026-06-11T20:00:00Z', stage: 'Group A' },
-      { home_team: 'Canada',       away_team: 'TBD',         kickoff: '2026-06-12T19:00:00Z', stage: 'Group B' },
-      { home_team: 'USA',          away_team: 'TBD',         kickoff: '2026-06-12T23:00:00Z', stage: 'Group D' },
-      { home_team: 'Argentina',    away_team: 'TBD',         kickoff: '2026-06-13T20:00:00Z', stage: 'Group ?' },
-      { home_team: 'Brazil',       away_team: 'TBD',         kickoff: '2026-06-14T20:00:00Z', stage: 'Group ?' },
-      { home_team: 'France',       away_team: 'TBD',         kickoff: '2026-06-15T18:00:00Z', stage: 'Group ?' },
-      { home_team: 'Germany',      away_team: 'TBD',         kickoff: '2026-06-15T21:00:00Z', stage: 'Group ?' },
-      { home_team: 'England',      away_team: 'TBD',         kickoff: '2026-06-16T18:00:00Z', stage: 'Group ?' },
-      { home_team: 'Spain',        away_team: 'TBD',         kickoff: '2026-06-16T21:00:00Z', stage: 'Group ?' },
-      { home_team: 'Portugal',     away_team: 'TBD',         kickoff: '2026-06-17T18:00:00Z', stage: 'Group ?' }
+      { home_team: 'Mexico',    away_team: 'TBD', kickoff: '2026-06-11T20:00:00Z', stage: 'Group A' },
+      { home_team: 'Canada',    away_team: 'TBD', kickoff: '2026-06-12T19:00:00Z', stage: 'Group B' },
+      { home_team: 'USA',       away_team: 'TBD', kickoff: '2026-06-12T23:00:00Z', stage: 'Group D' },
+      { home_team: 'Argentina', away_team: 'TBD', kickoff: '2026-06-13T20:00:00Z', stage: 'Group ?' },
+      { home_team: 'Brazil',    away_team: 'TBD', kickoff: '2026-06-14T20:00:00Z', stage: 'Group ?' },
+      { home_team: 'France',    away_team: 'TBD', kickoff: '2026-06-15T18:00:00Z', stage: 'Group ?' },
+      { home_team: 'Germany',   away_team: 'TBD', kickoff: '2026-06-15T21:00:00Z', stage: 'Group ?' },
+      { home_team: 'England',   away_team: 'TBD', kickoff: '2026-06-16T18:00:00Z', stage: 'Group ?' },
+      { home_team: 'Spain',     away_team: 'TBD', kickoff: '2026-06-16T21:00:00Z', stage: 'Group ?' },
+      { home_team: 'Portugal',  away_team: 'TBD', kickoff: '2026-06-17T18:00:00Z', stage: 'Group ?' }
     ]
 
-    async function importWC2026() {
-      await bulkImport(WC2026, 'WC 2026 sample')
-    }
-
+    function toggleCSV() { document.getElementById('csv-area').classList.toggle('hidden') }
+    async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
     async function importCSV() {
       const raw = document.getElementById('csv-input').value.trim()
       if (!raw) return showToast('Paste some rows first', 'warning')
@@ -416,32 +562,31 @@
       for (const r of rows) {
         const dup = allFixtures.find(f => f.home_team === r.home_team && f.away_team === r.away_team && new Date(f.kickoff).getTime() === new Date(r.kickoff).getTime())
         if (dup) { skipped++; continue }
-        const { data, error } = await addFixture(r)
+        const { error } = await addFixture(r)
         if (error) { failed++; continue }
         added++
-        if (data) allFixtures.push(data)
       }
       const fx = await getFixtures(); allFixtures = fx.data || []
       renderFixturesManage(); renderResults()
-      showToast(`${label}: +${added} added, ${skipped} dupes, ${failed} failed`, added ? 'success' : 'info')
+      showToast(`${label}: +${added} added, ${skipped} skipped`, added ? 'success' : 'info')
     }
 
     // ============== RESULTS ==============
     function renderResults() {
       const list = document.getElementById('admin-fixtures')
-      if (!allFixtures.length) { list.innerHTML = '<p class="text-gray-500 text-sm">No fixtures yet.</p>'; return }
+      if (!allFixtures.length) { list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No fixtures</div>'; return }
       list.innerHTML = allFixtures.map(f => `
-        <div class="border border-gray-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
-          <div class="flex-1">
-            <div class="font-bold text-sm">${f.home_team} vs ${f.away_team}</div>
-            <div class="text-xs text-gray-500">${f.stage} · ${new Date(f.kickoff).toLocaleString()}</div>
+        <div class="px-5 py-4">
+          <div class="mb-3">
+            <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-300">vs</span> ${f.away_team}</div>
+            <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <div class="flex items-center gap-2">
-            <input type="number" min="0" placeholder="H" class="w-14 text-center border border-gray-300 rounded-lg py-1.5 font-bold" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}', 'home', this.value)">
-            <span class="text-gray-400 font-bold">-</span>
-            <input type="number" min="0" placeholder="A" class="w-14 text-center border border-gray-300 rounded-lg py-1.5 font-bold" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}', 'away', this.value)">
+            <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
+            <span class="text-ink-300 font-bold">–</span>
+            <input type="number" min="0" placeholder="A" class="mini-score" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}','away',this.value)">
+            <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap">Save</button>
           </div>
-          <button onclick="confirmSaveScore('${f.id}')" class="bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-800 tap-active">Save</button>
         </div>
       `).join('')
     }
@@ -452,34 +597,38 @@
     }
     function confirmSaveScore(id) {
       const s = pendingScores[id] || {}
-      if (s.home === undefined && s.away === undefined) return showToast('No score changes', 'warning')
+      if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
       showModal({
-        icon: '⚽', title: 'Confirm Score', message: 'Save final score? Points will be calculated.',
+        icon: '⚽', title: 'Confirm score?', message: 'Points will be calculated and pushed to all players in real time.',
         actions: [
-          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-          { text: 'Confirm', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-emerald-600 text-white hover:bg-emerald-700' }
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Confirm', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-brand-900 text-white' }
         ]
       })
     }
     async function executeSaveScore(id) {
       const s = pendingScores[id] || {}
       const { error } = await updateFixtureScore(id, s.home, s.away)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       const f = allFixtures.find(x => x.id === id); if (f) { f.home_score = s.home; f.away_score = s.away }
       pendingScores[id] = {}
       renderResults(); renderFixturesManage()
-      showToast('Score saved, points calculated', 'success')
+      showToast('Score saved', 'success')
     }
 
     // ============== PRIZE POOL ==============
-    document.getElementById('prize-manual-toggle').addEventListener('change', e => {
-      document.getElementById('prize-manual-field').classList.toggle('hidden', !e.target.checked)
-    })
+    function togglePrizeOverride() {
+      const sw = document.getElementById('prize-switch')
+      sw.classList.toggle('on')
+      prizeSettings.manual_override = sw.classList.contains('on')
+      document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
+      renderPrize()
+    }
 
     function renderPrize() {
       document.getElementById('prize-currency').value = prizeSettings.currency || '$'
       document.getElementById('prize-entry-fee').value = prizeSettings.entry_fee || ''
-      document.getElementById('prize-manual-toggle').checked = !!prizeSettings.manual_override
+      document.getElementById('prize-switch').classList.toggle('on', !!prizeSettings.manual_override)
       document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
       document.getElementById('prize-manual-amount').value = prizeSettings.manual_amount || ''
 
@@ -490,19 +639,22 @@
 
       document.getElementById('prize-current').textContent = cur + pool.toLocaleString()
       document.getElementById('prize-meta').textContent = prizeSettings.manual_override
-        ? `Manual override · ${paidCount} of ${allUsers.length} users paid`
-        : `${paidCount} paid × ${cur}${prizeSettings.entry_fee || 0} entry fee`
+        ? `Manual · ${paidCount}/${allUsers.length} paid`
+        : `${paidCount} × ${cur}${prizeSettings.entry_fee || 0} entry fee`
 
-      // Suggested distribution: 50 / 30 / 20
       const splits = [
-        { place: '🥇 1st', pct: 0.5 },
-        { place: '🥈 2nd', pct: 0.3 },
-        { place: '🥉 3rd', pct: 0.2 }
+        { place: '1st', emoji: '🥇', pct: 0.5 },
+        { place: '2nd', emoji: '🥈', pct: 0.3 },
+        { place: '3rd', emoji: '🥉', pct: 0.2 }
       ]
       document.getElementById('prize-distribution').innerHTML = splits.map(s => `
-        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
-          <span>${s.place} <span class="text-xs text-gray-400">(${s.pct * 100}%)</span></span>
-          <span class="font-bold text-emerald-600">${cur}${(pool * s.pct).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        <div class="flex items-center gap-3 py-2 border-b border-paper-border last:border-0">
+          <div class="text-2xl">${s.emoji}</div>
+          <div class="flex-1">
+            <div class="font-semibold text-sm">${s.place} Place</div>
+            <div class="text-xs text-ink-500">${s.pct * 100}% of pool</div>
+          </div>
+          <div class="font-bold text-brand-700 text-lg">${cur}${(pool * s.pct).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
         </div>
       `).join('')
     }
@@ -511,15 +663,15 @@
       const payload = {
         currency: document.getElementById('prize-currency').value || '$',
         entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
-        manual_override: document.getElementById('prize-manual-toggle').checked,
+        manual_override: document.getElementById('prize-switch').classList.contains('on'),
         manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0
       }
-      if (typeof setPrizeSettings !== 'function') { showToast('setPrizeSettings helper not implemented', 'error'); return }
+      if (typeof setPrizeSettings !== 'function') { showToast('setPrizeSettings helper missing', 'error'); return }
       const { error } = await setPrizeSettings(payload)
-      if (error) return showToast('Error: ' + error.message, 'error')
+      if (error) return showToast(error.message, 'error')
       prizeSettings = { ...prizeSettings, ...payload }
       renderPrize()
-      showToast('Prize settings saved', 'success')
+      showToast('Settings saved', 'success')
     }
 
     init()

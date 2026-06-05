@@ -1,719 +1,603 @@
-<!-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>World Cup Prediction League</title>
-  
-  <!-- PWA -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>WC Predictions</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#059669">
+  <meta name="theme-color" content="#064E3B">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23059669' width='512' height='512' rx='128'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280'%3E🏆%3C/text%3E%3C/svg%3E">
-  
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23064E3B' width='512' height='512' rx='128'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280'%3E🏆%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+          colors: {
+            ink: { 900: '#0A0F0D', 700: '#1F2A26', 500: '#5C6B66', 400: '#8A9590', 300: '#B5BDB9' },
+            paper: { DEFAULT: '#FAFAF7', card: '#FFFFFF', border: '#EEEDE7' },
+            brand: { 900: '#064E3B', 700: '#047857', 500: '#10B981', 100: '#D1FAE5', 50: '#ECFDF5' },
+            gold: '#D4A24C'
+          },
+          boxShadow: {
+            soft: '0 1px 2px rgba(10,15,13,0.04), 0 4px 12px rgba(10,15,13,0.04)',
+            card: '0 1px 3px rgba(10,15,13,0.06)',
+            lifted: '0 8px 24px rgba(10,15,13,0.08)'
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    .tab-active { color: #059669; }
-    .tab-inactive { color: #9CA3AF; }
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-      -webkit-appearance: none; margin: 0; 
+    html, body { background: #FAFAF7; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
+    * { -webkit-font-smoothing: antialiased; }
+
+    .tap { transition: transform 120ms ease, opacity 120ms ease; }
+    .tap:active { transform: scale(0.97); opacity: 0.85; }
+
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* Number score input – big, friendly */
+    .score-input {
+      width: 56px; height: 56px;
+      text-align: center; font-weight: 700; font-size: 24px;
+      background: #FAFAF7; border: 1.5px solid #EEEDE7; border-radius: 14px;
+      outline: none; transition: all 150ms ease; color: #0A0F0D;
     }
-    .saved-indicator { animation: fadeOut 2s forwards; }
-    @keyframes fadeOut {
-      0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; }
+    .score-input:focus { border-color: #10B981; background: #fff; box-shadow: 0 0 0 4px rgba(16,185,129,0.12); }
+    .score-readonly {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 24px; color: #1F2A26;
+      background: #F4F3EE; border: 1.5px solid #EEEDE7;
     }
-    
-    /* Toast animations */
+
+    /* Toast */
     .toast-enter { transform: translateY(100%); opacity: 0; }
-    .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .toast-exit-active { transform: translateY(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    
-    /* Modal backdrop */
-    .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-    
-    /* Tap feedback */
-    .tap-active:active { transform: scale(0.96); }
-    
+    .toast-shown { transform: translateY(0); opacity: 1; transition: all 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+    .toast-exit { transform: translateY(100%); opacity: 0; transition: all 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+
+    /* Bottom sheet modal */
+    .sheet-backdrop { background: rgba(10,15,13,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .sheet-panel { transform: translateY(100%); transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1); padding-bottom: env(safe-area-inset-bottom); }
+    .sheet-panel.shown { transform: translateY(0); }
+
+    /* Bottom nav active pill */
+    .nav-btn { color: #8A9590; transition: color 150ms ease; }
+    .nav-btn.active { color: #064E3B; }
+    .nav-btn.active .nav-dot { opacity: 1; transform: scale(1); }
+    .nav-dot { opacity: 0; transform: scale(0); transition: all 200ms ease; }
+
+    /* Skeleton */
+    .skel { background: linear-gradient(90deg, #EEEDE7 0%, #F4F3EE 50%, #EEEDE7 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 12px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* Gradient hero card */
+    .hero-card {
+      background: radial-gradient(circle at top right, #047857 0%, #064E3B 60%, #052E26 100%);
+      position: relative; overflow: hidden;
+    }
+    .hero-card::before {
+      content: ''; position: absolute; top: -40px; right: -40px;
+      width: 160px; height: 160px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(16,185,129,0.35), transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Sticky header subtle blur */
+    .app-header { backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); background: rgba(250,250,247,0.85); }
+
+    /* Safe area for fixed elements */
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* Hide scrollbar */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+
     /* Install banner */
-    .install-banner {
-      animation: slideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    @keyframes slideDown {
-      from { transform: translateY(-100%); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    
-    /* Password toggle */
-    .password-toggle {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #9CA3AF;
-      transition: color 0.2s;
-    }
-    .password-toggle:hover { color: #6B7280; }
+    .install-slide { animation: slideDown 400ms cubic-bezier(0.32, 0.72, 0, 1); }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+    /* Tab fade */
+    .tab-content { animation: fadeIn 240ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans pb-20">
-  
+<body class="text-ink-900">
+
   <!-- PWA INSTALL BANNER -->
-  <div id="install-banner" class="install-banner hidden fixed top-0 left-0 right-0 z-50 bg-emerald-600 text-white px-4 py-3 shadow-lg">
-    <div class="max-w-lg mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl">🏆</span>
-        <div>
-          <p class="font-semibold text-sm">Install WC Predictions</p>
-          <p class="text-xs text-emerald-100">Add to your home screen for quick access</p>
-        </div>
+  <div id="install-banner" class="install-slide hidden fixed top-0 inset-x-0 z-50 safe-top">
+    <div class="m-3 bg-ink-900 text-white rounded-2xl p-4 shadow-lifted flex items-center gap-3">
+      <span class="text-2xl">🏆</span>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-sm">Install on your phone</p>
+        <p class="text-xs text-ink-300">Add to home screen for quick access</p>
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="dismissInstall()" class="text-xs text-emerald-200 hover:text-white px-2 py-1">Later</button>
-        <button onclick="installPWA()" class="bg-white text-emerald-600 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition">Install</button>
-      </div>
+      <button onclick="dismissInstall()" class="text-xs text-ink-300 px-2 py-2 tap">Later</button>
+      <button onclick="installPWA()" class="bg-brand-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl tap">Install</button>
     </div>
   </div>
 
-  <!-- TOAST CONTAINER -->
-  <div id="toast-container" class="fixed bottom-24 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <!-- TOAST -->
+  <div id="toast-container" class="fixed bottom-24 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none items-center"></div>
 
-  <!-- MODAL OVERLAY -->
-  <div id="modal-overlay" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
-    <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-95 opacity-0 transition-all duration-200">
-      <div id="modal-icon" class="text-4xl text-center mb-4"></div>
-      <h3 id="modal-title" class="text-lg font-bold text-center text-gray-900 mb-2"></h3>
-      <p id="modal-message" class="text-sm text-gray-600 text-center mb-6"></p>
+  <!-- BOTTOM SHEET MODAL -->
+  <div id="modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+    <div id="modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+      <div id="modal-icon" class="text-4xl text-center mb-3"></div>
+      <h3 id="modal-title" class="text-xl font-bold text-center text-ink-900 mb-2"></h3>
+      <p id="modal-message" class="text-sm text-ink-500 text-center mb-6 leading-relaxed"></p>
       <div id="modal-actions" class="flex gap-3"></div>
     </div>
   </div>
 
   <!-- AUTH SCREEN -->
-  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-      <div class="text-center mb-6">
-        <div class="text-4xl mb-2">🏆</div>
-        <h1 class="text-2xl font-bold text-gray-800">Prediction League</h1>
-        <p class="text-sm text-gray-500 mt-1">World Cup 2026</p>
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-5">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-brand-900 text-white text-4xl shadow-lifted mb-5">🏆</div>
+        <h1 class="text-3xl font-bold tracking-tight text-ink-900">Prediction League</h1>
+        <p class="text-sm text-ink-500 mt-1.5">FIFA World Cup 2026</p>
       </div>
 
-      <form id="auth-form" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Work Email</label>
-          <input type="email" id="email" required 
-            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition"
-            placeholder="you@company.com">
-        </div>
-        <div class="relative">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input type="password" id="password" required minlength="6"
-            class="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition"
-            placeholder="Create or enter password">
-          <span class="password-toggle" onclick="togglePassword()">
-            <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
-            <svg id="eye-slash-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.887m2.197-2.197A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.05 10.05 0 01-1.574 2.887m-2.197 2.197L4.5 19.5"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18"/>
-            </svg>
-          </span>
-          <p class="text-xs text-gray-400 mt-1">First time? Pick any password. We'll create your account.</p>
-        </div>
-        <div class="flex items-center justify-between">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
-            <span class="text-sm text-gray-600">Remember me</span>
+      <div class="bg-white rounded-3xl shadow-card p-6 border border-paper-border">
+        <form id="auth-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Work Email</label>
+            <input type="email" id="email" required
+              class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
+              placeholder="you@company.com">
+          </div>
+          <div class="relative">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Password</label>
+            <input type="password" id="password" required minlength="6"
+              class="w-full px-4 py-3.5 pr-12 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
+              placeholder="Create or enter password">
+            <button type="button" onclick="togglePassword()" class="absolute right-3 top-[38px] p-2 text-ink-400">
+              <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <svg id="eye-slash-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.887m2.197-2.197A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.05 10.05 0 01-1.574 2.887m-2.197 2.197L4.5 19.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18"/></svg>
+            </button>
+            <p class="text-xs text-ink-400 mt-2">First time? Pick any password — we'll create your account.</p>
+          </div>
+          <label class="flex items-center gap-2.5 cursor-pointer pt-1">
+            <input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-paper-border text-brand-700 focus:ring-brand-500">
+            <span class="text-sm text-ink-700">Remember me</span>
           </label>
-        </div>
-        <button type="submit" 
-          class="w-full bg-emerald-600 text-white font-semibold py-3 rounded-xl hover:bg-emerald-700 active:scale-95 transition tap-active">
-          Login / Sign Up
-        </button>
-      </form>
+          <button type="submit"
+            class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-2">
+            Continue
+          </button>
+        </form>
+        <div id="auth-message" class="mt-4 text-sm text-center hidden"></div>
+      </div>
 
-      <div id="auth-message" class="mt-4 text-sm text-center hidden"></div>
+      <p class="text-center text-xs text-ink-400 mt-6">Predict scores. Beat your colleagues. Win the pool.</p>
     </div>
   </div>
 
   <!-- APP SHELL -->
   <div id="app-shell" class="hidden min-h-screen flex flex-col">
-    <!-- Header -->
-    <header class="bg-white shadow-sm sticky top-0 z-10">
-      <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-2xl">🏆</span>
+
+    <!-- Sticky Header -->
+    <header class="app-header sticky top-0 z-30 border-b border-paper-border/60 safe-top">
+      <div class="max-w-lg mx-auto px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-brand-900 text-white flex items-center justify-center text-lg shadow-soft">🏆</div>
           <div>
-            <h1 class="font-bold text-lg leading-tight">WC Predictions</h1>
-            <p class="text-xs text-gray-500" id="user-name">Loading...</p>
+            <h1 class="font-bold text-[15px] leading-tight text-ink-900">WC Predictions</h1>
+            <p class="text-xs text-ink-500" id="user-name">Loading…</p>
           </div>
         </div>
-        <button onclick="confirmLogout()" class="text-sm text-gray-500 hover:text-gray-700 p-2 tap-active">
+        <button onclick="confirmLogout()" class="w-10 h-10 rounded-xl bg-paper-card border border-paper-border flex items-center justify-center text-ink-500 tap">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
         </button>
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-lg mx-auto w-full p-4">
-      
-      <!-- Home / Dashboard Tab -->
-      <div id="tab-home" class="tab-content space-y-4">
-        <!-- Stats Row -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-sm p-4 text-white">
-            <div class="text-xs uppercase tracking-wider opacity-80 font-semibold">Your Rank</div>
-            <div class="mt-1 flex items-baseline gap-1">
-              <span class="text-3xl font-bold" id="home-rank">—</span>
-              <span class="text-sm opacity-80" id="home-rank-total"></span>
+    <main class="flex-1 max-w-lg mx-auto w-full px-5 pt-5 pb-32">
+
+      <!-- HOME -->
+      <div id="tab-home" class="tab-content space-y-5">
+
+        <!-- Hero stats card -->
+        <div class="hero-card rounded-3xl p-6 text-white shadow-lifted">
+          <div class="text-xs uppercase tracking-[0.2em] opacity-70 font-semibold mb-2">Your Standing</div>
+          <div class="flex items-end justify-between">
+            <div>
+              <div class="flex items-baseline gap-2">
+                <span class="text-6xl font-bold tracking-tight" id="home-rank">—</span>
+                <span class="text-sm opacity-70" id="home-rank-total"></span>
+              </div>
+              <div class="text-xs mt-1 opacity-80" id="home-rank-medal">Loading…</div>
             </div>
-            <div class="text-xs mt-1 opacity-80" id="home-rank-medal"></div>
-          </div>
-          <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-            <div class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Total Points</div>
-            <div class="mt-1 flex items-baseline gap-1">
-              <span class="text-3xl font-bold text-gray-900" id="home-points">0</span>
-              <span class="text-sm text-gray-400">pts</span>
+            <div class="text-right">
+              <div class="text-xs uppercase tracking-wider opacity-70 font-semibold">Points</div>
+              <div class="text-4xl font-bold tracking-tight" id="home-points">0</div>
+              <div class="text-xs opacity-70 mt-0.5" id="home-points-breakdown">—</div>
             </div>
-            <div class="text-xs mt-1 text-gray-500" id="home-points-breakdown">0 exact · 0 correct</div>
           </div>
         </div>
 
-        <!-- Prize Pool Card -->
-        <div id="home-prize-card" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-          <div class="text-3xl">💰</div>
-          <div class="flex-1">
-            <div class="text-xs uppercase tracking-wider text-amber-700 font-semibold">Prize Pool</div>
-            <div class="text-xl font-bold text-amber-900" id="home-prize-amount">—</div>
+        <!-- Prize pool -->
+        <div id="home-prize-card" class="hidden bg-paper-card border border-paper-border rounded-3xl p-5 shadow-soft flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-gold/15 flex items-center justify-center text-2xl">💰</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Prize Pool</div>
+            <div class="text-2xl font-bold text-ink-900 tracking-tight" id="home-prize-amount">—</div>
           </div>
-          <div class="text-xs text-amber-700" id="home-prize-players"></div>
+          <div class="text-right">
+            <div class="text-xs text-ink-400" id="home-prize-players"></div>
+          </div>
         </div>
 
-        <!-- Upcoming Match -->
+        <!-- Next match -->
         <div>
-          <h2 class="text-lg font-bold mb-2">Next Up</h2>
-          <div id="home-next-match" class="text-center py-8 text-gray-400 bg-white rounded-xl shadow-sm">Loading...</div>
+          <div class="flex items-baseline justify-between mb-3 px-1">
+            <h2 class="text-lg font-bold tracking-tight">Next Match</h2>
+            <span id="home-next-countdown" class="text-xs font-semibold text-brand-700"></span>
+          </div>
+          <div id="home-next-match"><div class="skel h-44 rounded-3xl"></div></div>
         </div>
 
-        <!-- Recent Results -->
+        <!-- Recent results -->
         <div>
-          <h2 class="text-lg font-bold mb-2">Recent Results</h2>
-          <div id="home-recent" class="space-y-2"></div>
+          <div class="flex items-baseline justify-between mb-3 px-1">
+            <h2 class="text-lg font-bold tracking-tight">Recent Results</h2>
+            <button onclick="switchTab('predictions')" class="text-xs font-semibold text-brand-700 tap">View all</button>
+          </div>
+          <div id="home-recent" class="space-y-2.5"></div>
         </div>
       </div>
 
-      <!-- Predictions Tab -->
+      <!-- PREDICTIONS -->
       <div id="tab-predictions" class="tab-content hidden space-y-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-bold">Your Predictions</h2>
-          <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full" id="prediction-count">0/0</span>
+        <div class="flex items-baseline justify-between mb-1 px-1">
+          <h2 class="text-2xl font-bold tracking-tight">Predictions</h2>
+          <span class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full" id="prediction-count">0/0</span>
         </div>
+        <p class="text-sm text-ink-500 px-1 mb-2">Lock in your scores before kick-off.</p>
         <div id="fixtures-list" class="space-y-3">
-          <div class="text-center py-12 text-gray-400">Loading fixtures...</div>
+          <div class="skel h-44 rounded-3xl"></div>
+          <div class="skel h-44 rounded-3xl"></div>
         </div>
       </div>
 
-      <!-- Leaderboard Tab -->
-      <div id="tab-leaderboard" class="tab-content hidden">
-        <h2 class="text-lg font-bold mb-4">Leaderboard</h2>
-        <div id="leaderboard-list" class="space-y-2">
-          <div class="text-center py-12 text-gray-400">Loading...</div>
+      <!-- LEADERBOARD -->
+      <div id="tab-leaderboard" class="tab-content hidden space-y-4">
+        <div class="px-1">
+          <h2 class="text-2xl font-bold tracking-tight">Leaderboard</h2>
+          <p class="text-sm text-ink-500 mt-1">Live rankings, updated as results come in.</p>
+        </div>
+        <div id="leaderboard-list" class="space-y-2.5">
+          <div class="skel h-20 rounded-2xl"></div>
+          <div class="skel h-20 rounded-2xl"></div>
+          <div class="skel h-20 rounded-2xl"></div>
         </div>
       </div>
 
-      <!-- Profile Tab -->
-      <div id="tab-profile" class="tab-content hidden">
-        <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 class="text-lg font-bold mb-4">Your Profile</h2>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input type="text" id="profile-name" 
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none">
+      <!-- PROFILE -->
+      <div id="tab-profile" class="tab-content hidden space-y-5">
+        <div class="px-1">
+          <h2 class="text-2xl font-bold tracking-tight">Profile</h2>
+          <p class="text-sm text-ink-500 mt-1">Manage your info and preferences.</p>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
+          <div class="p-5 space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Name</label>
+              <input type="text" id="profile-name" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Department</label>
+              <input type="text" id="profile-dept" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Phone</label>
+              <input type="tel" id="profile-phone" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+            </div>
+            <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Profile</button>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
-            <input type="text" id="profile-dept" 
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input type="tel" id="profile-phone" 
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none">
-          </div>
-          <button onclick="handleSaveProfile()" 
-            class="w-full bg-emerald-600 text-white font-semibold py-3 rounded-xl hover:bg-emerald-700 active:scale-95 transition tap-active">
-            Save Profile
-          </button>
-          <div id="profile-message" class="text-sm text-center hidden"></div>
-          
-          <div id="admin-link" class="hidden pt-4 border-t border-gray-200">
-            <a href="admin.html" 
-              class="block w-full text-center bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition tap-active">
-              ⚙️ Admin Panel
+
+          <div id="admin-link" class="hidden border-t border-paper-border p-5">
+            <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
+              <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
           </div>
         </div>
-        
-        <div class="mt-6 bg-white rounded-xl shadow-sm p-6">
-          <h3 class="font-bold mb-3">Scoring Rules</h3>
-          <ul class="space-y-3 text-sm text-gray-600">
-            <li class="flex items-center gap-3">
-              <span class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">5</span>
-              <span>Exact score prediction</span>
-            </li>
-            <li class="flex items-center gap-3">
-              <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">3</span>
-              <span>Correct goal difference</span>
-            </li>
-            <li class="flex items-center gap-3">
-              <span class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">2</span>
-              <span>Correct winner / draw</span>
-            </li>
-          </ul>
+
+        <!-- Scoring rules -->
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+          <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold">5</div>
+              <div>
+                <div class="text-sm font-semibold">Exact score</div>
+                <div class="text-xs text-ink-500">e.g. you said 2–1, result was 2–1</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">3</div>
+              <div>
+                <div class="text-sm font-semibold">Correct goal difference</div>
+                <div class="text-xs text-ink-500">Right margin, wrong scoreline</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">2</div>
+              <div>
+                <div class="text-sm font-semibold">Correct outcome</div>
+                <div class="text-xs text-ink-500">Right winner or draw</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
-      <div class="max-w-lg mx-auto flex justify-around py-2">
-        <button onclick="switchTab('home')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-active tap-active" data-tab="home">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-          <span class="text-xs font-medium">Home</span>
+    <!-- Bottom Nav -->
+    <nav class="fixed bottom-0 inset-x-0 z-30 bg-white/90 border-t border-paper-border safe-bottom" style="backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);">
+      <div class="max-w-lg mx-auto grid grid-cols-4 px-2 py-2">
+        <button onclick="switchTab('home')" data-tab="home" class="nav-btn active flex flex-col items-center gap-0.5 py-2 tap">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span class="text-[10px] font-semibold tracking-wide">Home</span>
+          <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
-        <button onclick="switchTab('predictions')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-inactive tap-active" data-tab="predictions">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-          <span class="text-xs font-medium">Predict</span>
+        <button onclick="switchTab('predictions')" data-tab="predictions" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <span class="text-[10px] font-semibold tracking-wide">Predict</span>
+          <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
-        <button onclick="switchTab('leaderboard')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-inactive tap-active" data-tab="leaderboard">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-          <span class="text-xs font-medium">Leaderboard</span>
+        <button onclick="switchTab('leaderboard')" data-tab="leaderboard" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span class="text-[10px] font-semibold tracking-wide">Ranks</span>
+          <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
-        <button onclick="switchTab('profile')" class="flex flex-col items-center gap-1 p-2 tab-btn tab-inactive tap-active" data-tab="profile">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-          <span class="text-xs font-medium">Me</span>
+        <button onclick="switchTab('profile')" data-tab="profile" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          <span class="text-[10px] font-semibold tracking-wide">Me</span>
+          <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
       </div>
     </nav>
   </div>
 
   <script>
-    // =====================
-    // PWA INSTALL
-    // =====================
+    // ============== PWA ==============
     let deferredPrompt = null
-
     window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault()
-      deferredPrompt = e
-      
-      // Show banner after 2 seconds if not dismissed before
-      const dismissed = localStorage.getItem('install-dismissed')
-      if (!dismissed) {
-        setTimeout(() => {
-          document.getElementById('install-banner').classList.remove('hidden')
-        }, 2000)
+      e.preventDefault(); deferredPrompt = e
+      if (!localStorage.getItem('install-dismissed')) {
+        setTimeout(() => document.getElementById('install-banner').classList.remove('hidden'), 2000)
       }
     })
-
     async function installPWA() {
-      if (!deferredPrompt) {
-        showToast('Add to home screen from your browser menu', 'info')
-        return
-      }
+      if (!deferredPrompt) { showToast('Use your browser menu → Add to Home Screen', 'info'); return }
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
-      if (outcome === 'accepted') {
-        showToast('App installed!', 'success')
-        document.getElementById('install-banner').classList.add('hidden')
-      }
+      if (outcome === 'accepted') { showToast('Installed!', 'success'); document.getElementById('install-banner').classList.add('hidden') }
       deferredPrompt = null
     }
+    function dismissInstall() { document.getElementById('install-banner').classList.add('hidden'); localStorage.setItem('install-dismissed', 'true') }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 
-    function dismissInstall() {
-      document.getElementById('install-banner').classList.add('hidden')
-      localStorage.setItem('install-dismissed', 'true')
-    }
-
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then(() => console.log('SW registered'))
-        .catch(err => console.log('SW error:', err))
-    }
-
-    // =====================
-    // TOAST SYSTEM
-    // =====================
+    // ============== TOAST ==============
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container')
       const toast = document.createElement('div')
-      
-      const icons = {
-        success: '✅',
-        error: '❌',
-        info: 'ℹ️',
-        warning: '⚠️'
-      }
-      
-      const colors = {
-        success: 'bg-emerald-600',
-        error: 'bg-red-500',
-        info: 'bg-blue-500',
-        warning: 'bg-amber-500'
-      }
-      
-      toast.className = `toast-enter ${colors[type]} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium pointer-events-auto`
-      toast.innerHTML = `
-        <span class="text-lg">${icons[type]}</span>
-        <span>${message}</span>
-      `
-      
+      const icons = { success: '✓', error: '✕', info: 'i', warning: '!' }
+      const colors = { success: 'bg-brand-900', error: 'bg-red-600', info: 'bg-ink-900', warning: 'bg-amber-600' }
+      toast.className = `toast-enter ${colors[type]} text-white px-5 py-3.5 rounded-2xl shadow-lifted flex items-center gap-3 text-sm font-medium pointer-events-auto max-w-sm w-full`
+      toast.innerHTML = `<span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0">${icons[type]}</span><span class="flex-1">${message}</span>`
       container.appendChild(toast)
-      
-      requestAnimationFrame(() => {
-        toast.classList.remove('toast-enter')
-        toast.classList.add('toast-enter-active')
-      })
-      
-      setTimeout(() => {
-        toast.classList.remove('toast-enter-active')
-        toast.classList.add('toast-exit-active')
-        setTimeout(() => toast.remove(), 300)
-      }, 3000)
+      requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
+      setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
     }
 
-    // =====================
-    // MODAL SYSTEM
-    // =====================
+    // ============== MODAL ==============
     function showModal({ icon, title, message, actions }) {
       const overlay = document.getElementById('modal-overlay')
-      const content = document.getElementById('modal-content')
-      const iconEl = document.getElementById('modal-icon')
-      const titleEl = document.getElementById('modal-title')
-      const messageEl = document.getElementById('modal-message')
-      const actionsEl = document.getElementById('modal-actions')
-      
-      iconEl.textContent = icon
-      titleEl.textContent = title
-      messageEl.textContent = message
-      actionsEl.innerHTML = actions.map(btn => `
-        <button onclick="${btn.onclick}" 
-          class="flex-1 py-3 rounded-xl font-semibold text-sm transition active:scale-95 ${btn.class}">
-          ${btn.text}
-        </button>
-      `).join('')
-      
+      const panel = document.getElementById('modal-content')
+      document.getElementById('modal-icon').textContent = icon
+      document.getElementById('modal-title').textContent = title
+      document.getElementById('modal-message').textContent = message
+      document.getElementById('modal-actions').innerHTML = actions.map(b => `<button onclick="${b.onclick}" class="flex-1 py-4 rounded-2xl font-semibold text-sm tap ${b.class}">${b.text}</button>`).join('')
       overlay.classList.remove('hidden')
-      
-      requestAnimationFrame(() => {
-        content.classList.remove('scale-95', 'opacity-0')
-        content.classList.add('scale-100', 'opacity-100')
-      })
+      requestAnimationFrame(() => panel.classList.add('shown'))
     }
-
     function hideModal() {
       const overlay = document.getElementById('modal-overlay')
-      const content = document.getElementById('modal-content')
-      
-      content.classList.remove('scale-100', 'opacity-100')
-      content.classList.add('scale-95', 'opacity-0')
-      
-      setTimeout(() => overlay.classList.add('hidden'), 200)
+      const panel = document.getElementById('modal-content')
+      panel.classList.remove('shown')
+      setTimeout(() => overlay.classList.add('hidden'), 320)
     }
+    document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') hideModal() })
 
-    // =====================
-    // PASSWORD TOGGLE
-    // =====================
+    // ============== AUTH UI ==============
     function togglePassword() {
       const input = document.getElementById('password')
-      const eye = document.getElementById('eye-icon')
-      const eyeSlash = document.getElementById('eye-slash-icon')
-      
-      if (input.type === 'password') {
-        input.type = 'text'
-        eye.classList.add('hidden')
-        eyeSlash.classList.remove('hidden')
-      } else {
-        input.type = 'password'
-        eye.classList.remove('hidden')
-        eyeSlash.classList.add('hidden')
-      }
+      document.getElementById('eye-icon').classList.toggle('hidden')
+      document.getElementById('eye-slash-icon').classList.toggle('hidden')
+      input.type = input.type === 'password' ? 'text' : 'password'
     }
-
-    // =====================
-    // REMEMBER ME
-    // =====================
     function loadRememberedEmail() {
-      const remembered = localStorage.getItem('remembered-email')
-      if (remembered) {
-        document.getElementById('email').value = remembered
-        document.getElementById('remember-me').checked = true
-      }
+      const r = localStorage.getItem('remembered-email')
+      if (r) { document.getElementById('email').value = r; document.getElementById('remember-me').checked = true }
     }
-
     function saveRememberMe(email, checked) {
-      if (checked) {
-        localStorage.setItem('remembered-email', email)
-      } else {
-        localStorage.removeItem('remembered-email')
-      }
+      if (checked) localStorage.setItem('remembered-email', email)
+      else localStorage.removeItem('remembered-email')
     }
 
-    // =====================
-    // LOCAL STATE
-    // =====================
+    // ============== STATE ==============
     let fixtures = []
     let predictions = []
     const pendingPredictions = {}
 
-    // =====================
-    // INIT
-    // =====================
+    // ============== INIT ==============
     async function init() {
       loadRememberedEmail()
       const auth = await initAuth()
-      if (auth) {
-        showApp()
-      } else {
-        showAuth()
-      }
+      auth ? showApp() : showAuth()
     }
 
-    // =====================
-    // PASSWORD AUTH HANDLERS
-    // =====================
     document.getElementById('auth-form').addEventListener('submit', async (e) => {
       e.preventDefault()
       const email = document.getElementById('email').value.trim()
       const password = document.getElementById('password').value
-      const rememberMe = document.getElementById('remember-me').checked
-      const msg = document.getElementById('auth-message')
-      
-      const { data, error } = await signInOrSignUp(email, password)
-      
-      if (error) {
-        msg.textContent = 'Error: ' + error.message
-        msg.className = 'mt-4 text-sm text-center text-red-600'
-        msg.classList.remove('hidden')
-        showToast(error.message, 'error')
-      } else {
-        saveRememberMe(email, rememberMe)
-      }
+      const remember = document.getElementById('remember-me').checked
+      const { error } = await signInOrSignUp(email, password)
+      if (error) { showToast(error.message, 'error') }
+      else { saveRememberMe(email, remember) }
     })
 
     function confirmLogout() {
       showModal({
-        icon: '👋',
-        title: 'Log Out?',
-        message: 'Are you sure you want to leave?',
+        icon: '👋', title: 'Log out?', message: 'You\'ll need to sign in again next time.',
         actions: [
-          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-          { text: 'Log Out', onclick: 'hideModal(); handleLogoutConfirm()', class: 'bg-red-500 text-white hover:bg-red-600' }
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Log out', onclick: 'hideModal(); signOut()', class: 'bg-red-600 text-white' }
         ]
       })
     }
 
-    async function handleLogoutConfirm() {
-      await signOut()
-    }
-
-    // =====================
-    // PROFILE
-    // =====================
     async function handleSaveProfile() {
       const updates = {
         name: document.getElementById('profile-name').value,
         department: document.getElementById('profile-dept').value,
         phone: document.getElementById('profile-phone').value
       }
-      
       const { error } = await updateProfile(updates)
-      
-      if (error) {
-        showToast('Error saving profile', 'error')
-      } else {
-        showToast('Profile saved!', 'success')
-        document.getElementById('user-name').textContent = updates.name || 'Player'
-      }
+      if (error) showToast('Could not save', 'error')
+      else { showToast('Profile saved', 'success'); document.getElementById('user-name').textContent = updates.name || 'Player' }
     }
 
-    // =====================
-    // FIXTURES & PREDICTIONS
-    // =====================
+    // ============== FIXTURES ==============
     async function loadFixtures() {
-      const { data: fixturesData } = await getFixtures()
-      const { data: predictionsData } = await getMyPredictions()
-      
-      fixtures = fixturesData
-      predictions = predictionsData
-      
+      const { data: fxData } = await getFixtures()
+      const { data: predData } = await getMyPredictions()
+      fixtures = fxData || []
+      predictions = predData || []
       renderFixtures()
       updatePredictionCount()
     }
 
-    function getPrediction(fixtureId) {
-      return predictions.find(p => p.fixture_id === fixtureId)
-    }
-
-    function isLocked(kickoff) {
-      return new Date() >= new Date(kickoff)
-    }
+    function getPrediction(id) { return predictions.find(p => p.fixture_id === id) }
+    function isLocked(kickoff) { return new Date() >= new Date(kickoff) }
 
     function renderFixtures() {
-      const container = document.getElementById('fixtures-list')
+      const c = document.getElementById('fixtures-list')
       if (!fixtures.length) {
-        container.innerHTML = '<div class="text-center py-12 text-gray-400">No fixtures scheduled yet.</div>'
+        c.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-10 text-center">
+          <div class="text-5xl mb-3">⚽</div>
+          <div class="font-bold text-ink-900">No fixtures yet</div>
+          <p class="text-sm text-ink-500 mt-1">Matches will appear here once added.</p>
+        </div>`
         return
       }
-      
-      container.innerHTML = fixtures.map(fixture => {
-        const pred = getPrediction(fixture.id)
-        const locked = isLocked(fixture.kickoff)
-        const hasScore = fixture.home_score !== null && fixture.away_score !== null
-        
-        const homePred = pred ? pred.home_prediction : ''
-        const awayPred = pred ? pred.away_prediction : ''
-        
-        let statusBadge = ''
-        if (hasScore) {
-          statusBadge = `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">FT ${fixture.home_score}-${fixture.away_score}</span>`
-        } else if (locked) {
-          statusBadge = `<span class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">🔒 Locked</span>`
-        } else {
-          statusBadge = `<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">Open</span>`
-        }
-        
-        const pointsBadge = pred && pred.points_awarded > 0 
-          ? `<span class="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-md z-10">+${pred.points_awarded}</span>` 
-          : ''
-        
+      c.innerHTML = fixtures.map(f => {
+        const pred = getPrediction(f.id)
+        const locked = isLocked(f.kickoff)
+        const hasScore = f.home_score !== null && f.away_score !== null
+        const hP = pred ? pred.home_prediction : ''
+        const aP = pred ? pred.away_prediction : ''
+        const pts = pred?.points_awarded || 0
+
+        let badge
+        if (hasScore) badge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
+        else if (locked) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+        else badge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">OPEN</span>`
+
+        const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
+
         return `
-        <div class="fixture-card bg-white rounded-xl shadow-sm p-4 relative" data-fixture="${fixture.id}">
-          ${pointsBadge}
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">${fixture.stage}</span>
-            ${statusBadge}
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5 relative" data-fixture="${f.id}">
+          ${ptsBadge}
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em]">${f.stage}</span>
+            ${badge}
           </div>
-          
-          <div class="flex items-center gap-3">
+
+          <div class="flex items-center gap-3 mb-3">
             <div class="flex-1 text-center min-w-0">
-              <div class="font-bold text-lg truncate">${fixture.home_team}</div>
-              <div class="text-xs text-gray-500">Home</div>
+              <div class="font-bold text-[15px] truncate">${f.home_team}</div>
+              <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
             </div>
-            
             <div class="flex items-center gap-2 shrink-0">
-              ${locked ? `
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center font-bold text-xl text-gray-700">${homePred !== '' ? homePred : '-'}</div>
-                <span class="text-gray-400 font-bold">:</span>
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center font-bold text-xl text-gray-700">${awayPred !== '' ? awayPred : '-'}</div>
-              ` : `
-                <input type="number" min="0" inputmode="numeric" pattern="[0-9]*"
-                  class="w-12 h-12 text-center bg-gray-50 border-2 border-gray-200 rounded-lg font-bold text-xl focus:border-emerald-500 focus:bg-white outline-none transition"
-                  value="${homePred}" onchange="updatePrediction('${fixture.id}', 'home', this.value)">
-                <span class="text-gray-400 font-bold">:</span>
-                <input type="number" min="0" inputmode="numeric" pattern="[0-9]*"
-                  class="w-12 h-12 text-center bg-gray-50 border-2 border-gray-200 rounded-lg font-bold text-xl focus:border-emerald-500 focus:bg-white outline-none transition"
-                  value="${awayPred}" onchange="updatePrediction('${fixture.id}', 'away', this.value)">
-              `}
+              ${locked
+                ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
+                : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
             </div>
-            
             <div class="flex-1 text-center min-w-0">
-              <div class="font-bold text-lg truncate">${fixture.away_team}</div>
-              <div class="text-xs text-gray-500">Away</div>
+              <div class="font-bold text-[15px] truncate">${f.away_team}</div>
+              <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
             </div>
           </div>
-          
-          <div class="mt-3 text-center text-xs text-gray-400 font-medium">
-            ${new Date(fixture.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+          <div class="text-center text-[11px] text-ink-400 font-medium mb-3">
+            ${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </div>
-          
-          ${!locked ? `
-            <button onclick="handleSavePrediction('${fixture.id}')" 
-              class="mt-3 w-full bg-gray-900 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-gray-800 active:scale-95 transition tap-active">
-              Save Prediction
-            </button>
-          ` : ''}
-          
-          <div class="saved-msg-${fixture.id} text-center text-xs text-emerald-600 mt-2 h-4"></div>
-        </div>
-        `
+
+          ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
+        </div>`
       }).join('')
     }
 
-    function updatePrediction(fixtureId, side, value) {
-      if (!pendingPredictions[fixtureId]) pendingPredictions[fixtureId] = {}
-      pendingPredictions[fixtureId][side] = value
+    function updatePrediction(id, side, val) {
+      if (!pendingPredictions[id]) pendingPredictions[id] = {}
+      pendingPredictions[id][side] = val
     }
 
-    async function handleSavePrediction(fixtureId) {
-      const card = document.querySelector(`[data-fixture="${fixtureId}"]`)
+    async function handleSavePrediction(id) {
+      const card = document.querySelector(`[data-fixture="${id}"]`)
       const inputs = card.querySelectorAll('input')
-      const pending = pendingPredictions[fixtureId] || {}
-      
-      const homeVal = pending.home !== undefined ? pending.home : inputs[0]?.value
-      const awayVal = pending.away !== undefined ? pending.away : inputs[1]?.value
-      
-      if (homeVal === '' || homeVal === undefined || awayVal === '' || awayVal === undefined) {
-        showToast('Enter both scores', 'warning')
-        return
-      }
-      
-      const home = parseInt(homeVal)
-      const away = parseInt(awayVal)
-      
-      const { error } = await savePrediction(fixtureId, home, away)
-      
-      if (error) {
-        showToast('Error: ' + error.message, 'error')
-      } else {
-        showToast('Prediction saved!', 'success')
-        if (!getPrediction(fixtureId)) {
-          predictions.push({
-            user_id: getUser().id,
-            fixture_id: fixtureId,
-            home_prediction: home,
-            away_prediction: away,
-            points_awarded: 0
-          })
-        } else {
-          const pred = getPrediction(fixtureId)
-          pred.home_prediction = home
-          pred.away_prediction = away
-        }
-        updatePredictionCount()
-      }
+      const pending = pendingPredictions[id] || {}
+      const h = pending.home !== undefined ? pending.home : inputs[0]?.value
+      const a = pending.away !== undefined ? pending.away : inputs[1]?.value
+      if (h === '' || h === undefined || a === '' || a === undefined) { showToast('Enter both scores', 'warning'); return }
+      const home = parseInt(h), away = parseInt(a)
+      const { error } = await savePrediction(id, home, away)
+      if (error) { showToast(error.message, 'error'); return }
+      showToast('Prediction saved', 'success')
+      const existing = getPrediction(id)
+      if (existing) { existing.home_prediction = home; existing.away_prediction = away }
+      else predictions.push({ user_id: getUser().id, fixture_id: id, home_prediction: home, away_prediction: away, points_awarded: 0 })
+      updatePredictionCount()
     }
 
     function updatePredictionCount() {
-      const count = predictions.length
-      const total = fixtures.length
-      document.getElementById('prediction-count').textContent = `${count}/${total}`
+      document.getElementById('prediction-count').textContent = `${predictions.length}/${fixtures.length}`
     }
 
-    // =====================
-    // HOME / DASHBOARD
-    // =====================
+    // ============== HOME ==============
     async function loadHome() {
       const myId = getUser()?.id
-      
-      // Stats + rank from leaderboard
       const { data: stats } = await getLeaderboard()
-      const total = stats.length
-      const myIdx = stats.findIndex(s => s.user_id === myId)
+      const total = stats?.length || 0
+      const myIdx = stats?.findIndex(s => s.user_id === myId) ?? -1
       const me = myIdx >= 0 ? stats[myIdx] : null
-      
+
       if (me) {
         const rank = myIdx + 1
         document.getElementById('home-rank').textContent = `#${rank}`
         document.getElementById('home-rank-total').textContent = `of ${total}`
-        const medals = { 1: '🥇 Leading the pack', 2: '🥈 So close', 3: '🥉 Podium spot' }
-        document.getElementById('home-rank-medal').textContent = medals[rank] || ''
+        const medals = { 1: '🥇 Top of the table', 2: '🥈 Almost there', 3: '🥉 On the podium' }
+        document.getElementById('home-rank-medal').textContent = medals[rank] || `Keep climbing`
         document.getElementById('home-points').textContent = me.points || 0
         const correct = (me.exact || 0) + (me.gd || 0) + (me.result || 0)
         document.getElementById('home-points-breakdown').textContent = `${me.exact || 0} exact · ${correct} correct`
@@ -721,214 +605,175 @@
         document.getElementById('home-rank').textContent = '—'
         document.getElementById('home-rank-total').textContent = total ? `of ${total}` : ''
         document.getElementById('home-points').textContent = '0'
-        document.getElementById('home-points-breakdown').textContent = 'No predictions yet'
+        document.getElementById('home-rank-medal').textContent = 'Make your first prediction'
+        document.getElementById('home-points-breakdown').textContent = '—'
       }
-      
-      // Prize pool (optional — gracefully skip if helper missing)
+
+      // Prize pool
       try {
         if (typeof getPrizePool === 'function') {
           const { data: pool } = await getPrizePool()
           if (pool && pool.amount > 0) {
             document.getElementById('home-prize-card').classList.remove('hidden')
             document.getElementById('home-prize-amount').textContent = (pool.currency || '$') + Number(pool.amount).toLocaleString()
-            document.getElementById('home-prize-players').textContent = pool.paid_count ? `${pool.paid_count} players` : ''
+            document.getElementById('home-prize-players').textContent = pool.paid_count ? `${pool.paid_count} players in` : ''
           }
         }
-      } catch (e) { /* no prize pool yet */ }
-      
-      // Upcoming + recent matches
+      } catch (e) {}
+
+      // Next + recent
       const now = new Date()
-      const upcoming = fixtures
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const finished = fixtures
-        .filter(f => f.home_score !== null && f.away_score !== null)
-        .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
-        .slice(0, 3)
-      
+      const upcoming = fixtures.filter(f => new Date(f.kickoff) > now && f.home_score === null).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const finished = fixtures.filter(f => f.home_score !== null).sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff)).slice(0, 3)
+
       const nextEl = document.getElementById('home-next-match')
+      const cdEl = document.getElementById('home-next-countdown')
       if (!upcoming.length) {
-        nextEl.innerHTML = '<div class="py-8 text-gray-400">No upcoming matches.</div>'
+        cdEl.textContent = ''
+        nextEl.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-8 text-center">
+          <div class="text-4xl mb-2">⏳</div><div class="text-sm font-semibold text-ink-700">No upcoming matches</div><p class="text-xs text-ink-500 mt-1">Check back soon</p>
+        </div>`
       } else {
         const f = upcoming[0]
         const pred = getPrediction(f.id)
-        const kickoff = new Date(f.kickoff)
-        const diffMs = kickoff - now
-        const hours = Math.floor(diffMs / 3.6e6)
-        const days = Math.floor(hours / 24)
-        const countdown = days > 0 ? `in ${days}d ${hours % 24}h` : hours > 0 ? `in ${hours}h` : 'starting soon'
-        
+        const ko = new Date(f.kickoff)
+        const diff = ko - now
+        const days = Math.floor(diff / 8.64e7)
+        const hours = Math.floor((diff % 8.64e7) / 3.6e6)
+        const mins = Math.floor((diff % 3.6e6) / 6e4)
+        const cd = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+        cdEl.textContent = `in ${cd}`
+
         nextEl.innerHTML = `
-          <div class="bg-white rounded-xl shadow-sm p-5 text-left">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">${f.stage}</span>
-              <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">${countdown}</span>
-            </div>
-            <div class="flex items-center gap-3 mb-4">
-              <div class="flex-1 text-center min-w-0">
-                <div class="font-bold text-lg truncate">${f.home_team}</div>
+          <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
+            <div class="p-5">
+              <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-4">${f.stage}</div>
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex-1 text-center">
+                  <div class="font-bold text-lg truncate">${f.home_team}</div>
+                </div>
+                <div class="px-3 text-ink-300 font-bold text-sm">VS</div>
+                <div class="flex-1 text-center">
+                  <div class="font-bold text-lg truncate">${f.away_team}</div>
+                </div>
               </div>
-              <div class="text-gray-300 font-bold text-xl">vs</div>
-              <div class="flex-1 text-center min-w-0">
-                <div class="font-bold text-lg truncate">${f.away_team}</div>
+              <div class="text-center text-xs text-ink-500 font-medium pb-1">
+                ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
-            <div class="text-center text-xs text-gray-400 mb-3">${kickoff.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-            <div class="border-t border-gray-100 pt-3 text-center">
-              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Your Prediction</div>
-              ${pred ? `
-                <div class="text-2xl font-bold text-emerald-600">${pred.home_prediction} – ${pred.away_prediction}</div>
-                <button onclick="switchTab('predictions')" class="mt-2 text-xs text-gray-500 underline">Change</button>
-              ` : `
-                <div class="text-gray-400 text-sm mb-2">Not predicted yet</div>
-                <button onclick="switchTab('predictions')" class="bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-emerald-700 tap-active">Make Prediction</button>
-              `}
+            <div class="bg-paper border-t border-paper-border px-5 py-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-0.5">Your Pick</div>
+                  ${pred
+                    ? `<div class="text-xl font-bold text-brand-700">${pred.home_prediction} – ${pred.away_prediction}</div>`
+                    : `<div class="text-sm text-ink-500">Not predicted yet</div>`}
+                </div>
+                <button onclick="switchTab('predictions')" class="bg-brand-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
+              </div>
             </div>
-          </div>
-        `
+          </div>`
       }
-      
+
       const recentEl = document.getElementById('home-recent')
       if (!finished.length) {
-        recentEl.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No completed matches yet.</div>'
+        recentEl.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-6 text-center text-sm text-ink-500">No results yet</div>`
       } else {
         recentEl.innerHTML = finished.map(f => {
           const pred = getPrediction(f.id)
           const pts = pred?.points_awarded || 0
           return `
-            <div class="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-semibold truncate">${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team}</div>
-                <div class="text-xs text-gray-500">${pred ? `Predicted ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
-              </div>
-              <div class="text-right shrink-0">
-                <span class="${pts > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'} text-xs font-bold px-2 py-1 rounded-full">+${pts}</span>
-              </div>
+          <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-400 font-normal">${f.home_score}–${f.away_score}</span> ${f.away_team}</div>
+              <div class="text-xs text-ink-500 mt-0.5">${pred ? `You: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
             </div>
-          `
+            <div class="${pts > 0 ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-400'} text-xs font-bold px-2.5 py-1 rounded-full shrink-0">+${pts}</div>
+          </div>`
         }).join('')
       }
     }
 
-    // =====================
-    // LEADERBOARD (Real-time)
-    // =====================
+    // ============== LEADERBOARD ==============
     async function loadLeaderboard() {
       const { data: stats } = await getLeaderboard()
-      
-      const container = document.getElementById('leaderboard-list')
+      const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
-      container.innerHTML = stats.map((stat, index) => {
-        const rank = index + 1
+      if (!stats?.length) {
+        c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+          <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
+        </div>`; return
+      }
+      c.innerHTML = stats.map((s, i) => {
+        const rank = i + 1
+        const isMe = s.user_id === myId
+        const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
-        const rankDisplay = medal || `<span class="text-gray-400 font-bold">#${rank}</span>`
-        const isMe = stat.user_id === myId
-        const correct = (stat.exact || 0) + (stat.gd || 0) + (stat.result || 0)
-        
+        const rankDisplay = medal
+          ? `<div class="text-2xl">${medal}</div>`
+          : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
         return `
-        <div class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3 ${isMe ? 'ring-2 ring-emerald-500' : ''}">
-          <div class="w-10 text-center text-2xl shrink-0">${rankDisplay}</div>
+        <div class="bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3">
+          ${rankDisplay}
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <span class="font-bold text-gray-900 truncate">${stat.name || 'Anonymous'}${isMe ? ' (you)' : ''}</span>
-              ${stat.department ? `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate">${stat.department}</span>` : ''}
+              <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
+              ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
             </div>
-            <div class="text-xs text-gray-500 mt-0.5 flex gap-3">
-              <span><b class="text-gray-700">${correct}</b> correct</span>
-              <span><b class="text-emerald-600">${stat.exact || 0}</b> exact</span>
+            <div class="text-xs text-ink-500 mt-1 flex items-center gap-3">
+              <span><b class="text-ink-900">${correct}</b> correct</span>
+              <span class="text-ink-300">·</span>
+              <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
+              ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}
             </div>
           </div>
           <div class="text-right shrink-0">
-            <div class="text-2xl font-bold text-emerald-600">${stat.points}</div>
-            <div class="text-xs text-gray-400">pts</div>
+            <div class="text-2xl font-bold text-brand-700 leading-none">${s.points || 0}</div>
+            <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
           </div>
-        </div>
-        `
+        </div>`
       }).join('')
     }
 
-    // =====================
-    // REAL-TIME SUBSCRIPTIONS
-    // =====================
+    // ============== REALTIME ==============
     function setupRealtime() {
-      // Watch for prediction point updates
-      supabaseClient
-        .channel('leaderboard-updates')
-        .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'predictions' 
-        }, () => {
-          loadLeaderboard()
-          loadFixtures()
-          loadHome()
-        })
-        .subscribe()
-      
-      // Watch for new fixtures or score changes
-      supabaseClient
-        .channel('fixture-updates')
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'fixtures' 
-        }, () => {
-          loadFixtures()
-          loadLeaderboard()
-          loadHome()
-        })
-        .subscribe()
+      supabaseClient.channel('lb').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'predictions' }, () => { loadLeaderboard(); loadFixtures(); loadHome() }).subscribe()
+      supabaseClient.channel('fx').on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, () => { loadFixtures(); loadLeaderboard(); loadHome() }).subscribe()
     }
 
-    // =====================
-    // UI
-    // =====================
+    // ============== NAV ==============
     function showAuth() {
       document.getElementById('auth-screen').classList.remove('hidden')
       document.getElementById('app-shell').classList.add('hidden')
     }
-
     async function showApp() {
       document.getElementById('auth-screen').classList.add('hidden')
       document.getElementById('app-shell').classList.remove('hidden')
-      
       const profile = getProfile()
       document.getElementById('user-name').textContent = profile?.name || 'Player'
       document.getElementById('profile-name').value = profile?.name || ''
       document.getElementById('profile-dept').value = profile?.department || ''
       document.getElementById('profile-phone').value = profile?.phone || ''
-      
-      if (isAdmin()) {
-        document.getElementById('admin-link').classList.remove('hidden')
-      }
-      
+      if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
       await loadFixtures()
       await loadLeaderboard()
       await loadHome()
       setupRealtime()
     }
-
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
-      document.getElementById(`tab-${tab}`).classList.remove('hidden')
-      
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        if (btn.dataset.tab === tab) {
-          btn.classList.remove('tab-inactive')
-          btn.classList.add('tab-active')
-        } else {
-          btn.classList.remove('tab-active')
-          btn.classList.add('tab-inactive')
-        }
-      })
-      
+      const target = document.getElementById(`tab-${tab}`)
+      target.classList.remove('hidden')
+      // re-trigger animation
+      target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
       if (tab === 'home') loadHome()
       if (tab === 'leaderboard') loadLeaderboard()
       if (tab === 'predictions') loadFixtures()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
-    // Start
     init()
   </script>
 </body>
-</html> -->
+</html>
