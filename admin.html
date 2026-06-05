@@ -7,8 +7,29 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
+  <style>
+    .tap-active:active { transform: scale(0.96); }
+    .toast-enter { transform: translateY(100%); opacity: 0; }
+    .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .toast-exit-active { transform: translateY(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+  </style>
 </head>
 <body class="bg-gray-50 p-4">
+  
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- MODAL -->
+  <div id="modal-overlay" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+    <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-95 opacity-0 transition-all duration-200">
+      <div id="modal-icon" class="text-4xl text-center mb-4"></div>
+      <h3 id="modal-title" class="text-lg font-bold text-center text-gray-900 mb-2"></h3>
+      <p id="modal-message" class="text-sm text-gray-600 text-center mb-6"></p>
+      <div id="modal-actions" class="flex gap-3"></div>
+    </div>
+  </div>
+
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
@@ -28,7 +49,7 @@
           <input type="text" id="stage" placeholder="Stage (e.g. Group A, Round of 16)" required 
             class="px-4 py-2 border border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
           <button type="submit" 
-            class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 active:scale-95 transition">
+            class="md:col-span-2 bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 active:scale-95 transition tap-active">
             Add Fixture
           </button>
         </form>
@@ -51,6 +72,60 @@
 
   <script>
     const pendingScores = {}
+
+    // Toast system
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container')
+      const toast = document.createElement('div')
+      
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' }
+      const colors = { success: 'bg-emerald-600', error: 'bg-red-500', info: 'bg-blue-500', warning: 'bg-amber-500' }
+      
+      toast.className = `toast-enter ${colors[type]} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium pointer-events-auto`
+      toast.innerHTML = `<span class="text-lg">${icons[type]}</span><span>${message}</span>`
+      
+      container.appendChild(toast)
+      requestAnimationFrame(() => {
+        toast.classList.remove('toast-enter')
+        toast.classList.add('toast-enter-active')
+      })
+      
+      setTimeout(() => {
+        toast.classList.remove('toast-enter-active')
+        toast.classList.add('toast-exit-active')
+        setTimeout(() => toast.remove(), 300)
+      }, 3000)
+    }
+
+    // Modal system
+    function showModal({ icon, title, message, actions }) {
+      const overlay = document.getElementById('modal-overlay')
+      const content = document.getElementById('modal-content')
+      
+      document.getElementById('modal-icon').textContent = icon
+      document.getElementById('modal-title').textContent = title
+      document.getElementById('modal-message').textContent = message
+      document.getElementById('modal-actions').innerHTML = actions.map(btn => `
+        <button onclick="${btn.onclick}" 
+          class="flex-1 py-3 rounded-xl font-semibold text-sm transition active:scale-95 ${btn.class}">
+          ${btn.text}
+        </button>
+      `).join('')
+      
+      overlay.classList.remove('hidden')
+      requestAnimationFrame(() => {
+        content.classList.remove('scale-95', 'opacity-0')
+        content.classList.add('scale-100', 'opacity-100')
+      })
+    }
+
+    function hideModal() {
+      const overlay = document.getElementById('modal-overlay')
+      const content = document.getElementById('modal-content')
+      content.classList.remove('scale-100', 'opacity-100')
+      content.classList.add('scale-95', 'opacity-0')
+      setTimeout(() => overlay.classList.add('hidden'), 200)
+    }
 
     async function init() {
       const auth = await initAuth()
@@ -96,8 +171,8 @@
               value="${f.away_score !== null ? f.away_score : ''}" 
               onchange="updateScore('${f.id}', 'away', this.value)">
           </div>
-          <button onclick="handleSaveScore('${f.id}')" 
-            class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 active:scale-95 transition">
+          <button onclick="confirmSaveScore('${f.id}')" 
+            class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 active:scale-95 transition tap-active">
             Save
           </button>
         </div>
@@ -109,19 +184,35 @@
       pendingScores[id][side] = val === '' ? null : parseInt(val)
     }
 
-    async function handleSaveScore(id) {
+    function confirmSaveScore(id) {
+      const s = pendingScores[id] || {}
+      if (s.home === undefined && s.away === undefined) {
+        showToast('No score changes to save', 'warning')
+        return
+      }
+      
+      showModal({
+        icon: '⚽',
+        title: 'Confirm Score',
+        message: `Save final score for this match?`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+          { text: 'Confirm', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-emerald-600 text-white hover:bg-emerald-700' }
+        ]
+      })
+    }
+
+    async function executeSaveScore(id) {
       const s = pendingScores[id] || {}
       const homeScore = s.home
       const awayScore = s.away
       
-      if (homeScore === undefined && awayScore === undefined) return
-      
       const { error } = await updateFixtureScore(id, homeScore, awayScore)
       
       if (error) {
-        alert('Error: ' + error.message)
+        showToast('Error: ' + error.message, 'error')
       } else {
-        alert('✅ Score saved! Points auto-calculated.')
+        showToast('Score saved! Points calculated.', 'success')
         pendingScores[id] = {}
         loadFixtures()
       }
@@ -138,9 +229,9 @@
       })
       
       if (error) {
-        alert('Error: ' + error.message)
+        showToast('Error: ' + error.message, 'error')
       } else {
-        alert('✅ Fixture added!')
+        showToast('Fixture added!', 'success')
         e.target.reset()
         loadFixtures()
       }
