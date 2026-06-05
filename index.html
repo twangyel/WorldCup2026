@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>WC Predictions</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#064E3B">
+  <meta name="theme-color" content="#0B1221">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23064E3B' width='512' height='512' rx='128'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280'%3E🏆%3C/text%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%230B1221' width='512' height='512' rx='128'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280'%3E🏆%3C/text%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,9 +23,9 @@
         extend: {
           fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
           colors: {
-            ink: { 900: '#0A0F0D', 700: '#1F2A26', 500: '#5C6B66', 400: '#8A9590', 300: '#B5BDB9' },
+            ink: { 900: '#0A0F14', 700: '#1F2A35', 500: '#5C6B75', 400: '#8A959F', 300: '#B5BDC5' },
             paper: { DEFAULT: '#FAFAF7', card: '#FFFFFF', border: '#EEEDE7' },
-            brand: { 900: '#064E3B', 700: '#047857', 500: '#10B981', 100: '#D1FAE5', 50: '#ECFDF5' },
+            brand: { 900: '#0B1221', 700: '#1E3A5F', 500: '#D4A24C', 100: '#FDF6E3', 50: '#FFFBF0' },
             gold: '#D4A24C'
           },
           boxShadow: {
@@ -55,7 +55,7 @@
       background: #FAFAF7; border: 1.5px solid #EEEDE7; border-radius: 14px;
       outline: none; transition: all 150ms ease; color: #0A0F0D;
     }
-    .score-input:focus { border-color: #10B981; background: #fff; box-shadow: 0 0 0 4px rgba(16,185,129,0.12); }
+    .score-input:focus { border-color: #D4A24C; background: #fff; box-shadow: 0 0 0 4px rgba(212,162,76,0.12); }
     .score-readonly {
       width: 56px; height: 56px; border-radius: 14px;
       display: flex; align-items: center; justify-content: center;
@@ -85,13 +85,13 @@
 
     /* Gradient hero card */
     .hero-card {
-      background: radial-gradient(circle at top right, #047857 0%, #064E3B 60%, #052E26 100%);
+      background: radial-gradient(circle at top right, #1E3A5F 0%, #0B1221 60%, #060C18 100%);
       position: relative; overflow: hidden;
     }
     .hero-card::before {
       content: ''; position: absolute; top: -40px; right: -40px;
       width: 160px; height: 160px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(16,185,129,0.35), transparent 70%);
+      background: radial-gradient(circle, rgba(212,162,76,0.35), transparent 70%);
       pointer-events: none;
     }
 
@@ -114,6 +114,7 @@
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
