@@ -1,11 +1,13 @@
-const CACHE_NAME = 'wc-predictions-v2'  // bump this on every deploy
+const CACHE_NAME = 'wc-predictions-v2'
 const urlsToCache = [
   '/',
   '/index.html',
   '/admin.html',
   '/assets/js/auth.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/assets/logo.svg'  // <-- add this
 ]
+// ... rest of your sw.js stays the same
 
 self.addEventListener('install', event => {
   event.waitUntil(

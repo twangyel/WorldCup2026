@@ -9,9 +9,9 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23059669' width='512' height='512' rx='128'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280'%3E🏆%3C/text%3E%3C/svg%3E",
+      "src": "/assets/logo.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "/image/logo.svg",
       "purpose": "any maskable"
     }
   ],
