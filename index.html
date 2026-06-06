@@ -113,7 +113,19 @@
     /* Tab fade */
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  
+    /* Prize pool amount animation */
+    .prize-amount-anim {
+      animation: prizePop 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes prizePop {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
   </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 </head>
@@ -263,13 +275,14 @@
 
         <!-- Prize pool -->
         <div id="home-prize-card" class="hidden bg-paper-card border border-paper-border rounded-3xl p-5 shadow-soft flex items-center gap-4">
-          <div class="w-12 h-12 rounded-2xl bg-gold/15 flex items-center justify-center text-2xl">💰</div>
+          <div class="w-12 h-12 rounded-2xl bg-gold/15 flex items-center justify-center text-xl font-bold text-gold">Nu</div>
           <div class="flex-1 min-w-0">
             <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Prize Pool</div>
             <div class="text-2xl font-bold text-ink-900 tracking-tight" id="home-prize-amount">—</div>
           </div>
-          <div class="text-right">
+          <div class="text-right flex flex-col items-end gap-1">
             <div class="text-xs text-ink-400" id="home-prize-players"></div>
+            <button onclick="loadHomePrizePoolOnly()" class="text-[10px] font-semibold text-brand-700 bg-brand-50 px-2 py-1 rounded-lg tap">↻ Refresh</button>
           </div>
         </div>
 
@@ -936,8 +949,19 @@
         if (typeof getPrizePool === 'function') {
           const { data: pool } = await getPrizePool()
           if (pool && pool.amount > 0) {
-            document.getElementById('home-prize-card').classList.remove('hidden')
-            document.getElementById('home-prize-amount').textContent = (pool.currency || '$') + Number(pool.amount).toLocaleString()
+            const card = document.getElementById('home-prize-card')
+            const amountEl = document.getElementById('home-prize-amount')
+            const newText = Number(pool.amount).toLocaleString()
+
+            // Animate if amount changed
+            if (amountEl.textContent !== '—' && amountEl.textContent !== newText) {
+              amountEl.classList.remove('prize-amount-anim')
+              void amountEl.offsetWidth // force reflow
+              amountEl.classList.add('prize-amount-anim')
+            }
+
+            card.classList.remove('hidden')
+            amountEl.textContent = newText
             document.getElementById('home-prize-players').textContent = pool.paid_count ? `${pool.paid_count} players in` : ''
           }
         }
@@ -1058,9 +1082,71 @@
     }
 
     // ============== REALTIME ==============
+    let prizePollInterval = null
+
     function setupRealtime() {
-      supabaseClient.channel('lb').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'predictions' }, () => { loadLeaderboard(); loadFixtures(); loadHome() }).subscribe()
-      supabaseClient.channel('fx').on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, () => { loadFixtures(); loadLeaderboard(); loadHome() }).subscribe()
+      // Leaderboard updates from predictions
+      supabaseClient.channel('lb')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'predictions' }, () => { 
+          loadLeaderboard(); loadFixtures(); loadHome() 
+        })
+        .subscribe((status) => { 
+          if (status !== 'SUBSCRIBED') console.log('LB channel status:', status) 
+        })
+
+      // Fixture updates
+      supabaseClient.channel('fx')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, () => { 
+          loadFixtures(); loadLeaderboard(); loadHome() 
+        })
+        .subscribe((status) => { 
+          if (status !== 'SUBSCRIBED') console.log('FX channel status:', status) 
+        })
+
+      // Prize pool updates from profiles (fee_paid changes)
+      supabaseClient.channel('prize-pool')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+          console.log('[Realtime] Profile change detected:', payload.eventType, payload.new?.id)
+          loadHome()
+        })
+        .subscribe((status) => { 
+          console.log('[Realtime] Prize pool channel status:', status)
+        })
+
+      // Fallback: poll prize pool every 10 seconds in case realtime fails
+      if (prizePollInterval) clearInterval(prizePollInterval)
+      prizePollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadHomePrizePoolOnly()
+        }
+      }, 10000)
+    }
+
+    // Lightweight prize pool refresh without re-rendering everything
+    async function loadHomePrizePoolOnly() {
+      try {
+        if (typeof getPrizePool !== 'function') return
+        const { data: pool } = await getPrizePool()
+        if (!pool || pool.amount <= 0) return
+
+        const card = document.getElementById('home-prize-card')
+        const amountEl = document.getElementById('home-prize-amount')
+        const playersEl = document.getElementById('home-prize-players')
+        if (!card || !amountEl) return
+
+        const newText = Number(pool.amount).toLocaleString()
+        const oldText = amountEl.textContent
+
+        if (oldText !== '—' && oldText !== newText) {
+          amountEl.classList.remove('prize-amount-anim')
+          void amountEl.offsetWidth
+          amountEl.classList.add('prize-amount-anim')
+        }
+
+        card.classList.remove('hidden')
+        amountEl.textContent = newText
+        playersEl.textContent = pool.paid_count ? `${pool.paid_count} players in` : ''
+      } catch (e) { /* silent */ }
     }
 
     // ============== NAV ==============
@@ -1129,6 +1215,30 @@ async function showApp() {
         showToast('Copy failed', 'error')
       }
     }
+
+    // Fallback: ensure getPrizePool works even if auth.js doesn't define it
+if (typeof getPrizePool !== 'function') {
+  window.getPrizePool = async function() {
+    try {
+      const raw = localStorage.getItem('wc_prize_settings')
+      const settings = raw ? JSON.parse(raw) : { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0 }
+      const { data: profiles, error } = await supabaseClient
+        .from('profiles')
+        .select('fee_paid')
+        .eq('fee_paid', true)
+      if (error) throw error
+      const paidCount = profiles?.length || 0
+      const fee = Number(settings.entry_fee) || 0
+      const amount = settings.manual_override ? (Number(settings.manual_amount) || 0) : paidCount * fee
+      return {
+        data: { amount, currency: settings.currency || 'Nu.', paid_count: paidCount },
+        error: null
+      }
+    } catch (e) {
+      return { data: null, error: e }
+    }
+  }
+}
 
     init()
   </script>
