@@ -883,22 +883,42 @@
       'to be determined': { code: null, emoji: '❓' }, 'tbc': { code: null, emoji: '❓' }
     }
 
-    function getFlag(name) {
-      const key = (name || '').toLowerCase().trim()
-      const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
-      return {
-        emoji: mapped.emoji,
-        img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null
-      }
-    }
+   function getFlag(name) {
+  const key = (name || '').toLowerCase().trim()
+  
+  // TBD / placeholder teams
+  if (key === 'tbd' || key === 'to be determined' || key === 'tbc' || key === 'to be confirmed') {
+    return { emoji: '❓', img: null, isTbd: true }
+  }
+  
+  const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
+  return {
+    emoji: mapped.emoji,
+    img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null,
+    isTbd: false
+  }
+}
 
-    function flagHtml(name, size = 24) {
-      const f = getFlag(name)
-      if (f.img) {
-        return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" class="rounded-sm shadow-sm inline-block object-cover" style="border:1px solid #EEEDE7">`
-      }
-      return `<span class="text-xl">${f.emoji}</span>`
-    }
+function flagHtml(name, size = 24) {
+  const f = getFlag(name)
+  
+  // TBD: show a clean placeholder circle instead of broken image + ❓
+  if (f.isTbd) {
+    return `<div class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold" 
+      style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.4)}px;">?</div>`
+  }
+  
+  if (f.img) {
+    return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" 
+      class="rounded-sm shadow-sm inline-block object-cover" 
+      style="border:1px solid #EEEDE7" 
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
+      <span class="hidden text-xl">${f.emoji}</span>`
+  }
+  
+  // Unknown team (not TBD, not in flag map)
+  return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`
+}
 
     // ============== PWA ==============
     let deferredPrompt = null

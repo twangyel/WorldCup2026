@@ -426,21 +426,41 @@
     }
 
     function getFlag(name) {
-      const key = (name || '').toLowerCase().trim()
-      const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
-      return {
-        emoji: mapped.emoji,
-        img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null
-      }
-    }
+  const key = (name || '').toLowerCase().trim()
+  
+  // TBD / placeholder teams
+  if (key === 'tbd' || key === 'to be determined' || key === 'tbc' || key === 'to be confirmed') {
+    return { emoji: '❓', img: null, isTbd: true }
+  }
+  
+  const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
+  return {
+    emoji: mapped.emoji,
+    img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null,
+    isTbd: false
+  }
+}
 
-    function flagHtml(name, size = 24) {
-      const f = getFlag(name)
-      if (f.img) {
-        return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" class="rounded-sm shadow-sm inline-block object-cover" style="border:1px solid #EEEDE7">`
-      }
-      return `<span class="text-xl">${f.emoji}</span>`
-    }
+function flagHtml(name, size = 24) {
+  const f = getFlag(name)
+  
+  // TBD: show a clean placeholder circle instead of broken image + ❓
+  if (f.isTbd) {
+    return `<div class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold" 
+      style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.4)}px;">?</div>`
+  }
+  
+  if (f.img) {
+    return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" 
+      class="rounded-sm shadow-sm inline-block object-cover" 
+      style="border:1px solid #EEEDE7" 
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
+      <span class="hidden text-xl">${f.emoji}</span>`
+  }
+  
+  // Unknown team (not TBD, not in flag map)
+  return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`
+}
 
     // ============== STATE ==============
     let allFixtures = []
@@ -1067,17 +1087,68 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     function toggleCSV() { document.getElementById('csv-area').classList.toggle('hidden') }
     async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
     async function importCSV() {
-      const raw = document.getElementById('csv-input').value.trim()
-      if (!raw) return showToast('Paste some rows first', 'warning')
-      const rows = raw.split('\n').map(line => {
-        const parts = line.split(',').map(s => s.trim())
-        if (parts.length < 4) return null
-        return { home_team: parts[0], away_team: parts[1], kickoff: new Date(parts[2]).toISOString(), stage: parts[3] }
-      }).filter(Boolean)
-      if (!rows.length) return showToast('No valid rows parsed', 'error')
-      await bulkImport(rows, 'CSV')
-      document.getElementById('csv-input').value = ''
-    }
+  const raw = document.getElementById('csv-input').value.trim()
+  if (!raw) return showToast('Paste some rows first', 'warning')
+  
+  const rows = raw.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !line.toLowerCase().startsWith('home,')) // skip header & empty
+    .map(line => {
+      // Handle quoted CSV: "Brazil","Argentina","2026-06-15T18:00:00Z","Group A"
+      // Or simple CSV: Brazil,Argentina,2026-06-15T18:00:00Z,Group A
+      const parts = []
+      let current = ''
+      let inQuotes = false
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          parts.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      parts.push(current.trim()) // last part
+      
+      // Also try simple split as fallback
+      if (parts.length < 4) {
+        const simpleParts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''))
+        if (simpleParts.length >= 4) {
+          parts.length = 0
+          parts.push(...simpleParts)
+        }
+      }
+      
+      if (parts.length < 4) return null
+      
+      const home = parts[0].replace(/^"|"$/g, '')
+      const away = parts[1].replace(/^"|"$/g, '')
+      const kickoffRaw = parts[2].replace(/^"|"$/g, '')
+      const stage = parts[3].replace(/^"|"$/g, '')
+      
+      // Validate kickoff is parseable
+      const kickoffDate = new Date(kickoffRaw)
+      if (isNaN(kickoffDate.getTime())) {
+        console.warn('Invalid date:', kickoffRaw)
+        return null
+      }
+      
+      return { 
+        home_team: home, 
+        away_team: away, 
+        kickoff: kickoffDate.toISOString(), 
+        stage: stage 
+      }
+    })
+    .filter(Boolean)
+  
+  if (!rows.length) return showToast('No valid rows parsed', 'error')
+  await bulkImport(rows, 'CSV')
+  document.getElementById('csv-input').value = ''
+}
 
     async function bulkImport(rows, label) {
       let added = 0, skipped = 0, failed = 0
