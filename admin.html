@@ -101,7 +101,6 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1081,17 +1080,11 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
                 <span class="text-ink-300">vs</span>
                 ${flagHtml(f.away_team, 20)} ${f.away_team}
               </div>
-              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}${f.manual_locked ? ' · 🔒 Locked' : ''}</div>
+              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}</div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="flex items-center gap-2 bg-paper rounded-xl px-3 py-2 border border-paper-border">
-                <span class="text-[11px] font-semibold text-ink-700">Lock</span>
-                <div class="switch ${f.manual_locked ? 'on' : ''}" onclick="toggleFixtureLock('${f.id}', ${!f.manual_locked})"></div>
-              </div>
-              <button onclick="confirmDeleteFixture('${f.id}')" class="text-ink-400 hover:text-red-500 p-1.5 tap">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
-              </button>
-            </div>
+            <button onclick="confirmDeleteFixture('${f.id}')" class="text-ink-400 hover:text-red-500 p-1.5 tap shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+            </button>
           </div>
           <div class="flex items-center gap-2">
             <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}" style="padding: 10px 12px;">
@@ -1111,24 +1104,6 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       delete pendingKickoffs[id]
       showToast('Kickoff updated', 'success')
       renderFixturesManage()
-    }
-
-    async function toggleFixtureLock(id, locked) {
-      try {
-        const { error } = await supabaseClient
-          .from('fixtures')
-          .update({ manual_locked: locked })
-          .eq('id', id)
-        if (error) throw error
-        const f = allFixtures.find(x => x.id === id)
-        if (f) f.manual_locked = locked
-        showToast(locked ? 'Fixture locked — players cannot predict' : 'Fixture unlocked — predictions open', 'success')
-        renderFixturesManage()
-        renderResults()
-      } catch (e) {
-        console.error('toggleFixtureLock error:', e)
-        showToast(e.message || 'Failed to update lock status', 'error')
-      }
     }
 
     function confirmDeleteFixture(id) {
@@ -1229,7 +1204,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
   <span class="text-ink-300">vs</span>
   ${flagHtml(f.away_team, 20)} ${f.away_team}
 </div>
-            <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${f.manual_locked ? ' · 🔒 Manually Locked' : ''}</div>
+            <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <div class="flex items-center gap-2">
             <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
