@@ -247,47 +247,60 @@
           <h4 class="font-bold text-sm">Entry Fee</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
-          Entry fee is <b class="text-ink-900">Nu. 500</b> per player. Pay via bank transfer or mobile wallet and upload your proof. An admin will verify your payment before you can start predicting.
+          Entry fee is <b class="text-ink-900">Nu. 500</b> per player. Pay via online or cash and upload your payment screenshot. An admin will verify your payment before you can enter the game and start predicting.
         </p>
       </div>
 
       <!-- Point System -->
-      <div>
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">2</div>
-          <h4 class="font-bold text-sm">Point System</h4>
-        </div>
-        <div class="pl-10 space-y-2">
-          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
-            <div>
-              <div class="text-sm font-semibold">Exact Score</div>
-              <div class="text-xs text-ink-500">You predicted the exact final scoreline</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
-            <div>
-              <div class="text-sm font-semibold">Correct Goal Difference</div>
-              <div class="text-xs text-ink-500">Right margin, wrong score (e.g. you said 2–0, result was 3–1)</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
-            <div>
-              <div class="text-sm font-semibold">Correct Outcome</div>
-              <div class="text-xs text-ink-500">Right winner or correct draw, wrong margin</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-sm font-bold shrink-0">0</div>
-            <div>
-              <div class="text-sm font-semibold">Wrong Outcome</div>
-              <div class="text-xs text-ink-500">Wrong winner or wrong draw call</div>
-            </div>
-          </div>
-        </div>
+     <!-- Point System -->
+<div>
+  <div class="flex items-center gap-2 mb-2">
+    <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">2</div>
+    <h4 class="font-bold text-sm">Point System</h4>
+  </div>
+  
+  <!-- MAX POINTS BANNER -->
+  <div class="ml-10 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+    <span class="text-amber-700 text-lg leading-none mt-0.5">⚠️</span>
+    <div>
+      <div class="text-xs font-bold text-amber-800 uppercase tracking-wider">Important</div>
+      <div class="text-xs text-amber-700 mt-0.5 leading-relaxed">
+        You can earn a <b>maximum of 5 points per match</b>. Even if multiple conditions apply, only the <b>highest single tier</b> is awarded — they do not stack.
       </div>
+    </div>
+  </div>
+
+  <div class="pl-10 space-y-2">
+    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+      <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
+      <div>
+        <div class="text-sm font-semibold">Exact Score</div>
+        <div class="text-xs text-ink-500">You predicted the exact final scoreline</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
+      <div>
+        <div class="text-sm font-semibold">Correct Goal Difference</div>
+        <div class="text-xs text-ink-500">Right margin, wrong score (e.g. you said 2–0, result was 3–1)</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
+      <div>
+        <div class="text-sm font-semibold">Correct Outcome</div>
+        <div class="text-xs text-ink-500">Right winner or correct draw, wrong margin</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+      <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-sm font-bold shrink-0">0</div>
+      <div>
+        <div class="text-sm font-semibold">Wrong Outcome</div>
+        <div class="text-xs text-ink-500">Wrong winner or wrong draw call</div>
+      </div>
+    </div>
+  </div>
+</div>
 
       <!-- Prize Pool -->
       <div>
@@ -469,7 +482,7 @@
     </div>
     <div class="bg-white/70 rounded-xl p-3 text-center border border-gray-100 backdrop-blur-sm">
       <div class="text-lg mb-1">⚽</div>
-      <div class="text-xs font-bold text-ink-900">5 · 3 · 2</div>
+      <div class="text-xs font-bold text-ink-900">Max 5 pts</div>
       <div class="text-[10px] text-ink-500">Scoring</div>
     </div>
     <div class="bg-white/70 rounded-xl p-3 text-center border border-gray-100 backdrop-blur-sm">
