@@ -1471,68 +1471,73 @@ let pendingPredictions = {}
     function isLocked(kickoff) { return new Date() >= new Date(kickoff) }
 
     function renderFixtures() {
-      const c = document.getElementById('fixtures-list')
-      if (!fixtures.length) {
-        c.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-10 text-center">
-          <div class="text-5xl mb-3">⚽</div>
-          <div class="font-bold text-ink-900">No fixtures yet</div>
-          <p class="text-sm text-ink-500 mt-1">Matches will appear here once added.</p>
-        </div>`
-        return
-      }
-      c.innerHTML = fixtures.map(f => {
-        const pred = getPrediction(f.id)
-        const locked = isLocked(f.kickoff)
-        const hasScore = f.home_score !== null && f.away_score !== null
-        const hP = pred ? pred.home_prediction : ''
-        const aP = pred ? pred.away_prediction : ''
-        const pts = pred?.points_awarded || 0
+  const c = document.getElementById('fixtures-list')
+  const now = new Date()
+  const upcoming = fixtures
+    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  const f = upcoming[0]
 
-        let badge
-        if (hasScore) badge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
-        else if (locked) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
-        else badge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">OPEN</span>`
+  if (!f) {
+    c.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-10 text-center">
+      <div class="text-5xl mb-3">🏁</div>
+      <div class="font-bold text-ink-900">No upcoming matches</div>
+      <p class="text-sm text-ink-500 mt-1">Check back later for the next fixture.</p>
+    </div>`
+    return
+  }
 
-        const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
+  const pred = getPrediction(f.id)
+  const locked = isLocked(f.kickoff)
+  const hasScore = f.home_score !== null && f.away_score !== null
+  const hP = pred ? pred.home_prediction : ''
+  const aP = pred ? pred.away_prediction : ''
+  const pts = pred?.points_awarded || 0
 
-        return `
-        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5 relative" data-fixture="${f.id}">
-          ${ptsBadge}
-          <div class="flex items-center justify-between mb-4">
-            <span class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em]">${f.stage}</span>
-            ${badge}
-          </div>
+  let badge
+  if (hasScore) badge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
+  else if (locked) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+  else badge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">OPEN</span>`
 
-          <div class="flex items-center gap-3 mb-3">
-            <div class="flex-1 text-center min-w-0">
-  <div class="flex flex-col items-center gap-1 w-full">
-    ${flagHtml(f.home_team, 32)}
-    <div class="font-bold text-[15px] truncate w-full">${f.home_team}</div>
-  </div>
-              <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              ${locked
-                ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
-                : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
-            </div>
-            <div class="flex-1 text-center min-w-0">
-  <div class="flex flex-col items-center gap-1 w-full">
-    ${flagHtml(f.away_team, 32)}
-    <div class="font-bold text-[15px] truncate w-full">${f.away_team}</div>
-  </div>
-              <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
-            </div>
-          </div>
+  const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
 
-          <div class="text-center text-[11px] text-ink-400 font-medium mb-3">
-            ${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </div>
+  c.innerHTML = `
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5 relative" data-fixture="${f.id}">
+    ${ptsBadge}
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em]">${f.stage}</span>
+      ${badge}
+    </div>
 
-          ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
-        </div>`
-      }).join('')
-    }
+    <div class="flex items-center gap-3 mb-3">
+      <div class="flex-1 text-center min-w-0">
+        <div class="flex flex-col items-center gap-1 w-full">
+          ${flagHtml(f.home_team, 32)}
+          <div class="font-bold text-[15px] truncate w-full">${f.home_team}</div>
+        </div>
+        <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        ${locked
+          ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
+          : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
+      </div>
+      <div class="flex-1 text-center min-w-0">
+        <div class="flex flex-col items-center gap-1 w-full">
+          ${flagHtml(f.away_team, 32)}
+          <div class="font-bold text-[15px] truncate w-full">${f.away_team}</div>
+        </div>
+        <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
+      </div>
+    </div>
+
+    <div class="text-center text-[11px] text-ink-400 font-medium mb-3">
+      ${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+    </div>
+
+    ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
+  </div>`
+}
 
     function updatePrediction(id, side, val) {
       if (!pendingPredictions[id]) pendingPredictions[id] = {}
@@ -1557,8 +1562,19 @@ let pendingPredictions = {}
     }
 
     function updatePredictionCount() {
-      document.getElementById('prediction-count').textContent = `${predictions.length}/${fixtures.length}`
-    }
+  const now = new Date()
+  const upcoming = fixtures
+    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  const next = upcoming[0]
+  const el = document.getElementById('prediction-count')
+  if (!next) {
+    el.textContent = '—'
+    return
+  }
+  const pred = getPrediction(next.id)
+  el.textContent = pred ? '✓ Predicted' : 'Predict now'
+}
 
     // ============== HOME ==============
     async function loadHome() {
