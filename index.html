@@ -1717,68 +1717,6 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
 
    // ============== APP INITIALIZATION ==============
 
-async function showApp() {
-  const loader = document.getElementById('loading-screen');
-  const authScreen = document.getElementById('auth-screen');
-  const appShell = document.getElementById('app-shell');
-  
-  try {
-    // Phase 1: Keep loader visible, fetch everything
-    loader.classList.remove('hidden');
-    
-    const profile = getProfile();
-    
-    // Check payment status first
-    if (!profile?.fee_paid && !isAdmin()) {
-      // For payment gate, we still need to load prize settings
-      await loadGateFee();
-      // Pre-fetch fixtures for preview
-      await loadFixtures();
-    } else {
-      // Phase 2: Parallel data fetch while loader shows
-      await Promise.all([
-        loadFixtures(),
-        loadLeaderboard(),
-        loadHome() // this also loads prize breakdown
-      ]);
-    }
-    
-    // Phase 3: Prepare UI state with data already loaded
-    document.getElementById('user-name').textContent = profile?.name || 'Player';
-    document.getElementById('profile-name').value = profile?.name || '';
-    document.getElementById('profile-dept').value = profile?.department || '';
-    document.getElementById('profile-phone').value = profile?.phone || '';
-    
-    if (isAdmin()) {
-      document.getElementById('admin-link').classList.remove('hidden');
-    }
-    
-    // Phase 4: Smooth transition — auth out, app in
-    authScreen.classList.add('hidden');
-    appShell.classList.remove('hidden');
-    
-    // Start real-time updates after UI is visible
-    setupRealtime();
-    startCountdownTicker();
-    
-    // Final render pass (data is already cached)
-    renderFixtures();
-    updatePredictionCount();
-    loadLeaderboard(currentLbView);
-    loadHome();
-    renderBadges();
-    
-    // Phase 5: Fade out loader
-    loader.classList.add('hidden');
-    
-  } catch (err) {
-    console.error('showApp error:', err);
-    showToast('Something went wrong. Please refresh.', 'error');
-    // Keep auth screen visible on error
-    authScreen.classList.remove('hidden');
-    appShell.classList.add('hidden');
-  }
-}
 
 // Payment gate version — same pattern
 function showPaymentGate() {
