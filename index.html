@@ -230,6 +230,128 @@
     </div>
   </div>
 
+  <!-- Rules & Regulations Sheet -->
+<div id="rules-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+  <div id="rules-panel" class="sheet-panel bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-lifted max-h-[90vh] flex flex-col">
+    <div class="p-6 pb-2 shrink-0">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-4 sm:hidden"></div>
+      <h3 class="text-xl font-bold text-center text-ink-900">📖 Rules & Regulations</h3>
+      <p class="text-xs text-ink-500 text-center mt-1">Everything you need to know before playing</p>
+    </div>
+
+    <div class="overflow-y-auto px-6 pb-2 space-y-5 no-scrollbar">
+      <!-- Entry Fee -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold">1</div>
+          <h4 class="font-bold text-sm">Entry Fee</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10">
+          Entry fee is <b class="text-ink-900">Nu. 500</b> per player. Pay via bank transfer or mobile wallet and upload your proof. An admin will verify your payment before you can start predicting.
+        </p>
+      </div>
+
+      <!-- Point System -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">2</div>
+          <h4 class="font-bold text-sm">Point System</h4>
+        </div>
+        <div class="pl-10 space-y-2">
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
+            <div>
+              <div class="text-sm font-semibold">Exact Score</div>
+              <div class="text-xs text-ink-500">You predicted the exact final scoreline</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
+            <div>
+              <div class="text-sm font-semibold">Correct Goal Difference</div>
+              <div class="text-xs text-ink-500">Right margin, wrong score (e.g. you said 2–0, result was 3–1)</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
+            <div>
+              <div class="text-sm font-semibold">Correct Outcome</div>
+              <div class="text-xs text-ink-500">Right winner or correct draw, wrong margin</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-sm font-bold shrink-0">0</div>
+            <div>
+              <div class="text-sm font-semibold">Wrong Outcome</div>
+              <div class="text-xs text-ink-500">Wrong winner or wrong draw call</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prize Pool -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">3</div>
+          <h4 class="font-bold text-sm">Prize Distribution</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2">
+          Total pool is split among the top 3 finishers on the final leaderboard:
+        </p>
+        <div class="pl-10 space-y-2">
+          <div class="flex items-center justify-between bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🥇</span>
+              <span class="text-sm font-semibold">1st Place</span>
+            </div>
+            <span class="text-sm font-bold text-brand-700">50% of pool</span>
+          </div>
+          <div class="flex items-center justify-between bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🥈</span>
+              <span class="text-sm font-semibold">2nd Place</span>
+            </div>
+            <span class="text-sm font-bold text-brand-700">30% of pool</span>
+          </div>
+          <div class="flex items-center justify-between bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🥉</span>
+              <span class="text-sm font-semibold">3rd Place</span>
+            </div>
+            <span class="text-sm font-bold text-brand-700">20% of pool</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deadlines -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">4</div>
+          <h4 class="font-bold text-sm">Prediction Deadlines</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10">
+          Predictions lock at kick-off time. You can edit your prediction anytime before the match starts. Once the match begins, your prediction is frozen.
+        </p>
+      </div>
+
+      <!-- Fair Play -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">5</div>
+          <h4 class="font-bold text-sm">Fair Play</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10">
+          One account per person. Admins reserve the right to remove duplicate or fraudulent accounts. All decisions are final.
+        </p>
+      </div>
+    </div>
+
+    <div class="p-4 border-t border-paper-border shrink-0">
+      <button onclick="hideRulesSheet()" class="w-full bg-ink-900 text-white font-semibold py-3.5 rounded-2xl tap">Got it — Let's Play</button>
+    </div>
+  </div>
+</div>
+
   <!-- AUTH SCREEN -->
   <div id="auth-screen" class="min-h-screen flex items-center justify-center p-5 overflow-hidden">
 
@@ -334,23 +456,33 @@
 
         <div id="auth-message" class="mt-4 text-sm text-center hidden"></div>
 
+       
         <!-- Trust row -->
-        <div class="mt-5 pt-5 border-t border-gray-100 flex items-center justify-center gap-3 text-[11px] text-ink-500 flex-wrap">
-          <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" style="color:#10B981;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L3 6v6c0 5.5 3.8 10.5 9 12 5.2-1.5 9-6.5 9-12V6l-9-4z"/></svg>
-            Secure Login
-          </span>
-          <span class="text-gray-300">•</span>
-          <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" style="color:#10B981;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L3 6v6c0 5.5 3.8 10.5 9 12 5.2-1.5 9-6.5 9-12V6l-9-4z"/></svg>
-            Private League
-          </span>
-          <span class="text-gray-300">•</span>
-          <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" style="color:#10B981;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L3 6v6c0 5.5 3.8 10.5 9 12 5.2-1.5 9-6.5 9-12V6l-9-4z"/></svg>
-            Official Portal
-          </span>
-        </div>
+<!-- Trust row -->
+<!-- League Rules Preview -->
+<div class="mt-5 pt-5 border-t border-gray-100">
+  <div class="grid grid-cols-3 gap-2 mb-3">
+    <div class="bg-white/70 rounded-xl p-3 text-center border border-gray-100 backdrop-blur-sm">
+      <div class="text-lg mb-1">💰</div>
+      <div class="text-xs font-bold text-ink-900">Nu. 500</div>
+      <div class="text-[10px] text-ink-500">Entry Fee</div>
+    </div>
+    <div class="bg-white/70 rounded-xl p-3 text-center border border-gray-100 backdrop-blur-sm">
+      <div class="text-lg mb-1">⚽</div>
+      <div class="text-xs font-bold text-ink-900">5 · 3 · 2</div>
+      <div class="text-[10px] text-ink-500">Scoring</div>
+    </div>
+    <div class="bg-white/70 rounded-xl p-3 text-center border border-gray-100 backdrop-blur-sm">
+      <div class="text-lg mb-1">🏆</div>
+      <div class="text-xs font-bold text-ink-900">Top 3</div>
+      <div class="text-[10px] text-ink-500">Win Cash</div>
+    </div>
+  </div>
+  <button onclick="showRulesSheet()" class="w-full bg-white/80 border border-gray-200 text-ink-700 text-xs font-semibold py-2.5 rounded-xl tap flex items-center justify-center gap-2 hover:bg-white transition">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+    Read Full Rules & Regulations
+  </button>
+</div>
       </div>
 
       <!-- Footer flourish -->
@@ -806,6 +938,24 @@
       setTimeout(() => overlay.classList.add('hidden'), 320)
     }
     document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') hideModal() })
+
+    function showRulesSheet() {
+  const overlay = document.getElementById('rules-overlay')
+  const panel = document.getElementById('rules-panel')
+  overlay.classList.remove('hidden')
+  requestAnimationFrame(() => panel.classList.add('shown'))
+}
+
+function hideRulesSheet() {
+  const overlay = document.getElementById('rules-overlay')
+  const panel = document.getElementById('rules-panel')
+  panel.classList.remove('shown')
+  setTimeout(() => overlay.classList.add('hidden'), 320)
+}
+
+document.getElementById('rules-overlay').addEventListener('click', e => {
+  if (e.target.id === 'rules-overlay') hideRulesSheet()
+})
 
     // ============== AUTH UI ==============
 let authMode = 'login' // 'login' | 'signup'
