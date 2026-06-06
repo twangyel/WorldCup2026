@@ -1514,10 +1514,10 @@ let pendingPredictions = {}
                 : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
             </div>
             <div class="flex-1 text-center min-w-0">
-              <div class="flex flex-col items-center gap-1">
-                ${flagHtml(f.away_team, 32)}
-                <div class="font-bold text-[15px] truncate">${f.away_team}</div>
-              </div>
+  <div class="flex flex-col items-center gap-1 w-full">
+    ${flagHtml(f.away_team, 32)}
+    <div class="font-bold text-[15px] truncate w-full">${f.away_team}</div>
+  </div>
               <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
             </div>
           </div>
@@ -1642,15 +1642,15 @@ let pendingPredictions = {}
         <div class="p-5">
           <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-4">${f.stage}</div>
           <div class="flex items-center justify-between mb-4">
-            <div class="flex-1 text-center flex flex-col items-center gap-1">
-              ${flagHtml(f.home_team, 40)}
-              <div class="font-bold text-lg truncate">${f.home_team}</div>
-            </div>
+         <div class="flex-1 text-center flex flex-col items-center gap-1">
+  ${flagHtml(f.home_team, 40)}
+  <div class="font-bold text-lg truncate w-full">${f.home_team}</div>
+</div>
             <div class="px-3 text-ink-300 font-bold text-sm">VS</div>
-            <div class="flex-1 text-center flex flex-col items-center gap-1">
-              ${flagHtml(f.away_team, 40)}
-              <div class="font-bold text-lg truncate">${f.away_team}</div>
-            </div>
+          <div class="flex-1 text-center flex flex-col items-center gap-1">
+  ${flagHtml(f.away_team, 40)}
+  <div class="font-bold text-lg truncate w-full">${f.away_team}</div>
+</div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium pb-1">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}

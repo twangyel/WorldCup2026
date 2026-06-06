@@ -1199,11 +1199,11 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       list.innerHTML = displayFixtures.map(f => `
         <div class="px-5 py-4">
           <div class="mb-3">
-            <div class="font-semibold text-sm truncate flex items-center gap-2">
-              ${flagHtml(f.home_team, 20)} ${f.home_team}
-              <span class="text-ink-300">vs</span>
-              ${flagHtml(f.away_team, 20)} ${f.away_team}
-            </div>
+          <div class="font-semibold text-sm truncate flex items-center gap-2">
+  ${flagHtml(f.home_team, 20)} ${f.home_team}
+  <span class="text-ink-300">vs</span>
+  ${flagHtml(f.away_team, 20)} ${f.away_team}
+</div>
             <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <div class="flex items-center gap-2">
