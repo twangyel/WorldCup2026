@@ -124,6 +124,87 @@
       100% { transform: scale(1); }
     }
 
+    /* ========== LEADERBOARD LIVE TRANSITIONS ========== */
+    /* Each row is a positioned element so FLIP transforms read cleanly */
+    .lb-row {
+      will-change: transform;
+      transition: box-shadow 600ms cubic-bezier(0.32, 0.72, 0, 1),
+                  border-color 600ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    /* Glow when rank improves */
+    .lb-row.lb-up {
+      box-shadow: 0 0 0 2px rgba(34,197,94,0.55), 0 12px 28px rgba(34,197,94,0.18);
+      border-color: rgba(34,197,94,0.6) !important;
+    }
+    /* Soft red when rank drops */
+    .lb-row.lb-down {
+      box-shadow: 0 0 0 2px rgba(239,68,68,0.35), 0 8px 20px rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.45) !important;
+    }
+    /* Points number pulse when the score changes */
+    .pts-pulse {
+      animation: ptsPulse 700ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes ptsPulse {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.32); color: #16a34a; text-shadow: 0 0 18px rgba(34,197,94,0.45); }
+      100% { transform: scale(1); }
+    }
+    /* Tiny up/down arrow that floats next to rank when it changes */
+    .rank-delta {
+      position: absolute;
+      top: -6px; right: -6px;
+      font-size: 10px; font-weight: 800;
+      padding: 2px 5px; border-radius: 999px;
+      color: white;
+      animation: rankDeltaIn 1200ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+      pointer-events: none;
+    }
+    .rank-delta.up   { background: #16a34a; }
+    .rank-delta.down { background: #ef4444; }
+    @keyframes rankDeltaIn {
+      0%   { opacity: 0; transform: translateY(6px) scale(0.6); }
+      15%  { opacity: 1; transform: translateY(-2px) scale(1.05); }
+      75%  { opacity: 1; transform: translateY(-2px) scale(1); }
+      100% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+    }
+    /* New entry slide-in */
+    .lb-row.lb-new {
+      animation: lbNewIn 380ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes lbNewIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.985); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    /* "Live" dot near the Leaderboard title */
+    .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 999px;
+      background: #16a34a;
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.55);
+      animation: liveDot 2s ease-out infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .live-dot.flash { animation: liveDotFlash 900ms cubic-bezier(0.32, 0.72, 0, 1); }
+    @keyframes liveDot {
+      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.45); }
+      70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+    @keyframes liveDotFlash {
+      0%   { transform: scale(1);   box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+      50%  { transform: scale(1.7); box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+      100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lb-row, .pts-pulse, .lb-row.lb-new, .live-dot, .live-dot.flash, .rank-delta {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
     /* ========== AUTH SCREEN (Prediction League) ========== */
     :root {
       /* 🎨 REPLACE THIS URL WITH YOUR OWN BACKGROUND IMAGE */
@@ -615,7 +696,7 @@
       <!-- LEADERBOARD -->
       <div id="tab-leaderboard" class="tab-content hidden space-y-4">
         <div class="px-1">
-          <h2 class="text-2xl font-bold tracking-tight">Leaderboard</h2>
+          <h2 class="text-2xl font-bold tracking-tight"><span id="lb-live-dot" class="live-dot" title="Live"></span>Leaderboard</h2>
           <p class="text-sm text-ink-500 mt-1">Live rankings, updated as results come in.</p>
         </div>
         <div id="leaderboard-list" class="space-y-2.5">
@@ -1599,20 +1680,34 @@ let pendingPredictions = {}
   // Fallback: sum points from local predictions if leaderboard row is missing
   const myPredPoints = predictions.reduce((sum, p) => sum + (p.points_awarded || 0), 0)
 
+  // Helper: set text and pulse if value changed
+  const setAnimated = (id, val, cls = 'pts-pulse') => {
+    const el = document.getElementById(id)
+    if (!el) return
+    const newStr = String(val)
+    if (el.textContent !== newStr && el.textContent !== '—' && el.textContent !== '') {
+      el.classList.remove(cls)
+      void el.offsetWidth
+      el.classList.add(cls)
+      setTimeout(() => el.classList.remove(cls), 720)
+    }
+    el.textContent = newStr
+  }
+
   if (me) {
     const rank = myIdx + 1
-    document.getElementById('home-rank').textContent = `#${rank}`
+    setAnimated('home-rank', `#${rank}`)
     document.getElementById('home-rank-total').textContent = `of ${total}`
     const medals = { 1: '🥇 Top of the table', 2: '🥈 Almost there', 3: '🥉 On the podium' }
     document.getElementById('home-rank-medal').textContent = medals[rank] || `Keep climbing`
-    document.getElementById('home-points').textContent = me.points || myPredPoints || 0
+    setAnimated('home-points', me.points || myPredPoints || 0)
     const correct = (me.exact || 0) + (me.gd || 0) + (me.result || 0)
     document.getElementById('home-points-breakdown').textContent = `${me.exact || 0} exact · ${correct} correct`
   } else {
     const hasPoints = myPredPoints > 0
     document.getElementById('home-rank').textContent = '—'
     document.getElementById('home-rank-total').textContent = total ? `of ${total}` : ''
-    document.getElementById('home-points').textContent = myPredPoints || 0
+    setAnimated('home-points', myPredPoints || 0)
     document.getElementById('home-rank-medal').textContent = hasPoints ? 'Keep climbing' : 'Make your first prediction'
     document.getElementById('home-points-breakdown').textContent = hasPoints ? `${myPredPoints} points from predictions` : '—'
   }
@@ -1733,16 +1828,32 @@ let pendingPredictions = {}
           <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
         </div>`; return
       }
+
+      // ===== FLIP: capture old positions + points BEFORE we touch the DOM =====
+      const oldRects = {}
+      const oldPoints = {}
+      const oldRanks = {}
+      c.querySelectorAll('[data-uid]').forEach((el, idx) => {
+        const uid = el.dataset.uid
+        oldRects[uid] = el.getBoundingClientRect()
+        oldPoints[uid] = parseInt(el.dataset.points || '0', 10)
+        oldRanks[uid] = parseInt(el.dataset.rank || (idx + 1), 10)
+      })
+      const hadAnyRows = Object.keys(oldRects).length > 0
+
+      // Render fresh HTML
       c.innerHTML = stats.map((s, i) => {
         const rank = i + 1
+        const uid = s.user_id || s.id
         const isMe = s.user_id === myId || s.id === myId
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
         const rankDisplay = medal
-          ? `<div class="text-2xl">${medal}</div>`
-          : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
+          ? `<div class="text-2xl relative" data-rank-wrap>${medal}</div>`
+          : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500 relative" data-rank-wrap>${rank}</div>`
         return `
-        <div class="bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3">
+        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3"
+             data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           ${rankDisplay}
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
@@ -1757,11 +1868,86 @@ let pendingPredictions = {}
             </div>
           </div>
           <div class="text-right shrink-0">
-            <div class="text-2xl font-bold text-brand-700 leading-none">${s.points || 0}</div>
+            <div class="text-2xl font-bold text-brand-700 leading-none" data-points-el>${s.points || 0}</div>
             <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
           </div>
         </div>`
       }).join('')
+
+      // ===== FLIP: apply animations on the next frame =====
+      if (!hadAnyRows) return // first paint — let the natural fade happen
+      requestAnimationFrame(() => {
+        let somethingChanged = false
+        c.querySelectorAll('[data-uid]').forEach(el => {
+          const uid = el.dataset.uid
+          const newRect = el.getBoundingClientRect()
+          const oldRect = oldRects[uid]
+          const newRank = parseInt(el.dataset.rank, 10)
+          const oldRank = oldRanks[uid]
+          const newPts = parseInt(el.dataset.points, 10)
+          const oldPts = oldPoints[uid]
+
+          if (!oldRect) {
+            // Newly appeared row — slide it in
+            el.classList.add('lb-new')
+            setTimeout(() => el.classList.remove('lb-new'), 420)
+            somethingChanged = true
+            return
+          }
+
+          const dy = oldRect.top - newRect.top
+          if (Math.abs(dy) > 1) {
+            // FLIP translate from old position back to new
+            el.animate(
+              [
+                { transform: `translateY(${dy}px)` },
+                { transform: 'translateY(0)' }
+              ],
+              { duration: 520, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
+            )
+            somethingChanged = true
+          }
+
+          // Rank-change glow + delta badge
+          if (oldRank !== undefined && newRank !== oldRank) {
+            const movedUp = newRank < oldRank
+            el.classList.add(movedUp ? 'lb-up' : 'lb-down')
+            const wrap = el.querySelector('[data-rank-wrap]')
+            if (wrap) {
+              const delta = Math.abs(newRank - oldRank)
+              const badge = document.createElement('span')
+              badge.className = `rank-delta ${movedUp ? 'up' : 'down'}`
+              badge.textContent = (movedUp ? '▲' : '▼') + delta
+              wrap.appendChild(badge)
+              setTimeout(() => badge.remove(), 1300)
+            }
+            setTimeout(() => el.classList.remove('lb-up', 'lb-down'), 1400)
+            somethingChanged = true
+          }
+
+          // Points pulse
+          if (oldPts !== undefined && newPts !== oldPts) {
+            const pEl = el.querySelector('[data-points-el]')
+            if (pEl) {
+              pEl.classList.remove('pts-pulse')
+              void pEl.offsetWidth
+              pEl.classList.add('pts-pulse')
+            }
+            somethingChanged = true
+          }
+        })
+
+        // Pulse the live-dot once if anything moved
+        if (somethingChanged) {
+          const dot = document.getElementById('lb-live-dot')
+          if (dot) {
+            dot.classList.remove('flash')
+            void dot.offsetWidth
+            dot.classList.add('flash')
+            setTimeout(() => dot.classList.remove('flash'), 950)
+          }
+        }
+      })
     }
 
     // ============== REALTIME ==============
