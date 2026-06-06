@@ -631,6 +631,7 @@ function flagHtml(name, size = 24) {
     const stored = loadNotificationsFromStorage()
     let notifications = stored.notifications
     let unreadCount = stored.unreadCount
+    updateAppBadge(unreadCount) 
 
     function requestNotificationPermission() {
       if ('Notification' in window && Notification.permission === 'default') {
@@ -663,6 +664,7 @@ function flagHtml(name, size = 24) {
       const badge = document.getElementById('notif-badge')
       if (unreadCount > 0) { badge.classList.remove('hidden') }
       else { badge.classList.add('hidden') }
+      updateAppBadge(unreadCount)
     }
 
     function toggleNotifPanel() {
@@ -704,6 +706,15 @@ function flagHtml(name, size = 24) {
       renderNotifications()
       saveNotificationsToStorage()
     }
+
+    function updateAppBadge(count) {
+  if ('setAppBadge' in navigator) {
+    try {
+      if (count > 0) navigator.setAppBadge(count)
+      else navigator.clearAppBadge()
+    } catch (e) { /* silent fail — not supported on this device */ }
+  }
+}
 
     // Close notification panel when clicking outside
     document.addEventListener('click', (e) => {
