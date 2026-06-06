@@ -9,6 +9,38 @@ let currentUser = null
 let currentProfile = null
 
 // =====================
+// WHATSAPP HELPERS
+// =====================
+// We store auth identity in Supabase as a synthesized email derived from the
+// user's WhatsApp number. The real WhatsApp number lives in profiles.whatsapp
+// so it can be used for sending template messages.
+const WA_EMAIL_DOMAIN = 'wa.predict.local'
+const DEFAULT_COUNTRY_CODE = '975' // Bhutan
+
+// Strip everything except digits. If the result is short (local number without
+// country code), prepend the default country code.
+function normalizeWhatsapp(raw) {
+    if (!raw) return ''
+    let digits = String(raw).replace(/\D/g, '')
+    if (!digits) return ''
+    // Local numbers (e.g. "17123456" in Bhutan) -> add country code
+    // Heuristic: anything under 10 digits is treated as local
+    if (digits.length < 10) digits = DEFAULT_COUNTRY_CODE + digits
+    return digits
+}
+
+function whatsappToEmail(raw) {
+    const d = normalizeWhatsapp(raw)
+    return d ? `${d}@${WA_EMAIL_DOMAIN}` : ''
+}
+
+function isValidWhatsapp(raw) {
+    const d = normalizeWhatsapp(raw)
+    // Reasonable bounds: 10-15 digits per E.164
+    return d.length >= 10 && d.length <= 15
+}
+
+// =====================
 // AUTH
 // =====================
 async function initAuth() {
@@ -45,62 +77,24 @@ async function loadProfile() {
     return currentProfile
 }
 
-async function signInOrSignUp(email, password) {
+async function signInOrSignUp(name, whatsapp, password) {
+    if (!isValidWhatsapp(whatsapp)) {
+        return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
+    }
+    const email = whatsappToEmail(whatsapp)
+
     // 1. Try to sign in
     const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password })
 
     if (signInData?.session) {
         currentUser = signInData.user
         await loadProfile()
-        // Let showApp() route unpaid users to the payment gate.
         return { data: signInData, error: null }
     }
 
     // 2. If sign-in failed, try sign up
     if (signInError) {
-        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-            email,
-            password,
-            options: { data: { name: email.split('@')[0] } }
-        })
-
-        if (signUpError) {
-            if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
-                return {
-                    data: null,
-                    error: { message: 'Account exists but password is wrong. Try again or ask admin to reset it.' }
-                }
-            }
-            return { data: null, error: signUpError }
-        }
-
-        if (!signUpData.session) {
-            return {
-                data: null,
-                error: { message: 'Sign up succeeded but no session was returned. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' }
-            }
-        }
-
-        // Successful signup with session — set user and make sure a profile row exists.
-        currentUser = signUpData.user
-        await loadProfile()
-        if (!currentProfile) {
-            // Create the profile row so the payment gate has something to read/update.
-            const { data: newProfile } = await supabaseClient
-                .from('profiles')
-                .insert({
-                    id: signUpData.user.id,
-                    email,
-                    name: email.split('@')[0],
-                    fee_paid: false,
-                    role: 'user'
-                })
-                .select()
-                .single()
-            if (newProfile) currentProfile = newProfile
-        }
-
-        return { data: signUpData, error: null }
+        return signUpUser(name, whatsapp, password)
     }
 
     return { data: null, error: signInError }
@@ -141,7 +135,16 @@ async function checkEmailExists(email) {
     return { exists: !!data, error: null }
 }
 
-async function signInUser(email, password) {
+async function checkWhatsappExists(whatsapp) {
+    if (!isValidWhatsapp(whatsapp)) return { exists: false, error: null }
+    return checkEmailExists(whatsappToEmail(whatsapp))
+}
+
+async function signInUser(whatsapp, password) {
+    if (!isValidWhatsapp(whatsapp)) {
+        return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
+    }
+    const email = whatsappToEmail(whatsapp)
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
     if (data?.session) {
         currentUser = data.user
@@ -151,11 +154,18 @@ async function signInUser(email, password) {
     return { data: null, error }
 }
 
-async function signUpUser(email, password) {
+async function signUpUser(name, whatsapp, password) {
+    const cleanName = (name || '').trim()
+    const wa = normalizeWhatsapp(whatsapp)
+    if (!cleanName) return { data: null, error: { message: 'Name is required' } }
+    if (!isValidWhatsapp(whatsapp)) return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
+
+    const email = whatsappToEmail(wa)
+
     const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
-        options: { data: { name: email.split('@')[0] } }
+        options: { data: { name: cleanName, whatsapp: wa } }
     })
 
     if (error) return { data: null, error }
@@ -174,14 +184,23 @@ async function signUpUser(email, password) {
             .from('profiles')
             .insert({
                 id: data.user.id,
-                email,
-                name: email.split('@')[0],
+                email,           // synthesized — keeps the column populated
+                name: cleanName,
+                whatsapp: wa,
                 fee_paid: false,
                 role: 'user'
             })
             .select()
             .single()
         if (newProfile) currentProfile = newProfile
+    } else {
+        // Profile row already existed (e.g. trigger created it) — make sure
+        // name and whatsapp are filled in.
+        await supabaseClient
+            .from('profiles')
+            .update({ name: cleanName, whatsapp: wa })
+            .eq('id', data.user.id)
+        await loadProfile()
     }
     return { data, error: null }
 }
@@ -312,9 +331,11 @@ async function removeUser(userId) {
 
 async function inviteUser(payload) {
     // Insert a profile row; actual auth invite would need admin API or magic link
+    const wa = normalizeWhatsapp(payload.whatsapp || payload.phone)
     const { data, error } = await supabaseClient.from('profiles').insert({
         name: payload.name,
-        email: payload.email,
+        email: payload.email || (wa ? whatsappToEmail(wa) : null),
+        whatsapp: wa || null,
         department: payload.department || null,
         phone: payload.phone || null,
         fee_paid: false,

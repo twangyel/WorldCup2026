@@ -176,6 +176,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -424,10 +425,20 @@
         <form id="auth-form" class="space-y-4">
 
           <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Email</label>
+            <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">WhatsApp Number</label>
             <div class="auth-input-wrap">
-              <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-              <input type="email" id="email" required class="auth-input" placeholder="you@company.com">
+              <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.52 3.48A11.78 11.78 0 0012.04 0C5.46 0 .12 5.34.12 11.92c0 2.1.55 4.15 1.6 5.96L0 24l6.3-1.66a11.86 11.86 0 005.74 1.46h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.45-8.4zM12.05 21.8h-.01a9.86 9.86 0 01-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 01-1.52-5.25c0-5.46 4.45-9.9 9.91-9.9 2.65 0 5.14 1.03 7.01 2.9a9.83 9.83 0 012.9 7c0 5.46-4.45 9.88-9.92 9.88z"/></svg>
+              <input type="tel" id="whatsapp" required class="auth-input" placeholder="17123456" inputmode="numeric" autocomplete="tel">
+            </div>
+            <p class="text-[11px] text-ink-500 mt-1.5 ml-1">Country code +975 added automatically. We'll send match reminders here.</p>
+          </div>
+
+          <!-- Name field – shown only when creating an account -->
+          <div id="name-wrap" class="hidden">
+            <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Name</label>
+            <div class="auth-input-wrap">
+              <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              <input type="text" id="name" class="auth-input" placeholder="Your full name" autocomplete="name">
             </div>
           </div>
 
@@ -462,7 +473,7 @@
               <input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
               <span class="text-sm text-ink-700">Remember me</span>
             </label>
-            <a href="#" onclick="event.preventDefault(); handleForgotPassword();" class="text-sm font-semibold" style="color:#3B82F6;">Forgot Password?</a>
+            <a href="#" onclick="event.preventDefault(); handleForgotPassword();" class="text-sm font-semibold" style="color:#3B82F6;">Forgot? Ask admin</a>
           </div>
 
           <!-- Enter League button -->
@@ -824,18 +835,20 @@
 
   <script>
     // ============== FLAGS ==============
-    const FLAG_MAP = {
+        const FLAG_MAP = {
+      // ===== AFC (9) =====
       'argentina': { code: 'ar', emoji: '🇦🇷' }, 'brazil': { code: 'br', emoji: '🇧🇷' },
       'canada': { code: 'ca', emoji: '🇨🇦' }, 'mexico': { code: 'mx', emoji: '🇲🇽' },
-      'usa': { code: 'us', emoji: '🇺🇸' }, 'france': { code: 'fr', emoji: '🇫🇷' },
-      'germany': { code: 'de', emoji: '🇩🇪' }, 'spain': { code: 'es', emoji: '🇪🇸' },
-      'portugal': { code: 'pt', emoji: '🇵🇹' }, 'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-      'netherlands': { code: 'nl', emoji: '🇳🇱' }, 'belgium': { code: 'be', emoji: '🇧🇪' },
-      'italy': { code: 'it', emoji: '🇮🇹' }, 'croatia': { code: 'hr', emoji: '🇭🇷' },
-      'uruguay': { code: 'uy', emoji: '🇺🇾' }, 'colombia': { code: 'co', emoji: '🇨🇴' },
-      'ecuador': { code: 'ec', emoji: '🇪🇨' }, 'chile': { code: 'cl', emoji: '🇨🇱' },
-      'paraguay': { code: 'py', emoji: '🇵🇾' }, 'peru': { code: 'pe', emoji: '🇵🇪' },
-      'bolivia': { code: 'bo', emoji: '🇧🇴' }, 'venezuela': { code: 've', emoji: '🇻🇪' },
+      'usa': { code: 'us', emoji: '🇺🇸' }, 'united states': { code: 'us', emoji: '🇺🇸' },
+      'france': { code: 'fr', emoji: '🇫🇷' }, 'germany': { code: 'de', emoji: '🇩🇪' },
+      'spain': { code: 'es', emoji: '🇪🇸' }, 'portugal': { code: 'pt', emoji: '🇵🇹' },
+      'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' }, 'netherlands': { code: 'nl', emoji: '🇳🇱' },
+      'belgium': { code: 'be', emoji: '🇧🇪' }, 'italy': { code: 'it', emoji: '🇮🇹' },
+      'croatia': { code: 'hr', emoji: '🇭🇷' }, 'uruguay': { code: 'uy', emoji: '🇺🇾' },
+      'colombia': { code: 'co', emoji: '🇨🇴' }, 'ecuador': { code: 'ec', emoji: '🇪🇨' },
+      'chile': { code: 'cl', emoji: '🇨🇱' }, 'paraguay': { code: 'py', emoji: '🇵🇾' },
+      'peru': { code: 'pe', emoji: '🇵🇪' }, 'bolivia': { code: 'bo', emoji: '🇧🇴' },
+      'venezuela': { code: 've', emoji: '🇻🇪' },
       'japan': { code: 'jp', emoji: '🇯🇵' }, 'south korea': { code: 'kr', emoji: '🇰🇷' },
       'korea republic': { code: 'kr', emoji: '🇰🇷' }, 'australia': { code: 'au', emoji: '🇦🇺' },
       'iran': { code: 'ir', emoji: '🇮🇷' }, 'saudi arabia': { code: 'sa', emoji: '🇸🇦' },
@@ -855,19 +868,24 @@
       'czech republic': { code: 'cz', emoji: '🇨🇿' }, 'czechia': { code: 'cz', emoji: '🇨🇿' },
       'hungary': { code: 'hu', emoji: '🇭🇺' }, 'romania': { code: 'ro', emoji: '🇷🇴' },
       'slovakia': { code: 'sk', emoji: '🇸🇰' }, 'slovenia': { code: 'si', emoji: '🇸🇮' },
-      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
+      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'bosnia': { code: 'ba', emoji: '🇧🇦' },
+      'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
       'republic of ireland': { code: 'ie', emoji: '🇮🇪' }, 'ireland': { code: 'ie', emoji: '🇮🇪' },
       'finland': { code: 'fi', emoji: '🇫🇮' }, 'turkey': { code: 'tr', emoji: '🇹🇷' },
+      'türkiye': { code: 'tr', emoji: '🇹🇷' }, 'turkiye': { code: 'tr', emoji: '🇹🇷' },
       'greece': { code: 'gr', emoji: '🇬🇷' }, 'russia': { code: 'ru', emoji: '🇷🇺' },
       'china': { code: 'cn', emoji: '🇨🇳' }, 'indonesia': { code: 'id', emoji: '🇮🇩' },
       'thailand': { code: 'th', emoji: '🇹🇭' }, 'uzbekistan': { code: 'uz', emoji: '🇺🇿' },
-      'iraq': { code: 'iq', emoji: '🇮🇶' }, 'jordan': { code: 'jo', emoji: '🇯🇴' },
+      'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' }, 'turkmenistan': { code: 'tm', emoji: '🇹🇲' },
+      'philippines': { code: 'ph', emoji: '🇵🇭' }, 'vietnam': { code: 'vn', emoji: '🇻🇳' },
+      'malaysia': { code: 'my', emoji: '🇲🇾' }, 'singapore': { code: 'sg', emoji: '🇸🇬' },
       'bahrain': { code: 'bh', emoji: '🇧🇭' }, 'kuwait': { code: 'kw', emoji: '🇰🇼' },
       'lebanon': { code: 'lb', emoji: '🇱🇧' }, 'syria': { code: 'sy', emoji: '🇸🇾' },
       'oman': { code: 'om', emoji: '🇴🇲' }, 'emirates': { code: 'ae', emoji: '🇦🇪' },
       'united arab emirates': { code: 'ae', emoji: '🇦🇪' }, 'uae': { code: 'ae', emoji: '🇦🇪' },
       'south africa': { code: 'za', emoji: '🇿🇦' }, 'dr congo': { code: 'cd', emoji: '🇨🇩' },
-      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
+      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' },
+      'congo dr': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
       'burkina faso': { code: 'bf', emoji: '🇧🇫' }, 'guinea': { code: 'gn', emoji: '🇬🇳' },
       'zambia': { code: 'zm', emoji: '🇿🇲' }, 'equatorial guinea': { code: 'gq', emoji: '🇬🇶' },
       'gabon': { code: 'ga', emoji: '🇬🇦' }, 'angola': { code: 'ao', emoji: '🇦🇴' },
@@ -876,48 +894,107 @@
       'namibia': { code: 'na', emoji: '🇳🇦' }, 'mauritania': { code: 'mr', emoji: '🇲🇷' },
       'libya': { code: 'ly', emoji: '🇱🇾' }, 'sudan': { code: 'sd', emoji: '🇸🇩' },
       'ethiopia': { code: 'et', emoji: '🇪🇹' }, 'india': { code: 'in', emoji: '🇮🇳' },
-      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' },
-      'turkmenistan': { code: 'tm', emoji: '🇹🇲' }, 'philippines': { code: 'ph', emoji: '🇵🇭' },
-      'vietnam': { code: 'vn', emoji: '🇻🇳' }, 'malaysia': { code: 'my', emoji: '🇲🇾' },
-      'singapore': { code: 'sg', emoji: '🇸🇬' }, 'tbd': { code: null, emoji: '❓' },
-      'to be determined': { code: null, emoji: '❓' }, 'tbc': { code: null, emoji: '❓' }
+      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'iraq': { code: 'iq', emoji: '🇮🇶' },
+      'jordan': { code: 'jo', emoji: '🇯🇴' }, 'curaçao': { code: 'cw', emoji: '🇨🇼' },
+      'curacao': { code: 'cw', emoji: '🇨🇼' }, 'haiti': { code: 'ht', emoji: '🇭🇹' },
+      'cape verde': { code: 'cv', emoji: '🇨🇻' },
+      'benin': { code: 'bj', emoji: '🇧🇯' }, 'rwanda': { code: 'rw', emoji: '🇷🇼' },
+      'lesotho': { code: 'ls', emoji: '🇱🇸' }, 'eswatini': { code: 'sz', emoji: '🇸🇿' },
+      'sierra leone': { code: 'sl', emoji: '🇸🇱' }, 'guinea-bissau': { code: 'gw', emoji: '🇬🇼' },
+      'djibouti': { code: 'dj', emoji: '🇩🇯' }, 'togo': { code: 'tg', emoji: '🇹🇬' },
+      'south sudan': { code: 'ss', emoji: '🇸🇸' }, 'liberia': { code: 'lr', emoji: '🇱🇷' },
+      'madagascar': { code: 'mg', emoji: '🇲🇬' }, 'mozambique': { code: 'mz', emoji: '🇲🇿' },
+      'malawi': { code: 'mw', emoji: '🇲🇼' }, 'botswana': { code: 'bw', emoji: '🇧🇼' },
+      'comoros': { code: 'km', emoji: '🇰🇲' }, 'gambia': { code: 'gm', emoji: '🇬🇲' },
+      'central african republic': { code: 'cf', emoji: '🇨🇫' }, 'chad': { code: 'td', emoji: '🇹🇩' },
+      'congo': { code: 'cg', emoji: '🇨🇬' }, 'republic of the congo': { code: 'cg', emoji: '🇨🇬' },
+      'sao tome and principe': { code: 'st', emoji: '🇸🇹' }, 'seychelles': { code: 'sc', emoji: '🇸🇨' },
+      'mauritius': { code: 'mu', emoji: '🇲🇺' }, 'burundi': { code: 'bi', emoji: '🇧🇮' },
+      'eritrea': { code: 'er', emoji: '🇪🇷' }, 'somalia': { code: 'so', emoji: '🇸🇴' },
+      'fiji': { code: 'fj', emoji: '🇫🇯' }, 'tahiti': { code: 'pf', emoji: '🇵🇫' },
+      'new caledonia': { code: 'nc', emoji: '🇳🇨' }, 'samoa': { code: 'ws', emoji: '🇼🇸' },
+      'papua new guinea': { code: 'pg', emoji: '🇵🇬' }, 'solomon islands': { code: 'sb', emoji: '🇸🇧' },
+      'vanuatu': { code: 'vu', emoji: '🇻🇺' },
+      'guatemala': { code: 'gt', emoji: '🇬🇹' }, 'el salvador': { code: 'sv', emoji: '🇸🇻' },
+      'trinidad and tobago': { code: 'tt', emoji: '🇹🇹' }, 'nicaragua': { code: 'ni', emoji: '🇳🇮' },
+      'bermuda': { code: 'bm', emoji: '🇧🇲' }, 'suriname': { code: 'sr', emoji: '🇸🇷' },
+      'iceland': { code: 'is', emoji: '🇮🇸' }, 'montenegro': { code: 'me', emoji: '🇲🇪' },
+      'north macedonia': { code: 'mk', emoji: '🇲🇰' }, 'albania': { code: 'al', emoji: '🇦🇱' },
+      'belarus': { code: 'by', emoji: '🇧🇾' }, 'estonia': { code: 'ee', emoji: '🇪🇪' },
+      'latvia': { code: 'lv', emoji: '🇱🇻' }, 'lithuania': { code: 'lt', emoji: '🇱🇹' },
+      'moldova': { code: 'md', emoji: '🇲🇩' }, 'kazakhstan': { code: 'kz', emoji: '🇰🇿' },
+      'georgia': { code: 'ge', emoji: '🇬🇪' }, 'armenia': { code: 'am', emoji: '🇦🇲' },
+      'azerbaijan': { code: 'az', emoji: '🇦🇿' }, 'israel': { code: 'il', emoji: '🇮🇱' },
+      'cyprus': { code: 'cy', emoji: '🇨🇾' }, 'luxembourg': { code: 'lu', emoji: '🇱🇺' },
+      'malta': { code: 'mt', emoji: '🇲🇹' }, 'andorra': { code: 'ad', emoji: '🇦🇩' },
+      'liechtenstein': { code: 'li', emoji: '🇱🇮' }, 'san marino': { code: 'sm', emoji: '🇸🇲' },
+      'gibraltar': { code: 'gi', emoji: '🇬🇮' }, 'faroe islands': { code: 'fo', emoji: '🇫🇴' },
+      'kosovo': { code: 'xk', emoji: '🇽🇰' },
+      // ===== TBD / Placeholder =====
+      'tbd': { code: null, emoji: '❓' },
+      'to be determined': { code: null, emoji: '❓' },
+      'tbc': { code: null, emoji: '❓' },
+      'to be confirmed': { code: null, emoji: '❓' }
     }
 
-   function getFlag(name) {
-  const key = (name || '').toLowerCase().trim()
-  
-  // TBD / placeholder teams
-  if (key === 'tbd' || key === 'to be determined' || key === 'tbc' || key === 'to be confirmed') {
-    return { emoji: '❓', img: null, isTbd: true }
-  }
-  
-  const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
-  return {
-    emoji: mapped.emoji,
-    img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null,
-    isTbd: false
-  }
+    function getFlag(name) {
+    const key = (name || '').toLowerCase().trim();
+
+    if (
+        key === 'tbd' ||
+        key === 'to be determined' ||
+        key === 'tbc' ||
+        key === 'to be confirmed'
+    ) {
+        return { emoji: '❓', img: null, isTbd: true };
+    }
+
+    const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' };
+
+    return {
+        emoji: mapped.emoji,
+        img: mapped.code
+            ? `https://flagcdn.com/w40/${mapped.code}.png`
+            : null,
+        isTbd: false
+    };
 }
 
 function flagHtml(name, size = 24) {
-  const f = getFlag(name)
-  
-  // TBD: show a clean placeholder circle instead of broken image + ❓
-  if (f.isTbd) {
-    return `<div class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold" 
-      style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.4)}px;">?</div>`
-  }
-  
-  if (f.img) {
-    return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" 
-      class="rounded-sm shadow-sm inline-block object-cover" 
-      style="border:1px solid #EEEDE7" 
-      onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
-      <span class="hidden text-xl">${f.emoji}</span>`
-  }
-  
-  // Unknown team (not TBD, not in flag map)
-  return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`
+    const f = getFlag(name);
+
+    if (f.isTbd) {
+        return `
+            <div
+                class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+                style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+            >
+                ?
+            </div>
+        `;
+    }
+
+    if (f.img) {
+        return `
+            <img
+                src="${f.img}"
+                alt="${name}"
+                width="${size}"
+                height="${size}"
+                class="rounded-sm shadow-sm inline-block object-cover"
+                style="border:1px solid #EEEDE7"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"
+            >
+            <span
+                class="hidden inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+                style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+            >
+                ${f.emoji}
+            </span>
+        `;
+    }
+
+    return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`;
 }
 
     // ============== PWA ==============
@@ -1014,65 +1091,75 @@ function toggleConfirmPassword() {
 }
 
 function loadRememberedEmail() {
-  const r = localStorage.getItem('remembered-email')
+  const r = localStorage.getItem('remembered-whatsapp')
   if (r) {
-    document.getElementById('email').value = r
+    document.getElementById('whatsapp').value = r
     document.getElementById('remember-me').checked = true
-    // Trigger the existence check for pre-filled emails
-    handleEmailBlur()
+    // Trigger the existence check for pre-filled numbers
+    handleWhatsappBlur()
   }
 }
 
-function saveRememberMe(email, checked) {
-  if (checked) localStorage.setItem('remembered-email', email)
-  else localStorage.removeItem('remembered-email')
+function saveRememberMe(whatsapp, checked) {
+  if (checked) localStorage.setItem('remembered-whatsapp', whatsapp)
+  else localStorage.removeItem('remembered-whatsapp')
 }
 
-// Check if email is already registered
-async function handleEmailBlur() {
-  const email = document.getElementById('email').value.trim()
-  if (!email || !email.includes('@')) return
+// Check if WhatsApp number is already registered
+async function handleWhatsappBlur() {
+  const wa = document.getElementById('whatsapp').value.trim()
+  if (!wa || !isValidWhatsapp(wa)) return
 
-  const { exists, error } = await checkEmailExists(email)
+  const { exists, error } = await checkWhatsappExists(wa)
   const confirmWrap = document.getElementById('confirm-password-wrap')
+  const nameWrap = document.getElementById('name-wrap')
   const submitBtn = document.getElementById('auth-submit-btn')
   const subtitle = document.getElementById('auth-subtitle')
 
   // If the existence check failed, don't flip the UI — stay in default
   // (login) state. The form submit handler will recover gracefully.
   if (error) {
-    console.warn('Could not check email existence:', error)
+    console.warn('Could not check WhatsApp existence:', error)
     return
   }
 
   if (exists) {
     authMode = 'login'
     confirmWrap.classList.add('hidden')
+    nameWrap.classList.add('hidden')
     document.getElementById('confirm-password').required = false
-    submitBtn.textContent = 'Sign In'
-    subtitle.textContent = 'Welcome back! Enter your password.'
+    document.getElementById('name').required = false
+    submitBtn.querySelector('span').textContent = 'Sign In'
+    if (subtitle) subtitle.textContent = 'Welcome back! Enter your password.'
   } else {
     authMode = 'signup'
     confirmWrap.classList.remove('hidden')
+    nameWrap.classList.remove('hidden')
     document.getElementById('confirm-password').required = true
-    submitBtn.textContent = 'Create Account'
-    subtitle.textContent = 'New here? Create your account below.'
+    document.getElementById('name').required = true
+    submitBtn.querySelector('span').textContent = 'Create Account'
+    if (subtitle) subtitle.textContent = 'New here? Create your account below.'
   }
 }
 
 // Wire up blur detection
-document.getElementById('email').addEventListener('blur', handleEmailBlur)
+document.getElementById('whatsapp').addEventListener('blur', handleWhatsappBlur)
 
-// Helper: show the signup UI (confirm password field)
+// Helper: show the signup UI (name + confirm password fields)
 function switchToSignupUI(subtitleMsg) {
   authMode = 'signup'
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const confirmInput = document.getElementById('confirm-password')
+  const nameWrap = document.getElementById('name-wrap')
+  const nameInput = document.getElementById('name')
   confirmWrap.classList.remove('hidden')
   confirmInput.required = true
-  document.getElementById('auth-submit-btn').textContent = 'Create Account'
-  if (subtitleMsg) document.getElementById('auth-subtitle').textContent = subtitleMsg
-  confirmInput.focus()
+  nameWrap.classList.remove('hidden')
+  nameInput.required = true
+  document.getElementById('auth-submit-btn').querySelector('span').textContent = 'Create Account'
+  const subtitle = document.getElementById('auth-subtitle')
+  if (subtitleMsg && subtitle) subtitle.textContent = subtitleMsg
+  nameInput.focus()
 }
 
 // Helper: show the login UI
@@ -1080,22 +1167,36 @@ function switchToLoginUI() {
   authMode = 'login'
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const confirmInput = document.getElementById('confirm-password')
+  const nameWrap = document.getElementById('name-wrap')
+  const nameInput = document.getElementById('name')
   confirmWrap.classList.add('hidden')
   confirmInput.required = false
-  document.getElementById('auth-submit-btn').textContent = 'Sign In'
+  nameWrap.classList.add('hidden')
+  nameInput.required = false
+  document.getElementById('auth-submit-btn').querySelector('span').textContent = 'Sign In'
 }
 
 // Form submission
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault()
-  const email = document.getElementById('email').value.trim()
+  const name = document.getElementById('name').value.trim()
+  const whatsapp = document.getElementById('whatsapp').value.trim()
   const password = document.getElementById('password').value
   const remember = document.getElementById('remember-me').checked
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const confirmVisible = !confirmWrap.classList.contains('hidden')
 
+  if (!isValidWhatsapp(whatsapp)) {
+    showToast('Enter a valid WhatsApp number', 'error')
+    return
+  }
+
   // Path A: confirm-password field is visible => user is creating an account
   if (confirmVisible) {
+    if (!name) {
+      showToast('Please enter your name', 'error')
+      return
+    }
     const confirmPassword = document.getElementById('confirm-password').value
     if (password !== confirmPassword) {
       showToast('Passwords do not match', 'error')
@@ -1106,7 +1207,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       return
     }
 
-    const { error } = await signUpUser(email, password)
+    const { error } = await signUpUser(name, whatsapp, password)
     if (error) {
       if (error.message.includes('already registered') || error.message.includes('already exists')) {
         showToast('Account already exists. Please sign in.', 'info')
@@ -1118,25 +1219,19 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
   } else {
     // Path B: login form. Try sign-in first.
-    const { error } = await signInUser(email, password)
+    const { error } = await signInUser(whatsapp, password)
     if (error) {
       const msg = (error.message || '').toLowerCase()
-      // If credentials are invalid, the email might not exist yet.
-      // Re-check existence; if it's a new email, prompt to confirm password
-      // so we can create the account. This handles both the race condition
-      // (blur check didn't finish before submit) and RLS blocking the check.
+      // If credentials are invalid, the number might not be registered yet.
+      // Re-check existence; if it's new, prompt to create the account.
       if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
-        // Check whether the email actually exists. If the check itself fails
-        // (network, RLS, RPC missing), assume the account DOES exist — safer
-        // than wrongly prompting the user to "create" an account they already
-        // have, which would just produce another invalid-credentials error.
-        const { exists, error: checkErr } = await checkEmailExists(email)
+        const { exists, error: checkErr } = await checkWhatsappExists(whatsapp)
         if (checkErr || exists) {
           showToast('Wrong password. Please try again.', 'error')
           return
         }
-        switchToSignupUI('New here? Confirm your password to create your account.')
-        showToast('No account found — confirm your password to create one', 'info')
+        switchToSignupUI('New here? Enter your name and confirm your password.')
+        showToast('No account found — fill in your details to create one', 'info')
         return
       }
       showToast(error.message, 'error')
@@ -1144,7 +1239,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
   }
 
-  saveRememberMe(email, remember)
+  saveRememberMe(whatsapp, remember)
   await showApp()
 })
 
@@ -1769,15 +1864,7 @@ let pendingPredictions = {}
     }
 
     function handleForgotPassword() {
-      const email = document.getElementById('email').value.trim()
-      if (!email) { showToast('Enter your email above first', 'error'); return }
-      try {
-        supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/index.html' })
-          .then(({ error }) => {
-            if (error) showToast(error.message, 'error')
-            else showToast('Password reset link sent to your email', 'success')
-          })
-      } catch (e) { showToast('Could not send reset email', 'error') }
+      showToast('Please message the admin on WhatsApp to reset your password.', 'info')
     }
 async function showApp() {
   try {

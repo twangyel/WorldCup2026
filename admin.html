@@ -99,6 +99,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -366,18 +367,20 @@
 
   <script>
     // ============== FLAGS ==============
-    const FLAG_MAP = {
+        const FLAG_MAP = {
+      // ===== AFC (9) =====
       'argentina': { code: 'ar', emoji: '🇦🇷' }, 'brazil': { code: 'br', emoji: '🇧🇷' },
       'canada': { code: 'ca', emoji: '🇨🇦' }, 'mexico': { code: 'mx', emoji: '🇲🇽' },
-      'usa': { code: 'us', emoji: '🇺🇸' }, 'france': { code: 'fr', emoji: '🇫🇷' },
-      'germany': { code: 'de', emoji: '🇩🇪' }, 'spain': { code: 'es', emoji: '🇪🇸' },
-      'portugal': { code: 'pt', emoji: '🇵🇹' }, 'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-      'netherlands': { code: 'nl', emoji: '🇳🇱' }, 'belgium': { code: 'be', emoji: '🇧🇪' },
-      'italy': { code: 'it', emoji: '🇮🇹' }, 'croatia': { code: 'hr', emoji: '🇭🇷' },
-      'uruguay': { code: 'uy', emoji: '🇺🇾' }, 'colombia': { code: 'co', emoji: '🇨🇴' },
-      'ecuador': { code: 'ec', emoji: '🇪🇨' }, 'chile': { code: 'cl', emoji: '🇨🇱' },
-      'paraguay': { code: 'py', emoji: '🇵🇾' }, 'peru': { code: 'pe', emoji: '🇵🇪' },
-      'bolivia': { code: 'bo', emoji: '🇧🇴' }, 'venezuela': { code: 've', emoji: '🇻🇪' },
+      'usa': { code: 'us', emoji: '🇺🇸' }, 'united states': { code: 'us', emoji: '🇺🇸' },
+      'france': { code: 'fr', emoji: '🇫🇷' }, 'germany': { code: 'de', emoji: '🇩🇪' },
+      'spain': { code: 'es', emoji: '🇪🇸' }, 'portugal': { code: 'pt', emoji: '🇵🇹' },
+      'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' }, 'netherlands': { code: 'nl', emoji: '🇳🇱' },
+      'belgium': { code: 'be', emoji: '🇧🇪' }, 'italy': { code: 'it', emoji: '🇮🇹' },
+      'croatia': { code: 'hr', emoji: '🇭🇷' }, 'uruguay': { code: 'uy', emoji: '🇺🇾' },
+      'colombia': { code: 'co', emoji: '🇨🇴' }, 'ecuador': { code: 'ec', emoji: '🇪🇨' },
+      'chile': { code: 'cl', emoji: '🇨🇱' }, 'paraguay': { code: 'py', emoji: '🇵🇾' },
+      'peru': { code: 'pe', emoji: '🇵🇪' }, 'bolivia': { code: 'bo', emoji: '🇧🇴' },
+      'venezuela': { code: 've', emoji: '🇻🇪' },
       'japan': { code: 'jp', emoji: '🇯🇵' }, 'south korea': { code: 'kr', emoji: '🇰🇷' },
       'korea republic': { code: 'kr', emoji: '🇰🇷' }, 'australia': { code: 'au', emoji: '🇦🇺' },
       'iran': { code: 'ir', emoji: '🇮🇷' }, 'saudi arabia': { code: 'sa', emoji: '🇸🇦' },
@@ -397,19 +400,24 @@
       'czech republic': { code: 'cz', emoji: '🇨🇿' }, 'czechia': { code: 'cz', emoji: '🇨🇿' },
       'hungary': { code: 'hu', emoji: '🇭🇺' }, 'romania': { code: 'ro', emoji: '🇷🇴' },
       'slovakia': { code: 'sk', emoji: '🇸🇰' }, 'slovenia': { code: 'si', emoji: '🇸🇮' },
-      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
+      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'bosnia': { code: 'ba', emoji: '🇧🇦' },
+      'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
       'republic of ireland': { code: 'ie', emoji: '🇮🇪' }, 'ireland': { code: 'ie', emoji: '🇮🇪' },
       'finland': { code: 'fi', emoji: '🇫🇮' }, 'turkey': { code: 'tr', emoji: '🇹🇷' },
+      'türkiye': { code: 'tr', emoji: '🇹🇷' }, 'turkiye': { code: 'tr', emoji: '🇹🇷' },
       'greece': { code: 'gr', emoji: '🇬🇷' }, 'russia': { code: 'ru', emoji: '🇷🇺' },
       'china': { code: 'cn', emoji: '🇨🇳' }, 'indonesia': { code: 'id', emoji: '🇮🇩' },
       'thailand': { code: 'th', emoji: '🇹🇭' }, 'uzbekistan': { code: 'uz', emoji: '🇺🇿' },
-      'iraq': { code: 'iq', emoji: '🇮🇶' }, 'jordan': { code: 'jo', emoji: '🇯🇴' },
+      'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' }, 'turkmenistan': { code: 'tm', emoji: '🇹🇲' },
+      'philippines': { code: 'ph', emoji: '🇵🇭' }, 'vietnam': { code: 'vn', emoji: '🇻🇳' },
+      'malaysia': { code: 'my', emoji: '🇲🇾' }, 'singapore': { code: 'sg', emoji: '🇸🇬' },
       'bahrain': { code: 'bh', emoji: '🇧🇭' }, 'kuwait': { code: 'kw', emoji: '🇰🇼' },
       'lebanon': { code: 'lb', emoji: '🇱🇧' }, 'syria': { code: 'sy', emoji: '🇸🇾' },
       'oman': { code: 'om', emoji: '🇴🇲' }, 'emirates': { code: 'ae', emoji: '🇦🇪' },
       'united arab emirates': { code: 'ae', emoji: '🇦🇪' }, 'uae': { code: 'ae', emoji: '🇦🇪' },
       'south africa': { code: 'za', emoji: '🇿🇦' }, 'dr congo': { code: 'cd', emoji: '🇨🇩' },
-      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
+      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' },
+      'congo dr': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
       'burkina faso': { code: 'bf', emoji: '🇧🇫' }, 'guinea': { code: 'gn', emoji: '🇬🇳' },
       'zambia': { code: 'zm', emoji: '🇿🇲' }, 'equatorial guinea': { code: 'gq', emoji: '🇬🇶' },
       'gabon': { code: 'ga', emoji: '🇬🇦' }, 'angola': { code: 'ao', emoji: '🇦🇴' },
@@ -418,50 +426,112 @@
       'namibia': { code: 'na', emoji: '🇳🇦' }, 'mauritania': { code: 'mr', emoji: '🇲🇷' },
       'libya': { code: 'ly', emoji: '🇱🇾' }, 'sudan': { code: 'sd', emoji: '🇸🇩' },
       'ethiopia': { code: 'et', emoji: '🇪🇹' }, 'india': { code: 'in', emoji: '🇮🇳' },
-      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' },
-      'turkmenistan': { code: 'tm', emoji: '🇹🇲' }, 'philippines': { code: 'ph', emoji: '🇵🇭' },
-      'vietnam': { code: 'vn', emoji: '🇻🇳' }, 'malaysia': { code: 'my', emoji: '🇲🇾' },
-      'singapore': { code: 'sg', emoji: '🇸🇬' }, 'tbd': { code: null, emoji: '❓' },
-      'to be determined': { code: null, emoji: '❓' }, 'tbc': { code: null, emoji: '❓' }
+      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'iraq': { code: 'iq', emoji: '🇮🇶' },
+      'jordan': { code: 'jo', emoji: '🇯🇴' }, 'curaçao': { code: 'cw', emoji: '🇨🇼' },
+      'curacao': { code: 'cw', emoji: '🇨🇼' }, 'haiti': { code: 'ht', emoji: '🇭🇹' },
+      'cape verde': { code: 'cv', emoji: '🇨🇻' },
+      'benin': { code: 'bj', emoji: '🇧🇯' }, 'rwanda': { code: 'rw', emoji: '🇷🇼' },
+      'lesotho': { code: 'ls', emoji: '🇱🇸' }, 'eswatini': { code: 'sz', emoji: '🇸🇿' },
+      'sierra leone': { code: 'sl', emoji: '🇸🇱' }, 'guinea-bissau': { code: 'gw', emoji: '🇬🇼' },
+      'djibouti': { code: 'dj', emoji: '🇩🇯' }, 'togo': { code: 'tg', emoji: '🇹🇬' },
+      'south sudan': { code: 'ss', emoji: '🇸🇸' }, 'liberia': { code: 'lr', emoji: '🇱🇷' },
+      'madagascar': { code: 'mg', emoji: '🇲🇬' }, 'mozambique': { code: 'mz', emoji: '🇲🇿' },
+      'malawi': { code: 'mw', emoji: '🇲🇼' }, 'botswana': { code: 'bw', emoji: '🇧🇼' },
+      'comoros': { code: 'km', emoji: '🇰🇲' }, 'gambia': { code: 'gm', emoji: '🇬🇲' },
+      'central african republic': { code: 'cf', emoji: '🇨🇫' }, 'chad': { code: 'td', emoji: '🇹🇩' },
+      'congo': { code: 'cg', emoji: '🇨🇬' }, 'republic of the congo': { code: 'cg', emoji: '🇨🇬' },
+      'sao tome and principe': { code: 'st', emoji: '🇸🇹' }, 'seychelles': { code: 'sc', emoji: '🇸🇨' },
+      'mauritius': { code: 'mu', emoji: '🇲🇺' }, 'burundi': { code: 'bi', emoji: '🇧🇮' },
+      'eritrea': { code: 'er', emoji: '🇪🇷' }, 'somalia': { code: 'so', emoji: '🇸🇴' },
+      'fiji': { code: 'fj', emoji: '🇫🇯' }, 'tahiti': { code: 'pf', emoji: '🇵🇫' },
+      'new caledonia': { code: 'nc', emoji: '🇳🇨' }, 'samoa': { code: 'ws', emoji: '🇼🇸' },
+      'papua new guinea': { code: 'pg', emoji: '🇵🇬' }, 'solomon islands': { code: 'sb', emoji: '🇸🇧' },
+      'vanuatu': { code: 'vu', emoji: '🇻🇺' },
+      'guatemala': { code: 'gt', emoji: '🇬🇹' }, 'el salvador': { code: 'sv', emoji: '🇸🇻' },
+      'trinidad and tobago': { code: 'tt', emoji: '🇹🇹' }, 'nicaragua': { code: 'ni', emoji: '🇳🇮' },
+      'bermuda': { code: 'bm', emoji: '🇧🇲' }, 'suriname': { code: 'sr', emoji: '🇸🇷' },
+      'iceland': { code: 'is', emoji: '🇮🇸' }, 'montenegro': { code: 'me', emoji: '🇲🇪' },
+      'north macedonia': { code: 'mk', emoji: '🇲🇰' }, 'albania': { code: 'al', emoji: '🇦🇱' },
+      'belarus': { code: 'by', emoji: '🇧🇾' }, 'estonia': { code: 'ee', emoji: '🇪🇪' },
+      'latvia': { code: 'lv', emoji: '🇱🇻' }, 'lithuania': { code: 'lt', emoji: '🇱🇹' },
+      'moldova': { code: 'md', emoji: '🇲🇩' }, 'kazakhstan': { code: 'kz', emoji: '🇰🇿' },
+      'georgia': { code: 'ge', emoji: '🇬🇪' }, 'armenia': { code: 'am', emoji: '🇦🇲' },
+      'azerbaijan': { code: 'az', emoji: '🇦🇿' }, 'israel': { code: 'il', emoji: '🇮🇱' },
+      'cyprus': { code: 'cy', emoji: '🇨🇾' }, 'luxembourg': { code: 'lu', emoji: '🇱🇺' },
+      'malta': { code: 'mt', emoji: '🇲🇹' }, 'andorra': { code: 'ad', emoji: '🇦🇩' },
+      'liechtenstein': { code: 'li', emoji: '🇱🇮' }, 'san marino': { code: 'sm', emoji: '🇸🇲' },
+      'gibraltar': { code: 'gi', emoji: '🇬🇮' }, 'faroe islands': { code: 'fo', emoji: '🇫🇴' },
+      'kosovo': { code: 'xk', emoji: '🇽🇰' },
+      // ===== TBD / Placeholder =====
+      'tbd': { code: null, emoji: '❓' },
+      'to be determined': { code: null, emoji: '❓' },
+      'tbc': { code: null, emoji: '❓' },
+      'to be confirmed': { code: null, emoji: '❓' }
     }
 
-    function getFlag(name) {
-  const key = (name || '').toLowerCase().trim()
-  
-  // TBD / placeholder teams
-  if (key === 'tbd' || key === 'to be determined' || key === 'tbc' || key === 'to be confirmed') {
-    return { emoji: '❓', img: null, isTbd: true }
+ function getFlag(name) {
+  const key = (name || '').toLowerCase().trim();
+
+  if (
+    key === 'tbd' ||
+    key === 'to be determined' ||
+    key === 'tbc' ||
+    key === 'to be confirmed'
+  ) {
+    return { emoji: '❓', img: null, isTbd: true };
   }
-  
-  const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
+
+  const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' };
+
   return {
     emoji: mapped.emoji,
-    img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null,
+    img: mapped.code
+      ? `https://flagcdn.com/w40/${mapped.code}.png`
+      : null,
     isTbd: false
-  }
+  };
 }
 
 function flagHtml(name, size = 24) {
-  const f = getFlag(name)
-  
-  // TBD: show a clean placeholder circle instead of broken image + ❓
-  if (f.isTbd) {
-    return `<div class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold" 
-      style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.4)}px;">?</div>`
-  }
-  
-  if (f.img) {
-    return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" 
-      class="rounded-sm shadow-sm inline-block object-cover" 
-      style="border:1px solid #EEEDE7" 
-      onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
-      <span class="hidden text-xl">${f.emoji}</span>`
-  }
-  
-  // Unknown team (not TBD, not in flag map)
-  return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`
-}
+  const f = getFlag(name);
 
+  if (f.isTbd) {
+    return `
+      <div
+        class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+        style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+      >
+        ?
+      </div>
+    `;
+  }
+
+  if (f.img) {
+    return `
+      <img
+        src="${f.img}"
+        alt="${name}"
+        width="${size}"
+        height="${size}"
+        class="rounded-sm shadow-sm inline-block object-cover"
+        style="border:1px solid #EEEDE7"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';"
+      >
+      <span
+        class="hidden items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+        style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+      >
+        ${f.emoji}
+      </span>
+    `;
+  }
+
+  return `
+    <span class="text-xl" title="${name || 'Unknown'}">
+      ${f.emoji}
+    </span>
+  `;
+}
     // ============== STATE ==============
     let allFixtures = []
     let allUsers = []
@@ -1087,68 +1157,17 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     function toggleCSV() { document.getElementById('csv-area').classList.toggle('hidden') }
     async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
     async function importCSV() {
-  const raw = document.getElementById('csv-input').value.trim()
-  if (!raw) return showToast('Paste some rows first', 'warning')
-  
-  const rows = raw.split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.toLowerCase().startsWith('home,')) // skip header & empty
-    .map(line => {
-      // Handle quoted CSV: "Brazil","Argentina","2026-06-15T18:00:00Z","Group A"
-      // Or simple CSV: Brazil,Argentina,2026-06-15T18:00:00Z,Group A
-      const parts = []
-      let current = ''
-      let inQuotes = false
-      
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i]
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === ',' && !inQuotes) {
-          parts.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
-      }
-      parts.push(current.trim()) // last part
-      
-      // Also try simple split as fallback
-      if (parts.length < 4) {
-        const simpleParts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''))
-        if (simpleParts.length >= 4) {
-          parts.length = 0
-          parts.push(...simpleParts)
-        }
-      }
-      
-      if (parts.length < 4) return null
-      
-      const home = parts[0].replace(/^"|"$/g, '')
-      const away = parts[1].replace(/^"|"$/g, '')
-      const kickoffRaw = parts[2].replace(/^"|"$/g, '')
-      const stage = parts[3].replace(/^"|"$/g, '')
-      
-      // Validate kickoff is parseable
-      const kickoffDate = new Date(kickoffRaw)
-      if (isNaN(kickoffDate.getTime())) {
-        console.warn('Invalid date:', kickoffRaw)
-        return null
-      }
-      
-      return { 
-        home_team: home, 
-        away_team: away, 
-        kickoff: kickoffDate.toISOString(), 
-        stage: stage 
-      }
-    })
-    .filter(Boolean)
-  
-  if (!rows.length) return showToast('No valid rows parsed', 'error')
-  await bulkImport(rows, 'CSV')
-  document.getElementById('csv-input').value = ''
-}
+      const raw = document.getElementById('csv-input').value.trim()
+      if (!raw) return showToast('Paste some rows first', 'warning')
+      const rows = raw.split('\n').map(line => {
+        const parts = line.split(',').map(s => s.trim())
+        if (parts.length < 4) return null
+        return { home_team: parts[0], away_team: parts[1], kickoff: new Date(parts[2]).toISOString(), stage: parts[3] }
+      }).filter(Boolean)
+      if (!rows.length) return showToast('No valid rows parsed', 'error')
+      await bulkImport(rows, 'CSV')
+      document.getElementById('csv-input').value = ''
+    }
 
     async function bulkImport(rows, label) {
       let added = 0, skipped = 0, failed = 0
