@@ -671,6 +671,50 @@
         }).subscribe()
     }
 
+
+    // ============== POINTS CALCULATION ==============
+function calculatePoints(predHome, predAway, actualHome, actualAway) {
+  const ph = Number(predHome), pa = Number(predAway)
+  const ah = Number(actualHome), aa = Number(actualAway)
+
+  if (ph === ah && pa === aa) return 5          // Exact score
+  const predDiff = ph - pa
+  const actualDiff = ah - aa
+  if (predDiff === actualDiff) return 3          // Correct goal difference
+  const predOutcome = Math.sign(predDiff)
+  const actualOutcome = Math.sign(actualDiff)
+  if (predOutcome === actualOutcome) return 2    // Correct outcome
+  return 0
+}
+
+async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
+  try {
+    const { data: preds, error } = await supabaseClient
+      .from('predictions')
+      .select('id, home_prediction, away_prediction, user_id')
+      .eq('fixture_id', fixtureId)
+    if (error) throw error
+    if (!preds?.length) return
+
+    let updated = 0
+    for (const p of preds) {
+      const pts = calculatePoints(p.home_prediction, p.away_prediction, actualHome, actualAway)
+      const { error: updErr } = await supabaseClient
+        .from('predictions')
+        .update({ points_awarded: pts })
+        .eq('id', p.id)
+      if (!updErr) updated++
+    }
+
+    if (updated > 0) {
+      showToast(`Points calculated for ${updated} predictions`, 'success')
+    }
+  } catch (e) {
+    console.error('awardPointsForFixture error:', e)
+    showToast('Score saved but failed to calculate points', 'warning')
+  }
+}
+
     // ============== INIT ==============
     async function init() {
       await initAuth()

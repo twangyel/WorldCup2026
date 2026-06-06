@@ -1332,42 +1332,53 @@ let pendingPredictions = {}
     let prizePollInterval = null
 
    function setupRealtime() {
-  // 1) Predictions: ALL events (INSERT, UPDATE, DELETE)
-  //    Admin deleting a user/fixture wipes predictions → leaderboard must refresh
+  // 1) Predictions: ALL events
   supabaseClient.channel('lb')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => { 
-      loadLeaderboard(); loadFixtures(); loadHome() 
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload) => {
+      // Notify current user when their points change
+      if (payload.eventType === 'UPDATE' && payload.new?.points_awarded > 0) {
+        const myId = getUser()?.id
+        const oldPts = payload.old?.points_awarded || 0
+        if (myId && payload.new.user_id === myId && payload.new.points_awarded !== oldPts) {
+          showToast(`You scored ${payload.new.points_awarded} points!`, 'success')
+        }
+      }
+      loadLeaderboard(); loadFixtures(); loadHome()
     })
-    .subscribe((status) => { 
-      if (status !== 'SUBSCRIBED') console.log('LB channel status:', status) 
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') console.log('LB channel status:', status)
     })
 
-  // 2) Fixtures: ALL events (INSERT, UPDATE, DELETE)
-  //    Admin adds, deletes, or enters scores → everything refreshes
+  // 2) Fixtures: ALL events
   supabaseClient.channel('fx')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, async () => { 
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, async (payload) => {
+      // Notify when a final result is first entered
+      if (payload.eventType === 'UPDATE' && payload.new?.home_score !== null && payload.new?.away_score !== null) {
+        const hadScoreBefore = payload.old?.home_score !== null && payload.old?.away_score !== null
+        if (!hadScoreBefore) {
+          showToast(`Result: ${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`, 'result')
+        }
+      }
       await loadFixtures()
       loadLeaderboard()
       loadHome()
     })
-    .subscribe((status) => { 
-      if (status !== 'SUBSCRIBED') console.log('FX channel status:', status) 
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') console.log('FX channel status:', status)
     })
 
-  // 3) Profiles: ALL events (fee_paid, new user, user deleted, name changed)
-  //    Affects prize pool AND leaderboard rankings
+  // 3) Profiles
   supabaseClient.channel('prize-pool')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
       console.log('[Realtime] Profile change detected:', payload.eventType, payload.new?.id)
       loadHome()
       loadLeaderboard()
     })
-    .subscribe((status) => { 
+    .subscribe((status) => {
       console.log('[Realtime] Prize pool channel status:', status)
     })
 
-  // 4) Prize settings: ALL events (entry fee, manual override, currency)
-  //    Admin edits pool settings → home prize card updates instantly
+  // 4) Prize settings
   supabaseClient.channel('prize-settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'prize_settings' }, () => {
       loadHome()
