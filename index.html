@@ -119,6 +119,105 @@
     /* Tab fade */
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== Lock warning banner (predictions tab) ===== */
+    .lock-warn {
+      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+      border: 1.5px solid #F59E0B;
+      color: #78350F;
+    }
+    .lock-warn.urgent {
+      background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+      border-color: #EF4444;
+      color: #7F1D1D;
+      animation: pulse-urgent 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-urgent {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    }
+    .lock-warn-time { font-variant-numeric: tabular-nums; font-weight: 800; }
+
+    /* Per-card mini countdown */
+    .card-countdown {
+      font-variant-numeric: tabular-nums;
+      font-size: 11px; font-weight: 700;
+      color: #92400E; background: #FEF3C7;
+      padding: 4px 10px; border-radius: 999px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .card-countdown.urgent { color: #7F1D1D; background: #FEE2E2; }
+    .card-countdown::before { content: '⏱'; font-size: 10px; }
+
+    /* "Locked in 2h ago" stamp */
+    .submitted-stamp {
+      font-size: 11px; color: #5C6B75;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .submitted-stamp::before { content: '🔒'; font-size: 10px; opacity: 0.7; }
+
+    /* ===== Badges ===== */
+    .badge-card {
+      position: relative;
+      padding: 14px 12px 12px;
+      border-radius: 18px;
+      border: 1.5px solid #EEEDE7;
+      background: #fff;
+      text-align: center;
+      transition: all 200ms ease;
+    }
+    .badge-card.earned {
+      border-color: rgba(212,162,76,0.4);
+      background: linear-gradient(135deg, #FFFBF0 0%, #FDF6E3 100%);
+      box-shadow: 0 2px 12px rgba(212,162,76,0.12);
+    }
+    .badge-card.locked { opacity: 0.55; }
+    .badge-card.locked .badge-icon { filter: grayscale(1); }
+    .badge-icon { font-size: 28px; line-height: 1; margin-bottom: 6px; }
+    .badge-name { font-size: 11px; font-weight: 700; color: #1F2A26; letter-spacing: -0.01em; }
+    .badge-desc { font-size: 10px; color: #8A959F; margin-top: 2px; line-height: 1.3; }
+    .badge-earned-tick {
+      position: absolute; top: 6px; right: 6px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #10B981; color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 900;
+    }
+
+    /* Tiny inline badge icon (leaderboard) */
+    .lb-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      font-size: 11px; line-height: 1;
+      background: rgba(212,162,76,0.15);
+      margin-left: 4px;
+    }
+
+    /* Streak chip */
+    .streak-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: linear-gradient(135deg, #FEE2E2, #FECACA);
+      color: #7F1D1D; font-weight: 800; font-size: 12px;
+      padding: 4px 10px; border-radius: 999px;
+    }
+
+    /* ===== Preview mode ===== */
+    #preview-banner {
+      background: linear-gradient(90deg, #1E3A5F 0%, #0B1221 100%);
+      color: #FDF6E3;
+    }
+    .preview-blur { filter: blur(5px); user-select: none; pointer-events: none; }
+    .preview-leaderboard-wrap { position: relative; }
+    .preview-leaderboard-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: linear-gradient(180deg, rgba(250,250,247,0.4) 0%, rgba(250,250,247,0.92) 60%);
+      backdrop-filter: blur(2px);
+      border-radius: 18px;
+      padding: 24px;
+      text-align: center;
+    }
   
     /* Prize pool amount animation */
     .prize-amount-anim {
@@ -573,6 +672,13 @@
           </button>
         </form>
 
+        <!-- Preview mode entry -->
+        <button onclick="enterPreviewMode()" type="button"
+          class="w-full mt-3 bg-transparent border-2 border-dashed border-gray-300 text-ink-700 font-semibold py-3 rounded-2xl tap text-sm flex items-center justify-center gap-2 hover:bg-white/60 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <span>Preview the league (no signup)</span>
+        </button>
+
         <div id="auth-message" class="mt-4 text-sm text-center hidden"></div>
 
        
@@ -615,6 +721,12 @@
 
   <!-- APP SHELL -->
   <div id="app-shell" class="hidden min-h-screen flex flex-col">
+
+    <!-- Preview mode banner -->
+    <div id="preview-banner" class="hidden px-5 py-2.5 text-center text-xs font-semibold safe-top">
+      <span>👀 Preview mode — </span>
+      <button onclick="exitPreviewMode()" class="underline font-bold tap">Sign in to predict</button>
+    </div>
 
     <!-- Sticky Header -->
     <header class="app-header sticky top-0 z-30 border-b border-paper-border/60 safe-top">
@@ -695,6 +807,7 @@
           <span class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full" id="prediction-count">0/0</span>
         </div>
         <p class="text-sm text-ink-500 px-1 mb-2">Lock in your scores before kick-off.</p>
+        <div id="fixtures-lock-warn"></div>
         <div id="fixtures-list" class="space-y-3">
           <div class="skel h-44 rounded-3xl"></div>
           <div class="skel h-44 rounded-3xl"></div>
@@ -744,6 +857,20 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
           </div>
+        </div>
+
+        <!-- Badges & streaks -->
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold tracking-tight">Achievements</h3>
+            <span id="profile-streak" class="hidden"></span>
+          </div>
+          <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
+            <div class="skel h-24 rounded-2xl"></div>
+            <div class="skel h-24 rounded-2xl"></div>
+            <div class="skel h-24 rounded-2xl"></div>
+          </div>
+          <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
         </div>
 
         <!-- Scoring rules -->
@@ -1409,6 +1536,8 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       await loadFixtures()
       await loadLeaderboard()
       await loadHome()
+      renderBadges()
+      startCountdownTicker()
       setupRealtime()
     }
 
@@ -1546,6 +1675,52 @@ let fixtures = []
 let predictions = []
 let pendingPredictions = {}
 
+/* ===== NEW FEATURES STATE =====
+ *
+ * REQUIRED DB CHANGE for prediction lock timestamp (Feature 1):
+ *   ALTER TABLE predictions ADD COLUMN submitted_at TIMESTAMPTZ DEFAULT NOW();
+ *
+ * The code below writes `submitted_at` after each savePrediction(). If the
+ * column doesn't exist, the update will fail silently and the rest of the
+ * app keeps working.
+ */
+let previewMode = false                  // true when browsing as a guest
+let countdownTickerId = null             // live countdown interval id
+const BADGES = [
+  { id: 'champion',    icon: '👑', name: 'Champion',      desc: '#1 on the board' },
+  { id: 'nostradamus', icon: '🔮', name: 'Nostradamus',   desc: '3+ exact scores' },
+  { id: 'sharpshoot',  icon: '🎯', name: 'Sharpshooter',  desc: '5+ exact scores' },
+  { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 24h+ early' },
+  { id: 'underdog',    icon: '🐴', name: 'Underdog King', desc: '3+ correct draws' },
+  { id: 'streak',      icon: '🔥', name: 'On Fire',       desc: '3+ in a row' },
+  { id: 'centurion',   icon: '💯', name: 'Centurion',     desc: '100+ points' },
+  { id: 'allin',       icon: '🎲', name: 'All In',        desc: 'Predict every match' }
+]
+
+// ============== TIME HELPERS ==============
+function relativeTimeAgo(iso) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 0) return 'just now'
+  const m = Math.floor(diff / 6e4)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
+function msToCountdown(ms) {
+  if (ms <= 0) return '00:00:00'
+  const totalSec = Math.floor(ms / 1000)
+  const d = Math.floor(totalSec / 86400)
+  const h = Math.floor((totalSec % 86400) / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (d > 0) return `${d}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m`
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+}
+
     // ============== FIXTURES ==============
     async function loadFixtures() {
       const { data: fxData } = await getFixtures()
@@ -1569,6 +1744,31 @@ let pendingPredictions = {}
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
   const nextMatchId = upcoming[0]?.id || null
 
+  // ===== Lock warning banner (Feature 3) =====
+  const warnHost = document.getElementById('fixtures-lock-warn')
+  if (warnHost) {
+    const next = upcoming[0]
+    if (next) {
+      const ms = new Date(next.kickoff) - now
+      const mins = ms / 6e4
+      if (mins <= 60) {
+        const urgent = mins <= 10
+        warnHost.innerHTML = `
+          <div class="lock-warn ${urgent ? 'urgent' : ''} rounded-2xl px-4 py-3 flex items-center gap-3">
+            <span class="text-lg">${urgent ? '🚨' : '⚠️'}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-bold leading-tight">${next.home_team} vs ${next.away_team}</div>
+              <div class="text-[11px] opacity-80">Predictions lock in <span class="lock-warn-time" data-lockwarn="${next.id}">${msToCountdown(ms)}</span></div>
+            </div>
+          </div>`
+      } else {
+        warnHost.innerHTML = ''
+      }
+    } else {
+      warnHost.innerHTML = ''
+    }
+  }
+
   if (!fixtures.length) {
     c.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-10 text-center">
       <div class="text-5xl mb-3">⚽</div>
@@ -1583,17 +1783,31 @@ let pendingPredictions = {}
     const hasScore = f.home_score !== null && f.away_score !== null
     const isNext = f.id === nextMatchId
     const timeLocked = isLocked(f.kickoff)
-    const locked = !isNext || timeLocked  // LOCKED if not next OR time already passed
+    // In preview mode every card is locked (read-only)
+    const locked = previewMode || !isNext || timeLocked
     const hP = pred ? pred.home_prediction : ''
     const aP = pred ? pred.away_prediction : ''
     const pts = pred?.points_awarded || 0
 
     let badge
     if (hasScore) badge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
-    else if (locked) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+    else if (locked && !previewMode) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+    else if (previewMode && !hasScore) badge = `<span class="text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">PREVIEW</span>`
     else badge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">OPEN</span>`
 
     const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
+
+    // Mini countdown next to time, for the OPEN match
+    const ms = new Date(f.kickoff) - now
+    const showMiniCd = isNext && !timeLocked && !previewMode && ms <= 24 * 3600 * 1000
+    const miniCd = showMiniCd
+      ? `<span class="card-countdown ${ms <= 10*6e4 ? 'urgent' : ''}" data-cd-card="${f.id}">${msToCountdown(ms)}</span>`
+      : ''
+
+    // Feature 1: "Locked in 2h ago" stamp
+    const stamp = pred?.submitted_at
+      ? `<div class="submitted-stamp mt-2 justify-center flex">Locked in ${relativeTimeAgo(pred.submitted_at)}</div>`
+      : ''
 
     return `
     <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5 relative" data-fixture="${f.id}">
@@ -1625,11 +1839,15 @@ let pendingPredictions = {}
         </div>
       </div>
 
-      <div class="text-center text-[11px] text-ink-400 font-medium mb-3">
-        ${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      <div class="text-center text-[11px] text-ink-400 font-medium mb-3 flex items-center justify-center gap-2 flex-wrap">
+        <span>${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        ${miniCd}
       </div>
 
-      ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
+      ${stamp}
+
+      ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap mt-2">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
+      ${previewMode && !hasScore ? `<button onclick="exitPreviewMode()" class="w-full bg-brand-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap mt-2">🔓 Sign in to predict</button>` : ''}
     </div>`
   }).join('')
 }
@@ -1640,6 +1858,7 @@ let pendingPredictions = {}
     }
 
     async function handleSavePrediction(id) {
+      if (previewMode) { showToast('Sign in to make predictions', 'info'); return }
       const card = document.querySelector(`[data-fixture="${id}"]`)
       const inputs = card.querySelectorAll('input')
       const pending = pendingPredictions[id] || {}
@@ -1649,11 +1868,28 @@ let pendingPredictions = {}
       const home = parseInt(h), away = parseInt(a)
       const { error } = await savePrediction(id, home, away)
       if (error) { showToast(error.message, 'error'); return }
+
+      // Feature 1: write submitted_at timestamp. Silent-fail if column doesn't exist.
+      const submittedAt = new Date().toISOString()
+      try {
+        await supabaseClient
+          .from('predictions')
+          .update({ submitted_at: submittedAt })
+          .eq('user_id', getUser().id)
+          .eq('fixture_id', id)
+      } catch (e) { /* column may not exist yet — ignore */ }
+
       showToast('Prediction saved', 'success')
       const existing = getPrediction(id)
-      if (existing) { existing.home_prediction = home; existing.away_prediction = away }
-      else predictions.push({ user_id: getUser().id, fixture_id: id, home_prediction: home, away_prediction: away, points_awarded: 0 })
+      if (existing) {
+        existing.home_prediction = home
+        existing.away_prediction = away
+        existing.submitted_at = submittedAt
+      } else {
+        predictions.push({ user_id: getUser().id, fixture_id: id, home_prediction: home, away_prediction: away, points_awarded: 0, submitted_at: submittedAt })
+      }
       updatePredictionCount()
+      renderFixtures()  // re-render so "Locked in just now" appears immediately
     }
 
   function updatePredictionCount() {
@@ -1751,6 +1987,7 @@ let pendingPredictions = {}
   const cdEl = document.getElementById('home-next-countdown')
   if (!upcoming.length) {
     cdEl.textContent = ''
+    cdEl.removeAttribute('data-cd-home')
     nextEl.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-8 text-center">
       <div class="text-4xl mb-2">⏳</div><div class="text-sm font-semibold text-ink-700">No upcoming matches</div><p class="text-xs text-ink-500 mt-1">Check back soon</p>
     </div>`
@@ -1759,11 +1996,8 @@ let pendingPredictions = {}
     const pred = getPrediction(f.id)
     const ko = new Date(f.kickoff)
     const diff = ko - now
-    const days = Math.floor(diff / 8.64e7)
-    const hours = Math.floor((diff % 8.64e7) / 3.6e6)
-    const mins = Math.floor((diff % 3.6e6) / 6e4)
-    const cd = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
-    cdEl.textContent = `in ${cd}`
+    cdEl.dataset.cdHome = ko.toISOString()
+    cdEl.textContent = `in ${msToCountdown(diff)}`
 
     nextEl.innerHTML = `
       <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
@@ -1867,6 +2101,7 @@ let pendingPredictions = {}
             <div class="flex items-center gap-2">
               <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
               ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
+              ${leaderboardBadgeIcons(s, rank)}
             </div>
             <div class="text-xs text-ink-500 mt-1 flex items-center gap-3">
               <span><b class="text-ink-900">${correct}</b> correct</span>
@@ -2053,6 +2288,258 @@ let pendingPredictions = {}
       } catch (e) { /* silent */ }
     }
 
+    // ============== LIVE COUNTDOWN TICKER (Feature 3) ==============
+    function startCountdownTicker() {
+      if (countdownTickerId) return
+      countdownTickerId = setInterval(tickCountdowns, 1000)
+    }
+    function stopCountdownTicker() {
+      if (countdownTickerId) { clearInterval(countdownTickerId); countdownTickerId = null }
+    }
+    function tickCountdowns() {
+      const now = Date.now()
+
+      // 1. Home page next-match countdown
+      const homeCd = document.getElementById('home-next-countdown')
+      if (homeCd && homeCd.dataset.cdHome) {
+        const ms = new Date(homeCd.dataset.cdHome).getTime() - now
+        if (ms <= 0) {
+          homeCd.textContent = 'kicking off'
+          delete homeCd.dataset.cdHome
+          // refresh the home view so the now-locked match transitions correctly
+          setTimeout(() => { if (typeof loadHome === 'function') loadHome() }, 2000)
+        } else {
+          homeCd.textContent = `in ${msToCountdown(ms)}`
+        }
+      }
+
+      // 2. Per-card mini countdowns on predictions tab
+      document.querySelectorAll('[data-cd-card]').forEach(el => {
+        const fId = el.dataset.cdCard
+        const f = fixtures.find(x => x.id == fId)
+        if (!f) return
+        const ms = new Date(f.kickoff).getTime() - now
+        if (ms <= 0) {
+          // lock just elapsed — re-render
+          if (typeof renderFixtures === 'function') renderFixtures()
+        } else {
+          el.textContent = msToCountdown(ms)
+          if (ms <= 10 * 6e4 && !el.classList.contains('urgent')) el.classList.add('urgent')
+        }
+      })
+
+      // 3. Lock-warning banner timer
+      document.querySelectorAll('[data-lockwarn]').forEach(el => {
+        const fId = el.dataset.lockwarn
+        const f = fixtures.find(x => x.id == fId)
+        if (!f) return
+        const ms = new Date(f.kickoff).getTime() - now
+        if (ms <= 0) {
+          if (typeof renderFixtures === 'function') renderFixtures()
+        } else {
+          el.textContent = msToCountdown(ms)
+          // escalate styling on the parent banner
+          const banner = el.closest('.lock-warn')
+          if (banner && ms <= 10 * 6e4) banner.classList.add('urgent')
+        }
+      })
+    }
+
+    // ============== BADGES (Feature 2) ==============
+    function computeMyBadges() {
+      // Inputs: predictions[] (current user), fixtures[], + leaderboard stats fetched separately
+      const earned = new Set()
+      const myId = getUser()?.id
+
+      // Match each prediction to its fixture
+      const finishedPreds = predictions
+        .map(p => ({ p, f: fixtures.find(f => f.id === p.fixture_id) }))
+        .filter(x => x.f && x.f.home_score !== null && x.f.away_score !== null)
+        .sort((a, b) => new Date(a.f.kickoff) - new Date(b.f.kickoff))
+
+      const exactCount = finishedPreds.filter(({ p, f }) =>
+        p.home_prediction === f.home_score && p.away_prediction === f.away_score
+      ).length
+
+      if (exactCount >= 3) earned.add('nostradamus')
+      if (exactCount >= 5) earned.add('sharpshoot')
+
+      // Underdog King: 3+ correctly predicted draws
+      const correctDraws = finishedPreds.filter(({ p, f }) =>
+        f.home_score === f.away_score && p.home_prediction === p.away_prediction
+      ).length
+      if (correctDraws >= 3) earned.add('underdog')
+
+      // Early Bird: any prediction submitted 24h+ before kickoff
+      const earlyBird = predictions.some(p => {
+        if (!p.submitted_at) return false
+        const f = fixtures.find(x => x.id === p.fixture_id)
+        if (!f) return false
+        return new Date(f.kickoff) - new Date(p.submitted_at) >= 24 * 3600 * 1000
+      })
+      if (earlyBird) earned.add('earlybird')
+
+      // On Fire: current streak of 3+ point-scoring predictions in finished matches
+      let streak = 0
+      for (let i = finishedPreds.length - 1; i >= 0; i--) {
+        if ((finishedPreds[i].p.points_awarded || 0) > 0) streak++
+        else break
+      }
+      if (streak >= 3) earned.add('streak')
+
+      // All In: predicted every match that has either finished or has a prediction window
+      const predictableFixtures = fixtures.filter(f => predictions.find(p => p.fixture_id === f.id))
+      if (fixtures.length > 0 && predictableFixtures.length === fixtures.length) earned.add('allin')
+
+      return { earned, streak, exactCount }
+    }
+
+    async function renderBadges() {
+      const host = document.getElementById('profile-badges')
+      const streakEl = document.getElementById('profile-streak')
+      if (!host) return
+
+      const { earned, streak } = computeMyBadges()
+
+      // Champion + Centurion need leaderboard data
+      try {
+        const { data: stats } = await getLeaderboard()
+        const myId = getUser()?.id
+        if (stats?.length) {
+          const sorted = [...stats].sort((a, b) => (b.points || 0) - (a.points || 0))
+          const me = sorted.find(s => s.user_id === myId || s.id === myId)
+          if (me) {
+            if ((me.points || 0) >= 100) earned.add('centurion')
+            if (sorted[0] && (sorted[0].user_id === myId || sorted[0].id === myId) && (me.points || 0) > 0) earned.add('champion')
+          }
+        }
+      } catch (e) { /* leaderboard not available */ }
+
+      host.innerHTML = BADGES.map(b => {
+        const got = earned.has(b.id)
+        return `
+          <div class="badge-card ${got ? 'earned' : 'locked'}">
+            ${got ? '<div class="badge-earned-tick">✓</div>' : ''}
+            <div class="badge-icon">${b.icon}</div>
+            <div class="badge-name">${b.name}</div>
+            <div class="badge-desc">${b.desc}</div>
+          </div>`
+      }).join('')
+
+      if (streak >= 2) {
+        streakEl.className = 'streak-chip'
+        streakEl.innerHTML = `🔥 <span>${streak} in a row</span>`
+      } else {
+        streakEl.className = 'hidden'
+      }
+    }
+
+    // Compute small badge icons to show next to a user's name in the leaderboard
+    function leaderboardBadgeIcons(s, rank) {
+      const icons = []
+      if (rank === 1 && (s.points || 0) > 0) icons.push('👑')
+      if ((s.exact || 0) >= 5) icons.push('🎯')
+      else if ((s.exact || 0) >= 3) icons.push('🔮')
+      if ((s.points || 0) >= 100) icons.push('💯')
+      return icons.map(i => `<span class="lb-badge" title="badge">${i}</span>`).join('')
+    }
+
+    // ============== PREVIEW MODE (Feature 4) ==============
+    async function enterPreviewMode() {
+      previewMode = true
+      document.getElementById('auth-screen').classList.add('hidden')
+      document.getElementById('app-shell').classList.remove('hidden')
+      document.getElementById('preview-banner').classList.remove('hidden')
+
+      // Hide stuff that doesn't apply to guests
+      document.getElementById('user-name').textContent = 'Guest'
+      const logoutBtn = document.querySelector('[onclick="confirmLogout()"]')
+      if (logoutBtn) logoutBtn.style.display = 'none'
+      const profileNav = document.querySelector('[data-tab="profile"]')
+      if (profileNav) profileNav.style.display = 'none'
+      // Hide the personal-stats hero card (no user data to show)
+      const hero = document.querySelector('#tab-home .hero-card')
+      if (hero) hero.style.display = 'none'
+
+      // Fetch fixtures anonymously
+      try {
+        const { data } = await supabaseClient
+          .from('matches')
+          .select('*')
+          .order('kickoff', { ascending: true })
+        fixtures = data || []
+      } catch (e) {
+        fixtures = []
+      }
+      predictions = []
+
+      renderFixtures()
+      updatePredictionCount()
+      await loadHome()
+      renderPreviewLeaderboard()
+      startCountdownTicker()
+      switchTab('predictions')
+    }
+
+    function exitPreviewMode() {
+      previewMode = false
+      // Restore hidden elements
+      const logoutBtn = document.querySelector('[onclick="confirmLogout()"]')
+      if (logoutBtn) logoutBtn.style.display = ''
+      const profileNav = document.querySelector('[data-tab="profile"]')
+      if (profileNav) profileNav.style.display = ''
+      const hero = document.querySelector('#tab-home .hero-card')
+      if (hero) hero.style.display = ''
+      document.getElementById('preview-banner').classList.add('hidden')
+      document.getElementById('app-shell').classList.add('hidden')
+      stopCountdownTicker()
+      showAuth()
+    }
+
+    function renderPreviewLeaderboard() {
+      const c = document.getElementById('leaderboard-list')
+      if (!c) return
+      // Mock leaderboard data — blurred, just to show the structure
+      const fake = [
+        { name: 'Karma D.',     points: 87, exact: 6, dept: 'Operations'    },
+        { name: 'Sonam W.',     points: 74, exact: 4, dept: 'Engineering'   },
+        { name: 'Pema T.',      points: 68, exact: 3, dept: 'Finance'       },
+        { name: 'Tashi N.',     points: 55, exact: 2, dept: 'HR'            },
+        { name: 'Jigme P.',     points: 41, exact: 2, dept: 'Sales'         },
+        { name: 'Tenzin K.',    points: 33, exact: 1, dept: 'Marketing'     }
+      ]
+      c.innerHTML = `
+        <div class="preview-leaderboard-wrap">
+          <div class="preview-blur space-y-2.5">
+            ${fake.map((s, i) => {
+              const rank = i + 1
+              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+              const rankDisp = medal
+                ? `<div class="text-2xl">${medal}</div>`
+                : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
+              return `
+                <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
+                  ${rankDisp}
+                  <div class="flex-1 min-w-0">
+                    <div class="font-bold text-[15px] truncate">${s.name}</div>
+                    <div class="text-xs text-ink-500 mt-1">${s.exact} exact · ${s.dept}</div>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <div class="text-2xl font-bold text-brand-700 leading-none">${s.points}</div>
+                    <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
+                  </div>
+                </div>`
+            }).join('')}
+          </div>
+          <div class="preview-leaderboard-overlay">
+            <div class="text-4xl mb-2">🔒</div>
+            <div class="font-bold text-ink-900 text-base mb-1">Sign in to see the real rankings</div>
+            <p class="text-xs text-ink-500 mb-4 max-w-xs">Compete with real players for the prize pool. Join the league to see live scores and your rank.</p>
+            <button onclick="exitPreviewMode()" class="bg-brand-900 text-white font-semibold px-5 py-2.5 rounded-xl text-sm tap">Sign in</button>
+          </div>
+        </div>`
+    }
+
     // ============== NAV ==============
     function showAuth() {
       document.getElementById('auth-screen').classList.remove('hidden')
@@ -2112,8 +2599,9 @@ async function showApp() {
       target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
       if (tab === 'home') loadHome()
-      if (tab === 'leaderboard') loadLeaderboard()
-      if (tab === 'predictions') loadFixtures()
+      if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
+      if (tab === 'predictions') previewMode ? renderFixtures() : loadFixtures()
+      if (tab === 'profile' && !previewMode) renderBadges()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
