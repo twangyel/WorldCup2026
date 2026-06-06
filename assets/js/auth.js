@@ -127,18 +127,18 @@ function isAdmin() { return currentProfile?.role === 'admin' }
 // AUTH HELPERS
 // =====================
 
-async function checkEmailExists(email) {
-    const { data, error } = await supabaseClient
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single()
 
-    // PGRST116 = no rows returned (new user)
-    if (error && error.code === 'PGRST116') {
-        return { exists: false, error: null }
+
+async function checkEmailExists(email) {
+    // Uses the public.email_exists(check_email text) RPC defined in Supabase.
+    // This is safer than selecting from profiles directly: it doesn't expose
+    // any columns to anon, and works regardless of RLS on the profiles table.
+    const { data, error } = await supabaseClient.rpc('email_exists', { check_email: email })
+    if (error) {
+        console.warn('email_exists RPC failed:', error)
+        return { exists: false, error }
     }
-    return { exists: !!data, error }
+    return { exists: !!data, error: null }
 }
 
 async function signInUser(email, password) {

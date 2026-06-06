@@ -175,6 +175,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1017,8 +1018,9 @@ async function handleEmailBlur() {
   const submitBtn = document.getElementById('auth-submit-btn')
   const subtitle = document.getElementById('auth-subtitle')
 
-  // If RLS/network error, don't flip the UI — stay in default state
-  if (error && !exists) {
+  // If the existence check failed, don't flip the UI — stay in default
+  // (login) state. The form submit handler will recover gracefully.
+  if (error) {
     console.warn('Could not check email existence:', error)
     return
   }
@@ -1104,13 +1106,17 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       // so we can create the account. This handles both the race condition
       // (blur check didn't finish before submit) and RLS blocking the check.
       if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
-        const { exists } = await checkEmailExists(email)
-        if (!exists) {
-          switchToSignupUI('New here? Confirm your password to create your account.')
-          showToast('No account found — confirm your password to create one', 'info')
+        // Check whether the email actually exists. If the check itself fails
+        // (network, RLS, RPC missing), assume the account DOES exist — safer
+        // than wrongly prompting the user to "create" an account they already
+        // have, which would just produce another invalid-credentials error.
+        const { exists, error: checkErr } = await checkEmailExists(email)
+        if (checkErr || exists) {
+          showToast('Wrong password. Please try again.', 'error')
           return
         }
-        showToast('Wrong password. Please try again.', 'error')
+        switchToSignupUI('New here? Confirm your password to create your account.')
+        showToast('No account found — confirm your password to create one', 'info')
         return
       }
       showToast(error.message, 'error')
