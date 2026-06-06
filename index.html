@@ -372,6 +372,98 @@
         transition: none !important;
       }
     }
+    /* ===== LB SUB-TABS (Overall / Latest Matchday) ===== */
+    .lb-subtabs {
+      display: inline-flex; gap: 4px;
+      background: #F4F3EE; border: 1px solid #EEEDE7;
+      padding: 4px; border-radius: 14px;
+    }
+    .lb-subtab {
+      font-size: 12px; font-weight: 700;
+      padding: 8px 14px; border-radius: 10px;
+      color: #6b6b66; cursor: pointer;
+      transition: all 180ms ease;
+      white-space: nowrap;
+    }
+    .lb-subtab.active {
+      background: #fff; color: #0a0f0d;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    /* ===== Next-match CTA card on leaderboard ===== */
+    .lb-cta-card {
+      background: linear-gradient(135deg, #0B1221 0%, #1E3A5F 100%);
+      color: #fff; border-radius: 20px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 8px 20px rgba(11,18,33,0.18);
+    }
+    .lb-cta-card .lb-cta-pulse {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: #D4A24C; flex-shrink: 0;
+      box-shadow: 0 0 0 0 rgba(212,162,76,0.6);
+      animation: liveDot 2s ease-out infinite;
+    }
+    .lb-cta-btn {
+      background: #D4A24C; color: #1a1208;
+      font-weight: 800; font-size: 12px;
+      padding: 8px 14px; border-radius: 10px;
+      flex-shrink: 0; letter-spacing: 0.02em;
+    }
+    /* ===== Prize strip (compact, leaderboard) ===== */
+    .lb-prize-strip {
+      background: #fff; border: 1px solid #EEEDE7;
+      border-radius: 16px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .lb-prize-strip .pool {
+      font-weight: 800; color: #0a0f0d; font-size: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+    .lb-prize-strip .pool-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: #8a8a82;
+    }
+    .lb-prize-strip .projected {
+      margin-left: auto;
+      text-align: right;
+    }
+    .lb-prize-strip .proj-amount {
+      font-weight: 800; color: #16a34a; font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .lb-prize-strip .proj-label {
+      font-size: 10px; font-weight: 600; color: #6b6b66;
+    }
+    /* ===== Persistent rank trend badge (24h after matchday resolves) ===== */
+    .rank-trend {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 10px; font-weight: 800;
+      padding: 2px 5px; border-radius: 999px;
+      margin-left: 4px;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .rank-trend.up   { background: #DCFCE7; color: #15803D; }
+    .rank-trend.down { background: #FEE2E2; color: #B91C1C; }
+    .rank-trend.new  { background: #FEF3C7; color: #92400E; }
+    /* ===== Streak flame ===== */
+    .lb-streak {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 11px; font-weight: 800; color: #B45309;
+      background: linear-gradient(135deg, #FEF3C7, #FED7AA);
+      border-radius: 999px; padding: 2px 7px 2px 5px;
+      margin-left: 4px;
+    }
+    /* ===== Projected winnings inline on row ===== */
+    .lb-projected {
+      font-size: 10px; font-weight: 700; color: #15803D;
+      background: #DCFCE7; border-radius: 6px;
+      padding: 2px 5px;
+      display: inline-block;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ========== AUTH SCREEN (Prediction League) ========== */
     :root {
@@ -417,342 +509,7 @@
       box-shadow: 0 10px 24px -8px rgba(11,18,33,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
     }
     .enter-league-btn:hover { filter: brightness(1.08); }
-  
-    /* ========== ENHANCED LEADERBOARD STYLES ========== */
-    /* Segmented tab control (matches admin.html style) */
-    .lb-seg {
-      background: #fff;
-      border: 1px solid #EEEDE7;
-      border-radius: 16px;
-      padding: 4px;
-      display: flex;
-      gap: 4px;
-    }
-    .lb-seg-btn {
-      flex: 1;
-      text-align: center;
-      padding: 10px 8px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #5C6B75;
-      transition: all 200ms ease;
-      position: relative;
-      cursor: pointer;
-      border: none;
-      background: transparent;
-      outline: none;
-    }
-    .lb-seg-btn.active {
-      background: #0A0F0D;
-      color: #fff;
-      box-shadow: 0 1px 3px rgba(10,15,13,0.12);
-    }
-    .lb-seg-btn .seg-badge {
-      display: inline-block;
-      margin-left: 4px;
-      background: #EEEDE7;
-      color: #5C6B75;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 999px;
-      min-width: 18px;
-    }
-    .lb-seg-btn.active .seg-badge {
-      background: rgba(255,255,255,0.2);
-      color: #fff;
-    }
-
-    /* Rank number circle (for positions 4+) */
-    .lb-rank-num {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      flex-shrink: 0;
-      position: relative;
-    }
-    .lb-rank-num.gold {
-      background: linear-gradient(135deg, #FDF6E3, #FFFBF0);
-      color: #B45309;
-      border: 2px solid #D4A24C;
-      box-shadow: 0 0 0 3px rgba(212,162,76,0.15);
-    }
-    .lb-rank-num.silver {
-      background: linear-gradient(135deg, #F3F4F6, #E5E7EB);
-      color: #4B5563;
-      border: 2px solid #9CA3AF;
-      box-shadow: 0 0 0 3px rgba(156,163,175,0.15);
-    }
-    .lb-rank-num.bronze {
-      background: linear-gradient(135deg, #FEF3C7, #FDE68A);
-      color: #92400E;
-      border: 2px solid #F59E0B;
-      box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
-    }
-    .lb-rank-num.regular {
-      background: #FAFAF7;
-      color: #8A959F;
-      border: 1.5px solid #EEEDE7;
-    }
-
-    /* Trend arrow indicators */
-    .lb-trend {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 6px;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-    .lb-trend.up {
-      background: #DCFCE7;
-      color: #166534;
-    }
-    .lb-trend.down {
-      background: #FEE2E2;
-      color: #991B1B;
-    }
-    .lb-trend.same {
-      background: #F3F4F6;
-      color: #6B7280;
-    }
-
-    /* Streak fire icon next to name */
-    .lb-streak {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      background: linear-gradient(135deg, #FEE2E2, #FECACA);
-      color: #7F1D1D;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 999px;
-      margin-left: 4px;
-      vertical-align: middle;
-      animation: streakPulse 2s ease-in-out infinite;
-    }
-    @keyframes streakPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.2); }
-      50% { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
-    }
-
-    /* Prize pool bar at top of leaderboard */
-    .lb-prize-bar {
-      background: linear-gradient(90deg, #1E3A5F 0%, #0B1221 100%);
-      border-radius: 20px;
-      padding: 16px 18px;
-      color: #fff;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 4px 16px rgba(10,15,13,0.1);
-    }
-    .lb-prize-bar::before {
-      content: '';
-      position: absolute;
-      top: -30px;
-      right: -30px;
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(212,162,76,0.3), transparent 70%);
-      pointer-events: none;
-    }
-    .lb-prize-bar-amount {
-      font-size: 28px;
-      font-weight: 800;
-      color: #D4A24C;
-      line-height: 1.1;
-      font-variant-numeric: tabular-nums;
-    }
-    .lb-prize-bar-label {
-      font-size: 11px;
-      opacity: 0.7;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 600;
-    }
-    .lb-prize-bar-projection {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      padding: 8px 12px;
-      text-align: center;
-    }
-    .lb-prize-bar-projection-label {
-      font-size: 10px;
-      opacity: 0.6;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .lb-prize-bar-projection-amount {
-      font-size: 16px;
-      font-weight: 700;
-      color: #D4A24C;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* "The Chase" context bar for user's row */
-    .lb-chase-bar {
-      background: linear-gradient(135deg, #F0FDF4, #DCFCE7);
-      border: 1.5px solid #86EFAC;
-      border-radius: 16px;
-      padding: 12px 16px;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .lb-chase-bar-icon {
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-    .lb-chase-bar-text {
-      font-size: 13px;
-      color: #166534;
-      font-weight: 600;
-      line-height: 1.4;
-    }
-    .lb-chase-bar-text b {
-      color: #15803D;
-    }
-
-    /* Matchday empty state */
-    .lb-matchday-empty {
-      text-align: center;
-      padding: 40px 20px;
-      background: #fff;
-      border-radius: 20px;
-      border: 1.5px dashed #EEEDE7;
-    }
-    .lb-matchday-empty .emoji {
-      font-size: 40px;
-      margin-bottom: 12px;
-      opacity: 0.6;
-    }
-    .lb-matchday-empty .title {
-      font-weight: 700;
-      color: #1F2A26;
-      font-size: 15px;
-      margin-bottom: 4px;
-    }
-    .lb-matchday-empty .desc {
-      color: #8A959F;
-      font-size: 13px;
-    }
-
-    /* Matchday fixture badge on row */
-    .lb-matchday-fixture {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      background: #F0F9FF;
-      border: 1px solid #BAE6FD;
-      color: #0369A1;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 6px;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-
-    /* Rank delta badge (animated up/down) */
-    .rank-delta {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      font-size: 9px;
-      font-weight: 900;
-      padding: 2px 5px;
-      border-radius: 999px;
-      color: white;
-      z-index: 2;
-      animation: rankDeltaIn 1200ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .rank-delta.up { background: #16a34a; }
-    .rank-delta.down { background: #ef4444; }
-    @keyframes rankDeltaIn {
-      0%   { opacity: 0; transform: translateY(6px) scale(0.6); }
-      15%  { opacity: 1; transform: translateY(-2px) scale(1.05); }
-      75%  { opacity: 1; transform: translateY(-2px) scale(1); }
-      100% { opacity: 0; transform: translateY(-10px) scale(0.9); }
-    }
-
-    /* Row glow states */
-    .lb-row.lb-up {
-      box-shadow: 0 0 0 2px rgba(34,197,94,0.55), 0 12px 28px rgba(34,197,94,0.18);
-      border-color: rgba(34,197,94,0.6) !important;
-    }
-    .lb-row.lb-down {
-      box-shadow: 0 0 0 2px rgba(239,68,68,0.35), 0 8px 20px rgba(239,68,68,0.12);
-      border-color: rgba(239,68,68,0.45) !important;
-    }
-    .lb-row.lb-new {
-      animation: lbNewIn 380ms cubic-bezier(0.32, 0.72, 0, 1);
-    }
-    @keyframes lbNewIn {
-      from { opacity: 0; transform: translateY(10px) scale(0.985); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    /* Points pulse animation */
-    .pts-pulse {
-      animation: ptsPulse 700ms cubic-bezier(0.32, 0.72, 0, 1);
-    }
-    @keyframes ptsPulse {
-      0%   { transform: scale(1); }
-      30%  { transform: scale(1.32); color: #16a34a; text-shadow: 0 0 18px rgba(34,197,94,0.45); }
-      100% { transform: scale(1); }
-    }
-
-    /* Live dot */
-    .live-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: #16a34a;
-      box-shadow: 0 0 0 0 rgba(34,197,94,0.55);
-      animation: liveDot 2s ease-out infinite;
-      margin-right: 6px;
-      vertical-align: middle;
-    }
-    .live-dot.flash {
-      animation: liveDotFlash 900ms cubic-bezier(0.32, 0.72, 0, 1);
-    }
-    @keyframes liveDot {
-      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.45); }
-      70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
-      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
-    }
-    @keyframes liveDotFlash {
-      0%   { transform: scale(1);   box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
-      50%  { transform: scale(1.7); box-shadow: 0 0 0 10px rgba(34,197,94,0); }
-      100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(34,197,94,0); }
-    }
-
-    /* Reduced motion support */
-    @media (prefers-reduced-motion: reduce) {
-      .lb-row, .pts-pulse, .lb-row.lb-new, .live-dot, .live-dot.flash, .rank-delta, .lb-streak {
-        animation: none !important;
-        transition: none !important;
-      }
-    }
-
-</style>
-<base target="_blank">
+  </style>
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -1204,26 +961,26 @@
 
       <!-- LEADERBOARD -->
       <div id="tab-leaderboard" class="tab-content hidden space-y-4">
-        <!-- Prize Pool Bar -->
-        <div id="lb-prize-bar" class="hidden"></div>
-
-        <!-- "The Chase" context bar (shows when user is not 1st) -->
-        <div id="lb-chase-bar" class="hidden"></div>
-
-        <!-- Tab Switcher: Overall / Matchday -->
-        <div class="lb-seg">
-          <button onclick="switchLbView('overall')" id="lb-tab-overall" class="lb-seg-btn active">
-            Overall<span class="seg-badge" id="lb-badge-overall">—</span>
-          </button>
-          <button onclick="switchLbView('matchday')" id="lb-tab-matchday" class="lb-seg-btn">
-            Matchday<span class="seg-badge" id="lb-badge-matchday">—</span>
-          </button>
-        </div>
-
         <div class="px-1">
           <h2 class="text-2xl font-bold tracking-tight"><span id="lb-live-dot" class="live-dot" title="Live"></span>Leaderboard</h2>
-          <p class="text-sm text-ink-500 mt-1" id="lb-subtitle">Live rankings, updated as results come in.</p>
+          <p class="text-sm text-ink-500 mt-1">Live rankings, updated as results come in.</p>
         </div>
+
+        <!-- Next-match CTA card -->
+        <div id="lb-cta" class="hidden"></div>
+
+        <!-- Prize strip -->
+        <div id="lb-prize" class="hidden"></div>
+
+        <!-- Sub-tabs: Overall / Latest Matchday -->
+        <div class="flex items-center justify-between px-1">
+          <div class="lb-subtabs" role="tablist">
+            <button id="lb-subtab-overall" class="lb-subtab active tap" onclick="switchLbSubtab('overall')" role="tab" aria-selected="true">Overall</button>
+            <button id="lb-subtab-matchday" class="lb-subtab tap" onclick="switchLbSubtab('matchday')" role="tab" aria-selected="false">Latest Matchday</button>
+          </div>
+          <span id="lb-subtab-meta" class="text-[11px] text-ink-400 font-medium"></span>
+        </div>
+
         <div id="leaderboard-list" class="space-y-2.5">
           <div class="skel h-20 rounded-2xl"></div>
           <div class="skel h-20 rounded-2xl"></div>
@@ -2454,41 +2211,276 @@ function msToCountdown(ms) {
 }
 
     // ============== LEADERBOARD ==============
-    async function loadLeaderboard(viewMode = 'overall') {
-      const { data: stats } = await getLeaderboard()
+    // Sub-tab state: 'overall' | 'matchday'
+    let lbSubtab = 'overall'
+    // Cached enrichments (computed once per loadLeaderboard call)
+    let lbStreakMap = {}        // uid -> consecutive scoring predictions count
+    let lbTrendMap = {}         // uid -> { dir: 'up'|'down'|'new', delta }
+    let lbPrizeBreakdown = null // current prize breakdown
+    let lbMatchdayInfo = null   // { label, fixtureIds[], finishedAt }
+
+    function switchLbSubtab(tab) {
+      if (tab === lbSubtab) return
+      lbSubtab = tab
+      document.getElementById('lb-subtab-overall').classList.toggle('active', tab === 'overall')
+      document.getElementById('lb-subtab-overall').setAttribute('aria-selected', tab === 'overall')
+      document.getElementById('lb-subtab-matchday').classList.toggle('active', tab === 'matchday')
+      document.getElementById('lb-subtab-matchday').setAttribute('aria-selected', tab === 'matchday')
+      loadLeaderboard()
+    }
+
+    // Identify the "latest matchday" — calendar day of the most recently finished fixture.
+    // Returns { label, fixtureIds, finishedAt } or null if nothing finished yet.
+    function getLatestMatchday() {
+      if (!fixtures || !fixtures.length) return null
+      const finished = fixtures.filter(f => f.home_score !== null && f.away_score !== null)
+      if (!finished.length) return null
+      finished.sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
+      const latest = finished[0]
+      const latestDay = new Date(latest.kickoff).toDateString()
+      const sameDay = finished.filter(f => new Date(f.kickoff).toDateString() === latestDay)
+      const label = new Date(latest.kickoff).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+      return {
+        label,
+        fixtureIds: sameDay.map(f => f.id),
+        finishedAt: latest.kickoff,
+        matchKey: latestDay
+      }
+    }
+
+    // Compute matchday-specific leaderboard from predictions on the latest matchday's fixtures.
+    async function getMatchdayLeaderboard(md) {
+      if (!md || !md.fixtureIds.length) return []
+      try {
+        const { data } = await supabaseClient
+          .from('predictions')
+          .select('user_id, points_awarded, fixture_id')
+          .in('fixture_id', md.fixtureIds)
+        if (!data) return []
+        // Need user names — pull from profiles (or fall back to "Anonymous")
+        const userIds = [...new Set(data.map(p => p.user_id))]
+        let profMap = {}
+        if (userIds.length) {
+          const { data: profs } = await supabaseClient
+            .from('profiles').select('id, name, department').in('id', userIds)
+          ;(profs || []).forEach(p => { profMap[p.id] = p })
+        }
+        const agg = {}
+        data.forEach(p => {
+          const uid = p.user_id
+          if (!agg[uid]) agg[uid] = { user_id: uid, points: 0, exact: 0, gd: 0, result: 0, name: profMap[uid]?.name || 'Anonymous', department: profMap[uid]?.department || '' }
+          agg[uid].points += (p.points_awarded || 0)
+          // crude bucketing — exact = full match points, others lumped into "result"
+          // (real exact/gd/result split would need fixture-aware scoring rules; we don't need it here)
+        })
+        return Object.values(agg)
+          .filter(s => s.points > 0 || s.user_id === getUser()?.id) // keep self even with 0
+          .sort((a, b) => b.points - a.points)
+      } catch (e) { return [] }
+    }
+
+    // Compute current scoring-streaks for everyone, in one query.
+    // A streak = consecutive most-recent finished predictions where points_awarded > 0.
+    async function computeStreaks() {
+      try {
+        const { data } = await supabaseClient
+          .from('predictions')
+          .select('user_id, points_awarded, fixture_id, matches:fixture_id(kickoff, home_score)')
+        if (!data) return {}
+        // Keep only resolved fixtures
+        const resolved = data.filter(p => p.matches && p.matches.home_score !== null)
+        // Group by user, sort each user's predictions by kickoff desc, then count consecutive >0 from start
+        const byUser = {}
+        resolved.forEach(p => {
+          if (!byUser[p.user_id]) byUser[p.user_id] = []
+          byUser[p.user_id].push(p)
+        })
+        const streaks = {}
+        Object.entries(byUser).forEach(([uid, preds]) => {
+          preds.sort((a, b) => new Date(b.matches.kickoff) - new Date(a.matches.kickoff))
+          let s = 0
+          for (const p of preds) {
+            if ((p.points_awarded || 0) > 0) s++
+            else break
+          }
+          if (s >= 3) streaks[uid] = s
+        })
+        return streaks
+      } catch (e) { return {} }
+    }
+
+    // ===== Persistent rank trend snapshots =====
+    // Key the snapshot to the "latest resolved matchday". When that changes, we
+    // compare current ranks to the snapshot taken right BEFORE that matchday.
+    function rankTrendSnapshotKey() {
+      const md = getLatestMatchday()
+      return md ? `lb_rank_snapshot_${md.matchKey}` : null
+    }
+    function getStoredTrend() {
+      const key = rankTrendSnapshotKey()
+      if (!key) return { ranks: null, expiresAt: 0 }
+      try {
+        const raw = localStorage.getItem(key)
+        if (!raw) return { ranks: null, expiresAt: 0 }
+        return JSON.parse(raw)
+      } catch (e) { return { ranks: null, expiresAt: 0 } }
+    }
+    function storeTrend(snapshot) {
+      const key = rankTrendSnapshotKey()
+      if (!key) return
+      try { localStorage.setItem(key, JSON.stringify(snapshot)) } catch (e) { /* ignore */ }
+    }
+    // After a new matchday resolves, capture the pre-matchday ranks so we can
+    // diff once. We approximate "pre-matchday ranks" by saving on FIRST sighting
+    // of a new matchday key, using whatever ranks were stored from the previous key.
+    function computeTrendMap(currentStats) {
+      const md = getLatestMatchday()
+      if (!md) return {}
+      const key = rankTrendSnapshotKey()
+      const PRIOR_KEYS_LS = 'lb_rank_history'
+      let history = {}
+      try { history = JSON.parse(localStorage.getItem(PRIOR_KEYS_LS) || '{}') } catch(e) {}
+      const priorRanks = history[key]?.ranks
+      // Save current ranks for next time
+      const currentRanks = {}
+      currentStats.forEach((s, i) => { currentRanks[s.user_id || s.id] = i + 1 })
+      // Only stamp if not already stamped for this matchday
+      if (!history[key]) {
+        // First time seeing this matchday -> snapshot the *previous* known ranks from history
+        const lastKey = Object.keys(history).sort().pop()
+        const baseline = lastKey ? history[lastKey].ranks : null
+        history[key] = { ranks: currentRanks, baseline, stampedAt: Date.now() }
+        try { localStorage.setItem(PRIOR_KEYS_LS, JSON.stringify(history)) } catch(e) {}
+      } else {
+        // Keep refreshing currentRanks but preserve baseline
+        history[key].ranks = currentRanks
+        try { localStorage.setItem(PRIOR_KEYS_LS, JSON.stringify(history)) } catch(e) {}
+      }
+      const baseline = history[key]?.baseline
+      if (!baseline) return {}
+      // Show trend for 24h after matchday stamped
+      const ageMs = Date.now() - (history[key].stampedAt || 0)
+      if (ageMs > 24 * 3600 * 1000) return {}
+      const trend = {}
+      Object.entries(currentRanks).forEach(([uid, newRank]) => {
+        const oldRank = baseline[uid]
+        if (oldRank === undefined) {
+          trend[uid] = { dir: 'new', delta: 0 }
+        } else if (newRank < oldRank) {
+          trend[uid] = { dir: 'up', delta: oldRank - newRank }
+        } else if (newRank > oldRank) {
+          trend[uid] = { dir: 'down', delta: newRank - oldRank }
+        }
+        // equal -> nothing (no noisy dashes)
+      })
+      return trend
+    }
+
+    // ===== Next-match CTA card =====
+    function renderLbCta() {
+      const host = document.getElementById('lb-cta')
+      if (!host) return
+      if (previewMode) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const now = new Date()
+      const upcoming = (fixtures || [])
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const next = upcoming[0]
+      const myId = getUser()?.id
+      if (!next || !myId) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
+      if (hasPred) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const ms = new Date(next.kickoff) - now
+      const cd = msToCountdown(ms)
+      host.classList.remove('hidden')
+      host.innerHTML = `
+        <div class="lb-cta-card">
+          <span class="lb-cta-pulse"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold uppercase tracking-[0.15em] opacity-70">Next match — locks in <span data-cd-card="${next.id}">${cd}</span></div>
+            <div class="font-bold text-[14px] truncate mt-0.5">${next.home_team} vs ${next.away_team}</div>
+          </div>
+          <button class="lb-cta-btn tap" onclick="switchTab('predictions')">Predict</button>
+        </div>`
+    }
+
+    // ===== Prize strip =====
+    function renderLbPrize(myRank) {
+      const host = document.getElementById('lb-prize')
+      if (!host) return
+      const b = lbPrizeBreakdown
+      if (!b || b.gross <= 0) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      host.classList.remove('hidden')
+      const split = (myRank >= 1 && myRank <= 3) ? b.splits[myRank - 1] : null
+      const projectedHtml = split
+        ? `<div class="projected">
+             <div class="proj-amount">${fmtMoney(b.currency, split.amount)}</div>
+             <div class="proj-label">if standings hold</div>
+           </div>`
+        : `<div class="projected">
+             <div class="proj-amount">${b.splits.map(p => fmtMoney(b.currency, p.amount).replace(b.currency + ' ', '')).join(' / ')}</div>
+             <div class="proj-label">top 3 payouts</div>
+           </div>`
+      host.innerHTML = `
+        <div class="lb-prize-strip">
+          <div>
+            <div class="pool-label">Prize Pool</div>
+            <div class="pool">${fmtMoney(b.currency, b.net)}</div>
+          </div>
+          ${projectedHtml}
+        </div>`
+    }
+
+    async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
 
-      // Update tab badges
-      document.getElementById('lb-badge-overall').textContent = stats?.length || '—'
+      // Fetch core stats for current sub-tab in parallel with enrichments
+      const [overallRes, streaks, prizeBd] = await Promise.all([
+        getLeaderboard(),
+        computeStreaks(),
+        fetchPrizeBreakdown().catch(() => null)
+      ])
+      lbStreakMap = streaks || {}
+      lbPrizeBreakdown = prizeBd
+
+      const overallStats = overallRes?.data || []
+      // Always compute trend off the OVERALL standings (matchday tab has its own logic)
+      lbTrendMap = computeTrendMap(overallStats)
+
+      // Pick stats for current sub-tab
+      let stats = overallStats
+      let metaText = ''
+      lbMatchdayInfo = getLatestMatchday()
+      if (lbSubtab === 'matchday') {
+        if (!lbMatchdayInfo) {
+          metaText = ''
+          stats = []
+        } else {
+          stats = await getMatchdayLeaderboard(lbMatchdayInfo)
+          metaText = lbMatchdayInfo.label
+        }
+      }
+      document.getElementById('lb-subtab-meta').textContent = metaText
+
+      // Render CTA card + prize strip (use overall rank for "projected winning")
+      renderLbCta()
+      const myOverallIdx = overallStats.findIndex(s => (s.user_id || s.id) === myId)
+      const myOverallRank = myOverallIdx >= 0 ? myOverallIdx + 1 : null
+      renderLbPrize(myOverallRank)
 
       if (!stats?.length) {
-        c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-          <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
-        </div>`;
-        document.getElementById('lb-prize-bar').classList.add('hidden')
-        document.getElementById('lb-chase-bar').classList.add('hidden')
+        if (lbSubtab === 'matchday') {
+          c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+            <div class="text-4xl mb-2">⏳</div><div class="font-semibold">No matchday yet</div><p class="text-sm text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
+          </div>`
+        } else {
+          c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+            <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
+          </div>`
+        }
         return
       }
-
-      // If matchday view, compute matchday-specific stats
-      let displayStats = stats
-      if (viewMode === 'matchday') {
-        displayStats = await computeMatchdayStats(stats)
-        document.getElementById('lb-badge-matchday').textContent = displayStats.length || '—'
-      } else {
-        document.getElementById('lb-badge-matchday').textContent = '—'
-      }
-
-      // Update subtitle
-      const subtitle = viewMode === 'matchday'
-        ? 'Points from the most recent matchday only.'
-        : 'Live rankings, updated as results come in.'
-      document.getElementById('lb-subtitle').textContent = subtitle
-
-      // Render prize pool bar + chase bar
-      await renderLbPrizeBar(displayStats, myId)
-      renderChaseBar(displayStats, myId)
 
       // ===== FLIP: capture old positions + points BEFORE we touch the DOM =====
       const oldRects = {}
@@ -2502,64 +2494,67 @@ function msToCountdown(ms) {
       })
       const hadAnyRows = Object.keys(oldRects).length > 0
 
-      // Load previous rankings for trend arrows (persisted in localStorage)
-      const prevRanks = loadPrevRanks()
-      const currentRanks = {} // will save after render
-
-      // Compute streaks for display
-      const streaks = computeLeaderboardStreaks(displayStats)
-
       // Render fresh HTML
-      c.innerHTML = displayStats.map((s, i) => {
+      c.innerHTML = stats.map((s, i) => {
         const rank = i + 1
         const uid = s.user_id || s.id
         const isMe = s.user_id === myId || s.id === myId
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
-        currentRanks[uid] = rank
+        const hasPoints = (s.points || 0) > 0
+        // Medals ONLY when there are actual points (avoids "silver for 0pts")
+        const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
+        const rankDisplay = medal
+          ? `<div class="text-2xl relative" data-rank-wrap>${medal}</div>`
+          : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500 relative" data-rank-wrap>${rank}</div>`
 
-        // Rank display with number for all positions
-        const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'regular'
-        const rankDisplay = `<div class="lb-rank-num ${rankClass} relative" data-rank-wrap>${rank}</div>`
+        // Persistent trend badge (overall tab only — matchday is per-day, trend doesn't apply)
+        const tr = (lbSubtab === 'overall') ? lbTrendMap[uid] : null
+        const trendHtml = tr
+          ? (tr.dir === 'up'
+              ? `<span class="rank-trend up" title="Up ${tr.delta} since last matchday">▲${tr.delta}</span>`
+              : tr.dir === 'down'
+                ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼${tr.delta}</span>`
+                : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
+          : ''
 
-        // Trend arrow (compare to previous session)
-        const prevRank = prevRanks[uid]
-        let trendHtml = ''
-        if (prevRank !== undefined && prevRank !== rank) {
-          const movedUp = rank < prevRank
-          const delta = Math.abs(rank - prevRank)
-          trendHtml = `<span class="lb-trend ${movedUp ? 'up' : 'down'}">${movedUp ? '▲' : '▼'}${delta}</span>`
-        } else if (prevRank === rank) {
-          trendHtml = `<span class="lb-trend same">—</span>`
+        // Streak flame (overall tab only; matchday is too short to streak)
+        const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
+        const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row">🔥${streakN}</span>` : ''
+
+        // Projected winnings inline for top 3 in overall tab
+        let projectedHtml = ''
+        if (lbSubtab === 'overall' && lbPrizeBreakdown && rank >= 1 && rank <= 3 && hasPoints) {
+          const amt = lbPrizeBreakdown.splits[rank - 1]?.amount || 0
+          if (amt > 0) projectedHtml = `<span class="lb-projected">Projected: ${fmtMoney(lbPrizeBreakdown.currency, amt)}</span>`
         }
 
-        // Streak indicator
-        const streak = streaks[uid]
-        const streakHtml = streak >= 3 ? `<span class="lb-streak">🔥 ${streak}</span>` : ''
-
-        // Matchday fixture badge (only in matchday view)
-        const matchdayBadge = (viewMode === 'matchday' && s.matchday_fixture)
-          ? `<span class="lb-matchday-fixture">${s.matchday_fixture}</span>`
-          : ''
+        // Matchday tab uses simpler stats (just points)
+        const statsLineOverall = `
+          <span><b class="text-ink-900">${correct}</b> correct</span>
+          <span class="text-ink-300">·</span>
+          <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
+          ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}`
+        const statsLineMatchday = `
+          <span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>
+          ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}`
+        const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
         <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           ${rankDisplay}
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
               ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
               ${trendHtml}
               ${streakHtml}
-              ${matchdayBadge}
               ${leaderboardBadgeIcons(s, rank)}
             </div>
-            <div class="text-xs text-ink-500 mt-1 flex items-center gap-3">
-              <span><b class="text-ink-900">${correct}</b> correct</span>
-              <span class="text-ink-300">·</span>
-              <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
-              ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}
+            <div class="text-xs text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+              ${statsLine}
             </div>
+            ${projectedHtml}
           </div>
           <div class="text-right shrink-0">
             <div class="text-2xl font-bold text-brand-700 leading-none" data-points-el>${s.points || 0}</div>
@@ -2567,9 +2562,6 @@ function msToCountdown(ms) {
           </div>
         </div>`
       }).join('')
-
-      // Save current ranks for next comparison
-      saveCurrentRanks(currentRanks)
 
       // ===== FLIP: apply animations on the next frame =====
       if (!hadAnyRows) return // first paint — let the natural fade happen
@@ -2605,7 +2597,7 @@ function msToCountdown(ms) {
             somethingChanged = true
           }
 
-          // Rank-change glow + delta badge
+          // Rank-change glow + delta badge (transient, separate from persistent trend)
           if (oldRank !== undefined && newRank !== oldRank) {
             const movedUp = newRank < oldRank
             el.classList.add(movedUp ? 'lb-up' : 'lb-down')
@@ -2646,215 +2638,6 @@ function msToCountdown(ms) {
         }
       })
     }
-
-
-    // ============== LEADERBOARD ENHANCEMENT HELPERS ==============
-
-    // Persist rankings in localStorage for trend arrows
-    const LB_RANKS_KEY = 'wc_lb_prev_ranks'
-    function loadPrevRanks() {
-      try {
-        const raw = localStorage.getItem(LB_RANKS_KEY)
-        return raw ? JSON.parse(raw) : {}
-      } catch (e) { return {} }
-    }
-    function saveCurrentRanks(ranks) {
-      try { localStorage.setItem(LB_RANKS_KEY, JSON.stringify(ranks)) } catch (e) {}
-    }
-
-    // Compute current streak for each player (consecutive point-scoring finished matches)
-    function computeLeaderboardStreaks(stats) {
-      const streaks = {}
-      // We need predictions data to compute streaks. Since getLeaderboard() returns
-      // aggregated stats, we use the local predictions[] array as a best-effort source.
-      // For other players, we can't compute streaks without fetching their predictions.
-      // So we only show streaks for the current user.
-      const myId = getUser()?.id
-      if (!myId || !predictions.length || !fixtures.length) return streaks
-
-      const myPreds = predictions
-        .map(p => ({ p, f: fixtures.find(f => f.id === p.fixture_id) }))
-        .filter(x => x.f && x.f.home_score !== null && x.f.away_score !== null)
-        .sort((a, b) => new Date(a.f.kickoff) - new Date(b.f.kickoff))
-
-      let streak = 0
-      for (let i = myPreds.length - 1; i >= 0; i--) {
-        if ((myPreds[i].p.points_awarded || 0) > 0) streak++
-        else break
-      }
-      if (streak >= 2) streaks[myId] = streak
-      return streaks
-    }
-
-    // Compute matchday-specific stats from fixtures + predictions
-    // NOTE: Due to RLS, we can only fetch the current user's predictions directly.
-    // For other players, we use the overall leaderboard data as fallback.
-    async function computeMatchdayStats(allStats) {
-      // Find the most recent completed matchday (group of fixtures with same kickoff day)
-      const finished = fixtures
-        .filter(f => f.home_score !== null && f.away_score !== null)
-        .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
-
-      if (!finished.length) return []
-
-      // Group by calendar day
-      const dayKey = (iso) => {
-        const d = new Date(iso)
-        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-      }
-      const byDay = {}
-      finished.forEach(f => {
-        const k = dayKey(f.kickoff)
-        if (!byDay[k]) byDay[k] = []
-        byDay[k].push(f)
-      })
-
-      // Most recent day
-      const days = Object.keys(byDay).sort().reverse()
-      const recentDay = days[0]
-      const recentFixtures = byDay[recentDay]
-      const recentFixtureIds = Array.from(new Set(recentFixtures.map(f => f.id)))
-      const matchdayLabel = recentFixtures.length === 1
-        ? `${recentFixtures[0].home_team} vs ${recentFixtures[0].away_team}`
-        : `${recentFixtures.length} matches`
-
-      // Try to fetch all predictions for recent fixtures (may be RLS-restricted)
-      let matchdayPoints = {}
-      try {
-        const { data: allPreds } = await supabaseClient
-          .from('predictions')
-          .select('user_id, fixture_id, points_awarded')
-          .in('fixture_id', recentFixtureIds)
-
-        if (allPreds) {
-          allPreds.forEach(p => {
-            const uid = p.user_id
-            if (!matchdayPoints[uid]) matchdayPoints[uid] = 0
-            matchdayPoints[uid] += (p.points_awarded || 0)
-          })
-        }
-      } catch (e) {
-        console.warn('Matchday predictions fetch failed (RLS?):', e)
-      }
-
-      // If we couldn't get matchday-specific points (RLS blocked), fall back to
-      // showing overall standings but with matchday context
-      const hasMatchdayData = Object.keys(matchdayPoints).length > 0
-
-      return allStats.map(s => {
-        const uid = s.user_id || s.id
-        const mdPoints = matchdayPoints[uid] || 0
-        return {
-          ...s,
-          points: hasMatchdayData ? mdPoints : (s.points || 0),
-          exact: hasMatchdayData ? 0 : (s.exact || 0),  // Can't compute exact/gd/result per-matchday without full data
-          gd: 0,
-          result: 0,
-          matchday_fixture: hasMatchdayData && mdPoints > 0 ? matchdayLabel : null,
-          _isMatchdayFallback: !hasMatchdayData
-        }
-      }).sort((a, b) => b.points - a.points)
-    }
-
-    // Render prize pool bar at top of leaderboard
-    async function renderLbPrizeBar(stats, myId) {
-      const bar = document.getElementById('lb-prize-bar')
-      if (!bar) return
-
-      try {
-        const breakdown = await fetchPrizeBreakdown()
-        if (!breakdown || breakdown.gross <= 0) {
-          bar.classList.add('hidden')
-          return
-        }
-
-        // Find user's current rank and projected winnings
-        let myRank = -1
-        let myProjected = 0
-        if (myId) {
-          myRank = stats.findIndex(s => s.user_id === myId || s.id === myId)
-          if (myRank >= 0 && myRank < 3) {
-            myProjected = breakdown.splits[myRank].amount
-          }
-        }
-
-        const hasProjection = myRank >= 0 && myRank < 3 && myProjected > 0
-        const projectionHtml = hasProjection
-          ? `<div class="lb-prize-bar-projection">
-               <div class="lb-prize-bar-projection-label">Your ${['1st','2nd','3rd'][myRank]} Place Prize</div>
-               <div class="lb-prize-bar-projection-amount">${fmtMoney(breakdown.currency, myProjected)}</div>
-             </div>`
-          : `<div class="lb-prize-bar-projection">
-               <div class="lb-prize-bar-projection-label">Top 3 Win</div>
-               <div class="lb-prize-bar-projection-amount" style="font-size:13px;opacity:0.8;">${breakdown.paidCount} players in</div>
-             </div>`
-
-        bar.innerHTML = `
-          <div class="flex items-center justify-between relative z-10">
-            <div>
-              <div class="lb-prize-bar-label">Prize Pool</div>
-              <div class="lb-prize-bar-amount">${fmtMoney(breakdown.currency, breakdown.net)}</div>
-            </div>
-            ${projectionHtml}
-          </div>
-          <div class="flex items-center gap-2 mt-2 relative z-10">
-            ${breakdown.splits.map((p, i) => `
-              <div class="flex-1 text-center" style="opacity:0.75;">
-                <div style="font-size:10px;opacity:0.6;">${p.emoji} ${p.place}</div>
-                <div style="font-size:13px;font-weight:700;color:#D4A24C;font-variant-numeric:tabular-nums;">${fmtMoney(breakdown.currency, p.amount)}</div>
-              </div>
-            `).join('')}
-          </div>`
-        bar.classList.remove('hidden')
-      } catch (e) {
-        bar.classList.add('hidden')
-      }
-    }
-
-    // Render "The Chase" context bar
-    function renderChaseBar(stats, myId) {
-      const chase = document.getElementById('lb-chase-bar')
-      if (!chase || !myId || !stats.length) {
-        if (chase) chase.classList.add('hidden')
-        return
-      }
-
-      const myIdx = stats.findIndex(s => s.user_id === myId || s.id === myId)
-      if (myIdx <= 0) {
-        // User is 1st or not found — no chase needed
-        chase.classList.add('hidden')
-        return
-      }
-
-      const me = stats[myIdx]
-      const ahead = stats[myIdx - 1]
-      const gap = (ahead.points || 0) - (me.points || 0)
-      const myExact = me.exact || 0
-
-      let message = ''
-      if (gap <= 5) {
-        message = `You're <b>${gap} pts</b> behind ${ahead.name || '1st place'}. One exact score away from the top!`
-      } else if (gap <= 15) {
-        message = `You're <b>${gap} pts</b> behind ${ahead.name || '1st place'}. Keep predicting — you can close this gap.`
-      } else {
-        message = `You're <b>${gap} pts</b> behind. Time for some bold predictions! 🎯`
-      }
-
-      chase.innerHTML = `
-        <div class="lb-chase-bar-icon">🏃</div>
-        <div class="lb-chase-bar-text">${message}</div>`
-      chase.classList.remove('hidden')
-    }
-
-    // Switch between Overall and Matchday leaderboard views
-    let currentLbView = 'overall'
-    function switchLbView(mode) {
-      currentLbView = mode
-      document.getElementById('lb-tab-overall').classList.toggle('active', mode === 'overall')
-      document.getElementById('lb-tab-matchday').classList.toggle('active', mode === 'matchday')
-      loadLeaderboard(mode)
-    }
-
 
     // ============== REALTIME ==============
     let prizePollInterval = null
@@ -3289,6 +3072,9 @@ function msToCountdown(ms) {
       if (profileNav) profileNav.style.display = ''
       const hero = document.querySelector('#tab-home .hero-card')
       if (hero) hero.style.display = ''
+      // Restore leaderboard sub-tabs row that preview hid
+      const subOv = document.getElementById('lb-subtab-overall')
+      if (subOv) subOv.closest('.flex.items-center.justify-between')?.classList.remove('hidden')
       document.getElementById('preview-banner').classList.add('hidden')
       document.getElementById('app-shell').classList.add('hidden')
       stopCountdownTicker()
@@ -3298,11 +3084,11 @@ function msToCountdown(ms) {
     function renderPreviewLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       if (!c) return
-
-      // Hide prize bar and chase bar in preview mode
-      document.getElementById('lb-prize-bar').classList.add('hidden')
-      document.getElementById('lb-chase-bar').classList.add('hidden')
-
+      // Hide CTA, prize strip, and sub-tabs in preview mode (no real data)
+      const cta = document.getElementById('lb-cta'); if (cta) { cta.classList.add('hidden'); cta.innerHTML = '' }
+      const prize = document.getElementById('lb-prize'); if (prize) { prize.classList.add('hidden'); prize.innerHTML = '' }
+      const subOv = document.getElementById('lb-subtab-overall'); const subMd = document.getElementById('lb-subtab-matchday')
+      if (subOv) subOv.closest('.flex.items-center.justify-between')?.classList.add('hidden')
       // Mock leaderboard data — blurred, just to show the structure
       const fake = [
         { name: 'Karma D.',     points: 87, exact: 6, dept: 'Operations'    },
@@ -3317,21 +3103,16 @@ function msToCountdown(ms) {
           <div class="preview-blur space-y-2.5">
             ${fake.map((s, i) => {
               const rank = i + 1
-              const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'regular'
+              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+              const rankDisp = medal
+                ? `<div class="text-2xl">${medal}</div>`
+                : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
               return `
                 <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
-                  <div class="lb-rank-num ${rankClass}">${rank}</div>
+                  ${rankDisp}
                   <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1 flex-wrap">
-                      <span class="font-bold text-[15px] truncate">${s.name}</span>
-                    </div>
-                    <div class="text-xs text-ink-500 mt-1 flex items-center gap-3">
-                      <span><b class="text-ink-900">${s.exact + 2}</b> correct</span>
-                      <span class="text-ink-300">·</span>
-                      <span><b class="text-brand-700">${s.exact}</b> exact</span>
-                      <span class="text-ink-300">·</span>
-                      <span class="truncate">${s.dept}</span>
-                    </div>
+                    <div class="font-bold text-[15px] truncate">${s.name}</div>
+                    <div class="text-xs text-ink-500 mt-1">${s.exact} exact · ${s.dept}</div>
                   </div>
                   <div class="text-right shrink-0">
                     <div class="text-2xl font-bold text-brand-700 leading-none">${s.points}</div>
@@ -3343,7 +3124,7 @@ function msToCountdown(ms) {
           <div class="preview-leaderboard-overlay">
             <div class="text-4xl mb-2">🔒</div>
             <div class="font-bold text-ink-900 text-base mb-1">Sign in to see the real rankings</div>
-            <p class="text-xs text-ink-500 mb-4 max-w-xs">Compete with real players for the prize pool. Join the league to see live scores, trend arrows, and your projected winnings.</p>
+            <p class="text-xs text-ink-500 mb-4 max-w-xs">Compete with real players for the prize pool. Join the league to see live scores and your rank.</p>
             <button onclick="exitPreviewMode()" class="bg-brand-900 text-white font-semibold px-5 py-2.5 rounded-xl text-sm tap">Sign in</button>
           </div>
         </div>`
@@ -3408,7 +3189,7 @@ async function showApp() {
       target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
       if (tab === 'home') loadHome()
-      if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard(currentLbView)
+      if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
       if (tab === 'predictions') previewMode ? renderFixtures() : loadFixtures()
       if (tab === 'profile' && !previewMode) renderBadges()
       window.scrollTo({ top: 0, behavior: 'smooth' })
