@@ -101,6 +101,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -163,16 +164,16 @@
 
       <!-- Segmented tab control (horizontal scroll on mobile) -->
       <div class="card p-1 flex gap-1 mb-5 relative">
-        <button onclick="adminTab('users')" data-atab="users" class="seg-btn active flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+        <button onclick="adminTab('users')" data-atab="users" class="seg-btn active flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">👥 Users</span>
         </button>
-        <button onclick="adminTab('fixtures')" data-atab="fixtures" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+        <button onclick="adminTab('fixtures')" data-atab="fixtures" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">⚽ Fixtures</span>
         </button>
-        <button onclick="adminTab('results')" data-atab="results" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+        <button onclick="adminTab('results')" data-atab="results" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">🏁 Results</span>
         </button>
-        <button onclick="adminTab('prize')" data-atab="prize" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative">
+        <button onclick="adminTab('prize')" data-atab="prize" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">💰 Prize</span>
         </button>
       </div>
@@ -322,7 +323,7 @@
       <div id="atab-prize" class="atab hidden space-y-4">
 
         <!-- Pool display -->
-        <div class="card p-6" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border-color: #FDE68A;">
+        <div class="card p-6 flex flex-col justify-center" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border-color: #FDE68A; min-height: 140px;">
           <div class="text-[11px] font-bold text-amber-700 uppercase tracking-[0.15em] mb-2">Current Pool</div>
           <div class="text-5xl font-bold tracking-tight text-amber-900 mb-2" id="prize-current">—</div>
           <div class="text-sm text-amber-800" id="prize-meta">—</div>
@@ -515,7 +516,7 @@ function flagHtml(name, size = 24) {
         alt="${name}"
         width="${size}"
         height="${size}"
-        class="rounded-sm shadow-sm inline-block object-cover"
+        class="rounded-sm shadow-sm inline-block object-contain shrink-0"
         style="border:1px solid #EEEDE7"
         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';"
       >
@@ -914,7 +915,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       const paidCount = allUsers.filter(u => u.fee_paid).length
       document.getElementById('user-stats').textContent = `${allUsers.length} total · ${paidCount} paid`
       if (!displayUsers.length) {
-        list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No users found</div>'
+        list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">👤</div><div class="text-sm font-semibold text-ink-700">No users found</div><p class="text-xs text-ink-500 mt-1">Try a different search term</p></div>'
         return
       }
       list.innerHTML = displayUsers.map(u => {
@@ -1138,7 +1139,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
         )
       }
       document.getElementById('fix-count').textContent = `${allFixtures.length} fixture${allFixtures.length === 1 ? '' : 's'}`
-      if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No fixtures found</div>'; return }
+      if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => {
         const localIso = new Date(f.kickoff).toISOString().slice(0, 16)
         const locked = f.home_score !== null
@@ -1158,7 +1159,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
             </button>
           </div>
           <div class="flex items-center gap-2">
-            <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}" style="padding: 10px 12px;">
+            <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}">
             <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
           </div>
         </div>`
@@ -1266,7 +1267,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
           (f.stage || '').toLowerCase().includes(resultsFilter)
         )
       }
-      if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-8 text-center text-sm text-ink-500">No fixtures found</div>'; return }
+      if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => `
         <div class="px-5 py-4">
           <div class="mb-3">
@@ -1281,7 +1282,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
             <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
             <span class="text-ink-300 font-bold">–</span>
             <input type="number" min="0" placeholder="A" class="mini-score" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}','away',this.value)">
-            <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap">Save</button>
+            <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 h-11 rounded-xl tap flex items-center">Save</button>
           </div>
         </div>
       `).join('')

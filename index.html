@@ -75,7 +75,7 @@
 
     /* Bottom nav active pill */
     .nav-btn { color: #8A9590; transition: color 150ms ease; }
-    .nav-btn.active { color: #064E3B; }
+    .nav-btn.active { color: #0B1221; }
     .nav-btn.active .nav-dot { opacity: 1; transform: scale(1); }
     .nav-dot { opacity: 0; transform: scale(0); transition: all 200ms ease; }
 
@@ -250,6 +250,7 @@
     }
     .enter-league-btn:hover { filter: brightness(1.08); }
   </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -641,7 +642,7 @@
               <div class="text-xs mt-1 opacity-80" id="home-rank-medal">Loading…</div>
             </div>
             <div class="text-right">
-              <div class="text-xs uppercase tracking-wider opacity-70 font-semibold">Points</div>
+              <div class="text-xs uppercase tracking-wider opacity-70 font-semibold mb-2">Points</div>
               <div class="text-4xl font-bold tracking-tight" id="home-points">0</div>
               <div class="text-xs opacity-70 mt-0.5" id="home-points-breakdown">—</div>
             </div>
@@ -655,9 +656,9 @@
             <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Prize Pool</div>
             <div class="text-2xl font-bold text-ink-900 tracking-tight" id="home-prize-amount">—</div>
           </div>
-          <div class="text-right flex flex-col items-end gap-1">
-            <div class="text-xs text-ink-400" id="home-prize-players"></div>
-            <button onclick="loadHomePrizePoolOnly()" class="text-[10px] font-semibold text-brand-700 bg-brand-50 px-2 py-1 rounded-lg tap">↻ Refresh</button>
+          <div class="text-right flex flex-col items-end gap-2 justify-center h-full">
+            <div class="text-xs text-ink-400 leading-none" id="home-prize-players"></div>
+            <button onclick="loadHomePrizePoolOnly()" class="text-[10px] font-semibold text-brand-700 bg-brand-50 px-2.5 py-1.5 rounded-lg tap leading-none">↻ Refresh</button>
           </div>
         </div>
 
@@ -1062,7 +1063,7 @@ function flagHtml(name, size = 24) {
                 alt="${name}"
                 width="${size}"
                 height="${size}"
-                class="rounded-sm shadow-sm inline-block object-cover"
+                class="rounded-sm shadow-sm inline-block object-contain shrink-0"
                 style="border:1px solid #EEEDE7"
                 onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"
             >
@@ -1782,7 +1783,7 @@ let pendingPredictions = {}
               <div class="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-0.5">Your Pick</div>
               ${pred
                 ? `<div class="text-xl font-bold text-brand-700">${pred.home_prediction} – ${pred.away_prediction}</div>`
-                : `<div class="text-sm text-ink-500">Not predicted yet</div>`}
+                : `<div class="flex items-center gap-2 text-sm text-ink-500"><span class="w-2 h-2 rounded-full border-2 border-dashed border-ink-300"></span>Not predicted yet</div>`}
             </div>
             <button onclick="switchTab('predictions')" class="bg-brand-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
           </div>
@@ -1792,7 +1793,7 @@ let pendingPredictions = {}
 
   const recentEl = document.getElementById('home-recent')
   if (!finished.length) {
-    recentEl.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-6 text-center text-sm text-ink-500">No results yet</div>`
+    recentEl.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center"><div class="text-2xl mb-2 opacity-60">⏳</div><div class="text-sm font-semibold text-ink-700">No results yet</div><p class="text-xs text-ink-500 mt-1">Match results will appear here</p></div>`
   } else {
     recentEl.innerHTML = finished.map(f => {
       const pred = getPrediction(f.id)
