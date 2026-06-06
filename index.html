@@ -128,6 +128,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1096,8 +1097,10 @@
 
       // Fixture updates
       supabaseClient.channel('fx')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, () => { 
-          loadFixtures(); loadLeaderboard(); loadHome() 
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, async () => { 
+          await loadFixtures()
+          loadLeaderboard()
+          loadHome()
         })
         .subscribe((status) => { 
           if (status !== 'SUBSCRIBED') console.log('FX channel status:', status) 
