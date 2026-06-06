@@ -48,6 +48,45 @@
     input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
 
+    /* Screen transitions */
+#auth-screen, #app-shell {
+  transition: opacity 350ms cubic-bezier(0.32, 0.72, 0, 1), 
+              transform 350ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+#auth-screen {
+  opacity: 1;
+  transform: translateY(0);
+}
+#auth-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px);
+  position: absolute; /* remove from flow but keep transition */
+  width: 100%;
+}
+#app-shell {
+  opacity: 0;
+  transform: translateY(12px);
+  display: flex; /* keep in DOM for transition */
+}
+#app-shell.hidden {
+  display: none; /* fully hide when not active */
+}
+#app-shell:not(.hidden) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Loading screen */
+#loading-screen {
+  transition: opacity 400ms ease, visibility 400ms ease;
+}
+#loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
     /* Number score input – big, friendly */
     .score-input {
       width: 56px; height: 56px;
@@ -554,14 +593,7 @@
   </div>
 </div>
 
-<script>
-  // Hide loading screen when app is ready
-  window.addEventListener('load', () => {
-    const loader = document.getElementById('loading-screen');
-    loader.style.opacity = '0';
-    setTimeout(() => loader.remove(), 400);
-  });
-</script>
+
   <!-- TOAST -->
   <div id="toast-container" class="fixed bottom-24 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none items-center"></div>
 
@@ -1683,24 +1715,98 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         .subscribe()
     }
 
-    async function showNormalApp() {
-      document.getElementById('app-main').classList.remove('hidden')
-      document.getElementById('app-nav').classList.remove('hidden')
-      const gate = document.getElementById('payment-gate')
-      gate.classList.add('hidden')
-      gate.classList.remove('flex')
-      const profile = getProfile()
-      document.getElementById('profile-name').value = profile?.name || ''
-      document.getElementById('profile-dept').value = profile?.department || ''
-      document.getElementById('profile-phone').value = profile?.phone || ''
-      if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
-      await loadFixtures()
-      await loadLeaderboard()
-      await loadHome()
-      renderBadges()
-      startCountdownTicker()
-      setupRealtime()
+   // ============== APP INITIALIZATION ==============
+
+async function showApp() {
+  const loader = document.getElementById('loading-screen');
+  const authScreen = document.getElementById('auth-screen');
+  const appShell = document.getElementById('app-shell');
+  
+  try {
+    // Phase 1: Keep loader visible, fetch everything
+    loader.classList.remove('hidden');
+    
+    const profile = getProfile();
+    
+    // Check payment status first
+    if (!profile?.fee_paid && !isAdmin()) {
+      // For payment gate, we still need to load prize settings
+      await loadGateFee();
+      // Pre-fetch fixtures for preview
+      await loadFixtures();
+    } else {
+      // Phase 2: Parallel data fetch while loader shows
+      await Promise.all([
+        loadFixtures(),
+        loadLeaderboard(),
+        loadHome() // this also loads prize breakdown
+      ]);
     }
+    
+    // Phase 3: Prepare UI state with data already loaded
+    document.getElementById('user-name').textContent = profile?.name || 'Player';
+    document.getElementById('profile-name').value = profile?.name || '';
+    document.getElementById('profile-dept').value = profile?.department || '';
+    document.getElementById('profile-phone').value = profile?.phone || '';
+    
+    if (isAdmin()) {
+      document.getElementById('admin-link').classList.remove('hidden');
+    }
+    
+    // Phase 4: Smooth transition — auth out, app in
+    authScreen.classList.add('hidden');
+    appShell.classList.remove('hidden');
+    
+    // Start real-time updates after UI is visible
+    setupRealtime();
+    startCountdownTicker();
+    
+    // Final render pass (data is already cached)
+    renderFixtures();
+    updatePredictionCount();
+    loadLeaderboard(currentLbView);
+    loadHome();
+    renderBadges();
+    
+    // Phase 5: Fade out loader
+    loader.classList.add('hidden');
+    
+  } catch (err) {
+    console.error('showApp error:', err);
+    showToast('Something went wrong. Please refresh.', 'error');
+    // Keep auth screen visible on error
+    authScreen.classList.remove('hidden');
+    appShell.classList.add('hidden');
+  }
+}
+
+// Payment gate version — same pattern
+function showPaymentGate() {
+  const loader = document.getElementById('loading-screen');
+  const authScreen = document.getElementById('auth-screen');
+  const appShell = document.getElementById('app-shell');
+  const gate = document.getElementById('payment-gate');
+  
+  // Hide loader immediately since payment gate is simple
+  loader.classList.add('hidden');
+  
+  authScreen.classList.add('hidden');
+  appShell.classList.remove('hidden');
+  
+  document.getElementById('app-main').classList.add('hidden');
+  document.getElementById('app-nav').classList.add('hidden');
+  gate.classList.remove('hidden');
+  gate.classList.add('flex');
+  
+  loadGateFee();
+  setupPaymentRealtime();
+  
+  const profile = getProfile();
+  if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
+    document.getElementById('payment-form-content').classList.add('hidden');
+    document.getElementById('pending-state').classList.remove('hidden');
+  }
+}
 
     async function loadGateFee() {
       try {
@@ -3162,23 +3268,96 @@ function msToCountdown(ms) {
     function handleForgotPassword() {
       showToast('Please message the admin on WhatsApp to reset your password.', 'info')
     }
+// ============== APP INITIALIZATION ==============
+
 async function showApp() {
+  const loader = document.getElementById('loading-screen');
+  const authScreen = document.getElementById('auth-screen');
+  const appShell = document.getElementById('app-shell');
+  
   try {
-    document.getElementById('auth-screen').classList.add('hidden')
-    document.getElementById('app-shell').classList.remove('hidden')
-
-    const profile = getProfile()
-    document.getElementById('user-name').textContent = profile?.name || 'Player'
-
+    // Phase 1: Keep loader visible, fetch everything
+    loader.classList.remove('hidden');
+    
+    const profile = getProfile();
+    
+    // Check payment status first
     if (!profile?.fee_paid && !isAdmin()) {
-      showPaymentGate()
-      return
+      // For payment gate, we still need to load prize settings
+      await loadGateFee();
+      // Pre-fetch fixtures for preview
+      await loadFixtures();
+    } else {
+      // Phase 2: Parallel data fetch while loader shows
+      await Promise.all([
+        loadFixtures(),
+        loadLeaderboard(),
+        loadHome() // this also loads prize breakdown
+      ]);
     }
-
-    await showNormalApp()
+    
+    // Phase 3: Prepare UI state with data already loaded
+    document.getElementById('user-name').textContent = profile?.name || 'Player';
+    document.getElementById('profile-name').value = profile?.name || '';
+    document.getElementById('profile-dept').value = profile?.department || '';
+    document.getElementById('profile-phone').value = profile?.phone || '';
+    
+    if (isAdmin()) {
+      document.getElementById('admin-link').classList.remove('hidden');
+    }
+    
+    // Phase 4: Smooth transition — auth out, app in
+    authScreen.classList.add('hidden');
+    appShell.classList.remove('hidden');
+    
+    // Start real-time updates after UI is visible
+    setupRealtime();
+    startCountdownTicker();
+    
+    // Final render pass (data is already cached)
+    renderFixtures();
+    updatePredictionCount();
+    loadLeaderboard(currentLbView);
+    loadHome();
+    renderBadges();
+    
+    // Phase 5: Fade out loader
+    loader.classList.add('hidden');
+    
   } catch (err) {
-    console.error('showApp error:', err)
-    showToast('Something went wrong loading the app. Please refresh.', 'error')
+    console.error('showApp error:', err);
+    showToast('Something went wrong. Please refresh.', 'error');
+    // Keep auth screen visible on error
+    authScreen.classList.remove('hidden');
+    appShell.classList.add('hidden');
+  }
+}
+
+// Payment gate version — same pattern
+function showPaymentGate() {
+  const loader = document.getElementById('loading-screen');
+  const authScreen = document.getElementById('auth-screen');
+  const appShell = document.getElementById('app-shell');
+  const gate = document.getElementById('payment-gate');
+  
+  // Hide loader immediately since payment gate is simple
+  loader.classList.add('hidden');
+  
+  authScreen.classList.add('hidden');
+  appShell.classList.remove('hidden');
+  
+  document.getElementById('app-main').classList.add('hidden');
+  document.getElementById('app-nav').classList.add('hidden');
+  gate.classList.remove('hidden');
+  gate.classList.add('flex');
+  
+  loadGateFee();
+  setupPaymentRealtime();
+  
+  const profile = getProfile();
+  if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
+    document.getElementById('payment-form-content').classList.add('hidden');
+    document.getElementById('pending-state').classList.remove('hidden');
   }
 }
     function switchTab(tab) {
@@ -3256,10 +3435,18 @@ if (typeof getPrizePool !== 'function') {
   }
 }
 
-    (async function() {
+  // ✅ AFTER — loader stays until we're sure
+(async function() {
   await init();
+  
   if (typeof getUser === 'function' && getUser()) {
+    // User is logged in — show app with data-ready reveal
     await showApp();
+  } else {
+    // No user — just hide loader, show auth screen cleanly
+    const loader = document.getElementById('loading-screen');
+    loader.classList.add('hidden');
+    loadAuthStats(); // still load stats for the auth screen
   }
 })();
   </script>
