@@ -44,3 +44,33 @@ self.addEventListener('fetch', event => {
     caches.match(event.request).then(res => res || fetch(event.request))
   )
 })
+
+/* ========== PUSH NOTIFICATIONS ========== */
+self.addEventListener('push', event => {
+  let data = { title: 'WC Predictions', body: 'New update', tag: 'general', url: '/admin.html' }
+  try { data = event.data.json() } catch (e) {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/image/logo.svg',
+      badge: '/image/logo.svg',
+      tag: data.tag,
+      requireInteraction: true,
+      data: { url: data.url || '/admin.html' }
+    })
+  )
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const url = event.notification.data?.url || '/admin.html'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes(url) && 'focus' in client) return client.focus()
+      }
+      if (clients.openWindow) return clients.openWindow(url)
+    })
+  )
+})

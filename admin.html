@@ -814,6 +814,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       if (!isAdmin()) { document.getElementById('access-denied').classList.remove('hidden'); return }
       document.getElementById('admin-content').classList.remove('hidden')
       requestNotificationPermission()
+      await subscribeAdminPush()
             await loadAll()
       await loadNotifications()
       setupAdminRealtime()
@@ -1301,6 +1302,46 @@ async function executeSaveScore(id) {
       renderPrize()
       showToast('Settings saved', 'success')
     }
+
+
+    function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+}
+
+async function subscribeAdminPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') return
+
+  const reg = await navigator.serviceWorker.ready
+  const existing = await reg.pushManager.getSubscription()
+  if (existing) return // already done
+
+  // 🔑 Replace with YOUR VAPID public key (see Step 6)
+  const vapidPublicKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0Z2ZieWZodWhwYndyZXZjc3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NTYzNjUsImV4cCI6MjA5NjIzMjM2NX0.UJ2HDtmFpXwAz3pZERKsv0Mi_kFDFJG3SKemikq5rW8'
+
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+  })
+
+  const json = sub.toJSON()
+  const { error } = await supabaseClient
+    .from('push_subscriptions')
+    .upsert({
+      user_id: getUser().id,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth
+    }, { onConflict: 'user_id,endpoint' })
+
+  if (error) console.error('Push subscription save failed', error)
+  else console.log('Admin push subscribed')
+}
 
 
     // Fallback prize settings helpers if auth.js doesn't provide them
