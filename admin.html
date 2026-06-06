@@ -98,6 +98,47 @@
     .switch.on { background: #D4A24C; }
     .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; background: #fff; border-radius: 50%; transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .switch.on::after { transform: translateX(20px); }
+
+    /* Prize dashboard preview (mirror of player view) */
+    .prize-dash-light {
+      background: #fff; color: #1F2A26;
+      border: 1px solid #EEEDE7; border-radius: 18px;
+      padding: 18px;
+    }
+    .prize-dash-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; padding: 7px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .prize-dash-row.muted { color: #5C6B75; }
+    .prize-dash-row.deduct { color: #B91C1C; }
+    .prize-dash-row.total { font-weight: 700; font-size: 15px; color: #0A0F0D; padding-top: 10px; }
+    .prize-dash-divider { border-top: 1px dashed rgba(0,0,0,0.08); margin: 6px 0; }
+    .prize-dash-divider.solid { border-top: 1px solid rgba(212,162,76,0.5); margin: 8px 0; }
+    .prize-place-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: #FAFAF7;
+      border: 1px solid #EEEDE7; border-radius: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .prize-place-row + .prize-place-row { margin-top: 6px; }
+    .prize-place-emoji { font-size: 22px; line-height: 1; }
+    .prize-place-info { flex: 1; min-width: 0; }
+    .prize-place-name { font-size: 13px; font-weight: 700; }
+    .prize-place-pct { font-size: 11px; color: #8A959F; margin-top: 1px; }
+    .prize-place-amount { font-size: 17px; font-weight: 800; color: #1E3A5F; }
+
+    /* Compact split percent input */
+    .split-fld {
+      width: 100%; padding: 10px; border-radius: 12px;
+      border: 1.5px solid #EEEDE7; background: #FAFAF7;
+      outline: none; transition: all 150ms ease;
+      text-align: center; font-weight: 700; font-size: 18px;
+      color: #0A0F0D; font-variant-numeric: tabular-nums;
+    }
+    .split-fld:focus { border-color: #D4A24C; background: #fff; box-shadow: 0 0 0 3px rgba(212,162,76,0.12); }
+    .split-sum-ok { color: #047857; }
+    .split-sum-bad { color: #B91C1C; }
   </style>
 <base target="_blank">
 <base target="_blank">
@@ -329,48 +370,113 @@
       <!-- PRIZE -->
       <div id="atab-prize" class="atab hidden space-y-4">
 
-        <!-- Pool display -->
-        <div class="card p-6 flex flex-col justify-center" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border-color: #FDE68A; min-height: 140px;">
-          <div class="text-[11px] font-bold text-amber-700 uppercase tracking-[0.15em] mb-2">Current Pool</div>
-          <div class="text-5xl font-bold tracking-tight text-amber-900 mb-2" id="prize-current">—</div>
-          <div class="text-sm text-amber-800" id="prize-meta">—</div>
+        <!-- Live dashboard preview (matches what players see) -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg tracking-tight">Prize Pool Dashboard</h2>
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-wider">Live preview</span>
+          </div>
+          <p class="text-xs text-ink-500 mb-4">This is exactly what every player sees on their home tab — fully transparent.</p>
+          <div id="prize-dashboard-preview"></div>
         </div>
 
+        <!-- Pool source settings -->
         <div class="card p-5">
-          <h2 class="font-bold text-lg tracking-tight mb-4">Pool Settings</h2>
+          <h2 class="font-bold text-lg tracking-tight mb-1">Pool Source</h2>
+          <p class="text-xs text-ink-500 mb-4">How the total collected is calculated.</p>
           <div class="space-y-3">
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-1">
                 <label class="fld-label">Currency</label>
-                <input type="text" id="prize-currency" maxlength="3" placeholder="Nu." class="fld text-center">
+                <input type="text" id="prize-currency" maxlength="3" placeholder="Nu." class="fld text-center" oninput="updatePrizePreview()">
               </div>
               <div class="col-span-2">
                 <label class="fld-label">Entry Fee</label>
-                <input type="number" id="prize-entry-fee" min="0" step="0.01" placeholder="10" class="fld">
+                <input type="number" id="prize-entry-fee" min="0" step="0.01" placeholder="500" class="fld" oninput="updatePrizePreview()">
               </div>
             </div>
 
             <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border">
               <div class="min-w-0 mr-3">
                 <div class="font-semibold text-sm">Manual override</div>
-                <div class="text-xs text-ink-500 mt-0.5">Set pool amount directly</div>
+                <div class="text-xs text-ink-500 mt-0.5">Set pool amount directly (ignores entry fee × players)</div>
               </div>
               <div id="prize-switch" class="switch" onclick="togglePrizeOverride()"></div>
             </div>
 
             <div id="prize-manual-field" class="hidden">
               <label class="fld-label">Pool Amount</label>
-              <input type="number" id="prize-manual-amount" min="0" step="0.01" class="fld">
+              <input type="number" id="prize-manual-amount" min="0" step="0.01" class="fld" oninput="updatePrizePreview()">
             </div>
-
-            <button onclick="savePrizeSettings()" class="btn-primary tap">Save Settings</button>
           </div>
         </div>
 
+        <!-- House fee settings -->
         <div class="card p-5">
-          <h3 class="font-bold mb-4 tracking-tight">Suggested Distribution</h3>
-          <div id="prize-distribution" class="space-y-3"></div>
+          <h2 class="font-bold text-lg tracking-tight mb-1">Organizer Fee</h2>
+          <p class="text-xs text-ink-500 mb-4">A small cut off the top for organizing & hosting. Shown transparently to all players. Set to 0 if you don't want one.</p>
+          <div class="space-y-3">
+            <div>
+              <label class="fld-label">Fee Percentage (0 – 30%)</label>
+              <div class="relative">
+                <input type="number" id="prize-house-pct" min="0" max="30" step="0.5" placeholder="0" class="fld pr-12" oninput="updatePrizePreview()">
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-ink-500 font-semibold">%</span>
+              </div>
+              <p class="text-[11px] text-ink-400 mt-1.5">Common: 0% (free organizing), 5% (small leagues), 10% (large leagues)</p>
+            </div>
+            <div>
+              <label class="fld-label">Fee Label</label>
+              <input type="text" id="prize-house-note" placeholder="Organizing & hosting" maxlength="40" class="fld" oninput="updatePrizePreview()">
+              <p class="text-[11px] text-ink-400 mt-1.5">Shown to players, e.g. "Organizing & hosting" or "Admin fee"</p>
+            </div>
+          </div>
         </div>
+
+        <!-- Prize split settings -->
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-1">Prize Split</h2>
+          <p class="text-xs text-ink-500 mb-4">How the prize pool divides among the top 3. Must add up to 100%.</p>
+
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label class="fld-label text-center">🥇 1st</label>
+              <div class="relative">
+                <input type="number" id="prize-split-1" min="0" max="100" step="1" placeholder="50" class="split-fld pr-7" oninput="updatePrizePreview()">
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 text-xs font-semibold">%</span>
+              </div>
+            </div>
+            <div>
+              <label class="fld-label text-center">🥈 2nd</label>
+              <div class="relative">
+                <input type="number" id="prize-split-2" min="0" max="100" step="1" placeholder="30" class="split-fld pr-7" oninput="updatePrizePreview()">
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 text-xs font-semibold">%</span>
+              </div>
+            </div>
+            <div>
+              <label class="fld-label text-center">🥉 3rd</label>
+              <div class="relative">
+                <input type="number" id="prize-split-3" min="0" max="100" step="1" placeholder="20" class="split-fld pr-7" oninput="updatePrizePreview()">
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 text-xs font-semibold">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-paper rounded-xl p-3 text-center text-xs font-semibold" id="split-sum-display">
+            Total: <span id="split-sum">100</span>%
+          </div>
+
+          <!-- Quick presets -->
+          <div class="mt-3">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-2">Quick presets</div>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="applySplitPreset(50,30,20)" class="btn-ghost text-xs py-2.5 px-2">50 / 30 / 20</button>
+              <button onclick="applySplitPreset(60,25,15)" class="btn-ghost text-xs py-2.5 px-2">60 / 25 / 15</button>
+              <button onclick="applySplitPreset(70,20,10)" class="btn-ghost text-xs py-2.5 px-2">70 / 20 / 10</button>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="savePrizeSettings()" class="btn-primary tap">Save All Settings</button>
       </div>
     </div>
   </div>
@@ -545,7 +651,7 @@ function flagHtml(name, size = 24) {
     // ============== STATE ==============
     let allFixtures = []
     let allUsers = []
-    let prizeSettings = { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0 }
+    let prizeSettings = { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0, house_fee_pct: 0, house_fee_note: 'Organizing & hosting', split_1st: 50, split_2nd: 30, split_3rd: 20 }
     const pendingScores = {}
     const pendingKickoffs = {}
 
@@ -1350,62 +1456,212 @@ async function executeSaveScore(id) {
   showToast('Score saved', 'success')
 }
 
-    // ============== PRIZE POOL ==============
+    // ============== PRIZE POOL DASHBOARD ==============
+    /* DB CHANGE for the transparent house-fee dashboard:
+     *   ALTER TABLE prize_settings ADD COLUMN house_fee_pct NUMERIC DEFAULT 0;
+     *   ALTER TABLE prize_settings ADD COLUMN house_fee_note TEXT DEFAULT 'Organizing & hosting';
+     *   ALTER TABLE prize_settings ADD COLUMN split_1st NUMERIC DEFAULT 50;
+     *   ALTER TABLE prize_settings ADD COLUMN split_2nd NUMERIC DEFAULT 30;
+     *   ALTER TABLE prize_settings ADD COLUMN split_3rd NUMERIC DEFAULT 20;
+     * If missing, the code defaults to 0% house fee and 50/30/20 silently.
+     */
+
+    function fmtMoney(cur, n) {
+      return `${cur || 'Nu.'} ${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    }
+
+    function computePrizeBreakdown(s, paidCount) {
+      const fee = Number(s.entry_fee) || 0
+      const gross = s.manual_override ? (Number(s.manual_amount) || 0) : paidCount * fee
+      const housePct = Math.max(0, Math.min(100, Number(s.house_fee_pct) || 0))
+      const houseFee = gross * (housePct / 100)
+      const net = Math.max(0, gross - houseFee)
+      const s1 = Number(s.split_1st) || 50
+      const s2 = Number(s.split_2nd) || 30
+      const s3 = Number(s.split_3rd) || 20
+      const totalSplit = (s1 + s2 + s3) || 100
+      return {
+        currency: s.currency || 'Nu.',
+        paidCount,
+        entryFee: fee,
+        manualOverride: !!s.manual_override,
+        gross,
+        housePct, houseFee,
+        houseNote: s.house_fee_note || 'Organizing & hosting',
+        net,
+        splits: [
+          { place: '1st', emoji: '🥇', pct: s1 / totalSplit * 100, amount: net * s1 / totalSplit },
+          { place: '2nd', emoji: '🥈', pct: s2 / totalSplit * 100, amount: net * s2 / totalSplit },
+          { place: '3rd', emoji: '🥉', pct: s3 / totalSplit * 100, amount: net * s3 / totalSplit }
+        ]
+      }
+    }
+
+    function readPrizeFormState() {
+      return {
+        currency: document.getElementById('prize-currency').value || 'Nu.',
+        entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
+        manual_override: document.getElementById('prize-switch').classList.contains('on'),
+        manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0,
+        house_fee_pct: Number(document.getElementById('prize-house-pct').value) || 0,
+        house_fee_note: document.getElementById('prize-house-note').value.trim() || 'Organizing & hosting',
+        split_1st: Number(document.getElementById('prize-split-1').value) || 0,
+        split_2nd: Number(document.getElementById('prize-split-2').value) || 0,
+        split_3rd: Number(document.getElementById('prize-split-3').value) || 0
+      }
+    }
+
+    function renderPrizeDashboardPreview(b) {
+      const host = document.getElementById('prize-dashboard-preview')
+      if (!host) return
+
+      const collectedLabel = b.manualOverride
+        ? `Pool set by organizer`
+        : `${b.paidCount} ${b.paidCount === 1 ? 'player' : 'players'} × ${fmtMoney(b.currency, b.entryFee)}`
+
+      const houseRow = b.housePct > 0
+        ? `
+          <div class="prize-dash-row muted">
+            <span>${b.houseNote}</span>
+            <span>${b.housePct}%</span>
+          </div>
+          <div class="prize-dash-row deduct">
+            <span>Organizer fee</span>
+            <span>− ${fmtMoney(b.currency, b.houseFee)}</span>
+          </div>`
+        : `<div class="prize-dash-row muted"><span>Organizer fee</span><span>None — 100% goes to players</span></div>`
+
+      host.innerHTML = `
+        <div class="prize-dash-light">
+          <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500 mb-1.5">Prize Pool</div>
+          <div class="text-4xl font-bold tracking-tight text-amber-700" style="font-variant-numeric:tabular-nums;">${fmtMoney(b.currency, b.net)}</div>
+          <div class="text-xs text-ink-500 mt-1 mb-4">After ${b.housePct > 0 ? `${b.housePct}% organizer fee` : 'no deductions'} · ${b.paidCount} ${b.paidCount === 1 ? 'player' : 'players'} in</div>
+
+          <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500 mb-1">Where the money goes</div>
+          <div class="prize-dash-row">
+            <span>Collected</span>
+            <span>${fmtMoney(b.currency, b.gross)}</span>
+          </div>
+          <div class="prize-dash-row muted" style="font-size:11px;margin-top:-4px;">
+            <span>${collectedLabel}</span>
+            <span></span>
+          </div>
+          ${houseRow}
+          <div class="prize-dash-divider solid"></div>
+          <div class="prize-dash-row total">
+            <span>Prize pool</span>
+            <span>${fmtMoney(b.currency, b.net)}</span>
+          </div>
+
+          <div class="mt-4">
+            ${b.splits.map(p => `
+              <div class="prize-place-row">
+                <div class="prize-place-emoji">${p.emoji}</div>
+                <div class="prize-place-info">
+                  <div class="prize-place-name">${p.place} Place</div>
+                  <div class="prize-place-pct">${p.pct.toFixed(0)}% of prize pool</div>
+                </div>
+                <div class="prize-place-amount">${fmtMoney(b.currency, p.amount)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`
+    }
+
+    function updateSplitSum() {
+      const s1 = Number(document.getElementById('prize-split-1').value) || 0
+      const s2 = Number(document.getElementById('prize-split-2').value) || 0
+      const s3 = Number(document.getElementById('prize-split-3').value) || 0
+      const sum = s1 + s2 + s3
+      const el = document.getElementById('split-sum')
+      const wrap = document.getElementById('split-sum-display')
+      el.textContent = sum
+      if (sum === 100) {
+        wrap.classList.remove('split-sum-bad', 'bg-red-50', 'text-red-700')
+        wrap.classList.add('split-sum-ok', 'bg-emerald-50', 'text-emerald-700')
+        wrap.innerHTML = `✓ Total: <span id="split-sum">${sum}</span>% — looks good`
+      } else {
+        wrap.classList.remove('split-sum-ok', 'bg-emerald-50', 'text-emerald-700')
+        wrap.classList.add('split-sum-bad', 'bg-red-50', 'text-red-700')
+        wrap.innerHTML = `⚠ Total: <span id="split-sum">${sum}</span>% — must equal 100% to save`
+      }
+      return sum
+    }
+
+    function updatePrizePreview() {
+      const formState = readPrizeFormState()
+      const paidCount = allUsers.filter(u => u.fee_paid).length
+      const breakdown = computePrizeBreakdown(formState, paidCount)
+      renderPrizeDashboardPreview(breakdown)
+      updateSplitSum()
+    }
+
+    function applySplitPreset(a, b, c) {
+      document.getElementById('prize-split-1').value = a
+      document.getElementById('prize-split-2').value = b
+      document.getElementById('prize-split-3').value = c
+      updatePrizePreview()
+    }
+
     function togglePrizeOverride() {
       const sw = document.getElementById('prize-switch')
       sw.classList.toggle('on')
       prizeSettings.manual_override = sw.classList.contains('on')
       document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
-      renderPrize()
+      updatePrizePreview()
     }
 
     function renderPrize() {
-      document.getElementById('prize-currency').value = 'Nu.'
+      // Hydrate form from prizeSettings (loaded from DB)
+      document.getElementById('prize-currency').value = prizeSettings.currency || 'Nu.'
       document.getElementById('prize-entry-fee').value = prizeSettings.entry_fee || ''
       document.getElementById('prize-switch').classList.toggle('on', !!prizeSettings.manual_override)
       document.getElementById('prize-manual-field').classList.toggle('hidden', !prizeSettings.manual_override)
       document.getElementById('prize-manual-amount').value = prizeSettings.manual_amount || ''
+      document.getElementById('prize-house-pct').value = prizeSettings.house_fee_pct ?? ''
+      document.getElementById('prize-house-note').value = prizeSettings.house_fee_note || ''
+      document.getElementById('prize-split-1').value = prizeSettings.split_1st ?? 50
+      document.getElementById('prize-split-2').value = prizeSettings.split_2nd ?? 30
+      document.getElementById('prize-split-3').value = prizeSettings.split_3rd ?? 20
 
-      const paidCount = allUsers.filter(u => u.fee_paid).length
-      const autoPool = paidCount * (Number(prizeSettings.entry_fee) || 0)
-      const pool = prizeSettings.manual_override ? Number(prizeSettings.manual_amount) || 0 : autoPool
-      const cur = 'Nu.'
-
-      document.getElementById('prize-current').textContent = pool.toLocaleString()
-      document.getElementById('prize-meta').textContent = prizeSettings.manual_override
-  ? `Manual · ${paidCount}/${allUsers.length} paid`
-  : `${paidCount} players × ${prizeSettings.entry_fee || 0} entry fee`
-
-      const splits = [
-        { place: '1st', emoji: '🥇', pct: 0.5 },
-        { place: '2nd', emoji: '🥈', pct: 0.3 },
-        { place: '3rd', emoji: '🥉', pct: 0.2 }
-      ]
-      document.getElementById('prize-distribution').innerHTML = splits.map(s => `
-        <div class="flex items-center gap-3 py-2 border-b border-paper-border last:border-0">
-          <div class="text-2xl">${s.emoji}</div>
-          <div class="flex-1">
-            <div class="font-semibold text-sm">${s.place} Place</div>
-            <div class="text-xs text-ink-500">${s.pct * 100}% of pool</div>
-          </div>
-          <div class="font-bold text-brand-700 text-lg">${(pool * s.pct).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-        </div>
-      `).join('')
+      updatePrizePreview()
     }
 
     async function savePrizeSettings() {
-      const payload = {
-        currency: 'Nu.',
-        entry_fee: Number(document.getElementById('prize-entry-fee').value) || 0,
-        manual_override: document.getElementById('prize-switch').classList.contains('on'),
-        manual_amount: Number(document.getElementById('prize-manual-amount').value) || 0
+      const state = readPrizeFormState()
+
+      // Validate splits sum to 100
+      const sum = state.split_1st + state.split_2nd + state.split_3rd
+      if (sum !== 100) {
+        showToast(`Prize splits must total 100% (currently ${sum}%)`, 'error')
+        return
       }
+      // Validate house fee
+      if (state.house_fee_pct < 0 || state.house_fee_pct > 30) {
+        showToast('Organizer fee must be between 0 and 30%', 'error')
+        return
+      }
+
       if (typeof setPrizeSettings !== 'function') { showToast('setPrizeSettings helper missing', 'error'); return }
-      const { error } = await setPrizeSettings(payload)
-      if (error) return showToast(error.message, 'error')
-      prizeSettings = { ...prizeSettings, ...payload }
+      const { error } = await setPrizeSettings(state)
+      if (error) {
+        // If the error mentions a missing column, retry without the new ones
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('column') && (msg.includes('house_fee') || msg.includes('split_'))) {
+          showToast('⚠ Add the new columns to prize_settings (see SQL in code) — saving basic settings only.', 'warning')
+          const basic = {
+            currency: state.currency, entry_fee: state.entry_fee,
+            manual_override: state.manual_override, manual_amount: state.manual_amount
+          }
+          const { error: e2 } = await setPrizeSettings(basic)
+          if (e2) return showToast(e2.message, 'error')
+        } else {
+          return showToast(error.message, 'error')
+        }
+      }
+      prizeSettings = { ...prizeSettings, ...state }
       renderPrize()
-      showToast('Settings saved', 'success')
+      showToast('Settings saved — players will see this immediately', 'success')
     }
 
 

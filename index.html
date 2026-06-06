@@ -218,6 +218,69 @@
       padding: 24px;
       text-align: center;
     }
+
+    /* ===== Prize pool dashboard ===== */
+    .prize-dash {
+      background: radial-gradient(circle at top right, #1E3A5F 0%, #0B1221 60%, #060C18 100%);
+      color: #fff;
+      border-radius: 24px;
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(10,15,13,0.12);
+    }
+    .prize-dash::before {
+      content: ''; position: absolute; top: -60px; right: -60px;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,162,76,0.4), transparent 70%);
+      pointer-events: none;
+    }
+    .prize-dash-amount {
+      font-size: 44px; font-weight: 800; letter-spacing: -0.02em;
+      color: #D4A24C; line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .prize-dash-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; padding: 7px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .prize-dash-row.muted { color: rgba(255,255,255,0.65); }
+    .prize-dash-row.deduct { color: #FCA5A5; }
+    .prize-dash-row.total { font-weight: 700; font-size: 15px; color: #fff; padding-top: 10px; }
+    .prize-dash-divider { border-top: 1px dashed rgba(255,255,255,0.18); margin: 6px 0; }
+    .prize-dash-divider.solid { border-top: 1px solid rgba(212,162,76,0.4); margin: 8px 0; }
+    .prize-place-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .prize-place-row + .prize-place-row { margin-top: 6px; }
+    .prize-place-emoji { font-size: 22px; line-height: 1; }
+    .prize-place-info { flex: 1; min-width: 0; }
+    .prize-place-name { font-size: 13px; font-weight: 700; }
+    .prize-place-pct { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+    .prize-place-amount { font-size: 17px; font-weight: 800; color: #D4A24C; }
+
+    /* Admin-side mirror of the dashboard (light theme) */
+    .prize-dash-light {
+      background: #fff;
+      color: #1F2A26;
+      border: 1px solid #EEEDE7;
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .prize-dash-light .prize-dash-row.muted { color: #5C6B75; }
+    .prize-dash-light .prize-dash-row.deduct { color: #B91C1C; }
+    .prize-dash-light .prize-dash-row.total { color: #0A0F0D; }
+    .prize-dash-light .prize-dash-divider { border-top-color: rgba(0,0,0,0.08); }
+    .prize-dash-light .prize-dash-divider.solid { border-top-color: rgba(212,162,76,0.5); }
+    .prize-dash-light .prize-place-row { background: #FAFAF7; border-color: #EEEDE7; }
+    .prize-dash-light .prize-place-pct { color: #8A959F; }
+    .prize-dash-light .prize-place-amount { color: #1E3A5F; }
   
     /* Prize pool amount animation */
     .prize-amount-anim {
@@ -768,18 +831,8 @@
           </div>
         </div>
 
-        <!-- Prize pool -->
-        <div id="home-prize-card" class="hidden bg-paper-card border border-paper-border rounded-3xl p-5 shadow-soft flex items-center gap-4">
-          <div class="w-12 h-12 rounded-2xl bg-gold/15 flex items-center justify-center text-xl font-bold text-gold">Nu</div>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Prize Pool</div>
-            <div class="text-2xl font-bold text-ink-900 tracking-tight" id="home-prize-amount">—</div>
-          </div>
-          <div class="text-right flex flex-col items-end gap-2 justify-center h-full">
-            <div class="text-xs text-ink-400 leading-none" id="home-prize-players"></div>
-            <button onclick="loadHomePrizePoolOnly()" class="text-[10px] font-semibold text-brand-700 bg-brand-50 px-2.5 py-1.5 rounded-lg tap leading-none">↻ Refresh</button>
-          </div>
-        </div>
+        <!-- Prize pool dashboard -->
+        <div id="home-prize-dashboard" class="hidden"></div>
 
         <!-- Next match -->
         <div>
@@ -1956,25 +2009,13 @@ function msToCountdown(ms) {
     document.getElementById('home-points-breakdown').textContent = hasPoints ? `${myPredPoints} points from predictions` : '—'
   }
 
-  // Prize pool
+  // Prize pool dashboard
   try {
-    if (typeof getPrizePool === 'function') {
-      const { data: pool } = await getPrizePool()
-      if (pool && pool.amount > 0) {
-        const card = document.getElementById('home-prize-card')
-        const amountEl = document.getElementById('home-prize-amount')
-        const newText = Number(pool.amount).toLocaleString()
-
-        if (amountEl.textContent !== '—' && amountEl.textContent !== newText) {
-          amountEl.classList.remove('prize-amount-anim')
-          void amountEl.offsetWidth
-          amountEl.classList.add('prize-amount-anim')
-        }
-
-        card.classList.remove('hidden')
-        amountEl.textContent = newText
-        document.getElementById('home-prize-players').textContent = pool.paid_count ? `${pool.paid_count} players in` : ''
-      }
+    const breakdown = await fetchPrizeBreakdown()
+    if (breakdown && breakdown.gross > 0) {
+      renderPrizeDashboard(breakdown)
+    } else {
+      document.getElementById('home-prize-dashboard').classList.add('hidden')
     }
   } catch (e) {}
 
@@ -2264,28 +2305,128 @@ function msToCountdown(ms) {
     // Lightweight prize pool refresh without re-rendering everything
     async function loadHomePrizePoolOnly() {
       try {
-        if (typeof getPrizePool !== 'function') return
-        const { data: pool } = await getPrizePool()
-        if (!pool || pool.amount <= 0) return
-
-        const card = document.getElementById('home-prize-card')
-        const amountEl = document.getElementById('home-prize-amount')
-        const playersEl = document.getElementById('home-prize-players')
-        if (!card || !amountEl) return
-
-        const newText = Number(pool.amount).toLocaleString()
-        const oldText = amountEl.textContent
-
-        if (oldText !== '—' && oldText !== newText) {
-          amountEl.classList.remove('prize-amount-anim')
-          void amountEl.offsetWidth
-          amountEl.classList.add('prize-amount-anim')
-        }
-
-        card.classList.remove('hidden')
-        amountEl.textContent = newText
-        playersEl.textContent = pool.paid_count ? `${pool.paid_count} players in` : ''
+        const breakdown = await fetchPrizeBreakdown()
+        if (!breakdown || breakdown.gross <= 0) return
+        renderPrizeDashboard(breakdown, true)
       } catch (e) { /* silent */ }
+    }
+
+    // ============== PRIZE POOL DASHBOARD ==============
+    /* DB CHANGE for the transparent house-fee dashboard:
+     *   ALTER TABLE prize_settings ADD COLUMN house_fee_pct NUMERIC DEFAULT 0;
+     *   ALTER TABLE prize_settings ADD COLUMN house_fee_note TEXT DEFAULT 'Organizing & hosting';
+     *   ALTER TABLE prize_settings ADD COLUMN split_1st NUMERIC DEFAULT 50;
+     *   ALTER TABLE prize_settings ADD COLUMN split_2nd NUMERIC DEFAULT 30;
+     *   ALTER TABLE prize_settings ADD COLUMN split_3rd NUMERIC DEFAULT 20;
+     * If missing, the code falls back to 0% / 50-30-20 silently.
+     */
+    function computePrizeBreakdown(s, paidCount) {
+      const fee = Number(s.entry_fee) || 0
+      const gross = s.manual_override
+        ? (Number(s.manual_amount) || 0)
+        : paidCount * fee
+      const housePct = Math.max(0, Math.min(100, Number(s.house_fee_pct) || 0))
+      const houseFee = gross * (housePct / 100)
+      const net = Math.max(0, gross - houseFee)
+      const s1 = Number(s.split_1st) || 50
+      const s2 = Number(s.split_2nd) || 30
+      const s3 = Number(s.split_3rd) || 20
+      const totalSplit = (s1 + s2 + s3) || 100
+      return {
+        currency: s.currency || 'Nu.',
+        paidCount,
+        entryFee: fee,
+        manualOverride: !!s.manual_override,
+        gross,
+        housePct,
+        houseFee,
+        houseNote: s.house_fee_note || 'Organizing & hosting',
+        net,
+        splits: [
+          { place: '1st', emoji: '🥇', pct: s1 / totalSplit * 100, amount: net * s1 / totalSplit },
+          { place: '2nd', emoji: '🥈', pct: s2 / totalSplit * 100, amount: net * s2 / totalSplit },
+          { place: '3rd', emoji: '🥉', pct: s3 / totalSplit * 100, amount: net * s3 / totalSplit }
+        ]
+      }
+    }
+
+    async function fetchPrizeBreakdown() {
+      try {
+        const { data: s } = await supabaseClient
+          .from('prize_settings').select('*').eq('id', 1).single()
+        const settings = s || {}
+        const { data: profiles } = await supabaseClient
+          .from('profiles').select('fee_paid').eq('fee_paid', true)
+        const paidCount = profiles?.length || 0
+        return computePrizeBreakdown(settings, paidCount)
+      } catch (e) { return null }
+    }
+
+    function fmtMoney(cur, n) {
+      return `${cur} ${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    }
+
+    function renderPrizeDashboard(b, animate = false) {
+      const host = document.getElementById('home-prize-dashboard')
+      if (!host) return
+      host.classList.remove('hidden')
+
+      const collectedLabel = b.manualOverride
+        ? `Pool set by organizer`
+        : `${b.paidCount} ${b.paidCount === 1 ? 'player' : 'players'} × ${fmtMoney(b.currency, b.entryFee)}`
+
+      const houseRow = b.housePct > 0
+        ? `
+          <div class="prize-dash-row muted">
+            <span>${b.houseNote}</span>
+            <span>${b.housePct}%</span>
+          </div>
+          <div class="prize-dash-row deduct">
+            <span>Organizer fee</span>
+            <span>− ${fmtMoney(b.currency, b.houseFee)}</span>
+          </div>`
+        : `<div class="prize-dash-row muted"><span>Organizer fee</span><span>None — 100% goes to players</span></div>`
+
+      host.innerHTML = `
+        <div class="prize-dash">
+          <div class="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1.5">Prize Pool</div>
+          <div class="prize-dash-amount ${animate ? 'prize-amount-anim' : ''}">${fmtMoney(b.currency, b.net)}</div>
+          <div class="text-xs opacity-70 mt-1 mb-4">After ${b.housePct > 0 ? `${b.housePct}% organizer fee` : 'no deductions'} · ${b.paidCount} ${b.paidCount === 1 ? 'player' : 'players'} in</div>
+
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-1">Where the money goes</div>
+          <div class="prize-dash-row">
+            <span>Collected</span>
+            <span>${fmtMoney(b.currency, b.gross)}</span>
+          </div>
+          <div class="prize-dash-row muted" style="font-size:11px;margin-top:-4px;">
+            <span>${collectedLabel}</span>
+            <span></span>
+          </div>
+          ${houseRow}
+          <div class="prize-dash-divider solid"></div>
+          <div class="prize-dash-row total">
+            <span>Prize pool</span>
+            <span>${fmtMoney(b.currency, b.net)}</span>
+          </div>
+
+          <div class="mt-4 space-y-0">
+            ${b.splits.map(p => `
+              <div class="prize-place-row">
+                <div class="prize-place-emoji">${p.emoji}</div>
+                <div class="prize-place-info">
+                  <div class="prize-place-name">${p.place} Place</div>
+                  <div class="prize-place-pct">${p.pct.toFixed(0)}% of prize pool</div>
+                </div>
+                <div class="prize-place-amount">${fmtMoney(b.currency, p.amount)}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <button onclick="loadHomePrizePoolOnly()" class="mt-4 w-full bg-white/10 hover:bg-white/15 text-white/90 text-xs font-semibold py-2.5 rounded-xl tap flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5 13a7 7 0 0011.95 4.95M19 11a7 7 0 00-11.95-4.95"/></svg>
+            Refresh
+          </button>
+        </div>`
     }
 
     // ============== LIVE COUNTDOWN TICKER (Feature 3) ==============
