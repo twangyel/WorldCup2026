@@ -1139,15 +1139,19 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
         ]
       })
     }
-    async function executeSaveScore(id) {
-      const s = pendingScores[id] || {}
-      const { error } = await updateFixtureScore(id, s.home, s.away)
-      if (error) return showToast(error.message, 'error')
-      const f = allFixtures.find(x => x.id === id); if (f) { f.home_score = s.home; f.away_score = s.away }
-      pendingScores[id] = {}
-      renderResults(); renderFixturesManage()
-      showToast('Score saved', 'success')
-    }
+async function executeSaveScore(id) {
+  const s = pendingScores[id] || {}
+  const { error } = await updateFixtureScore(id, s.home, s.away)
+  if (error) return showToast(error.message, 'error')
+  const f = allFixtures.find(x => x.id === id)
+  if (f) {
+    if (s.home !== undefined) f.home_score = s.home
+    if (s.away !== undefined) f.away_score = s.away
+  }
+  pendingScores[id] = {}
+  renderResults(); renderFixturesManage()
+  showToast('Score saved', 'success')
+}
 
     // ============== PRIZE POOL ==============
     function togglePrizeOverride() {
