@@ -1145,6 +1145,9 @@ async function handleWhatsappBlur() {
 // Wire up blur detection
 document.getElementById('whatsapp').addEventListener('blur', handleWhatsappBlur)
 
+// Restore remembered WhatsApp number (if user previously checked "Remember me")
+loadRememberedEmail()
+
 // Helper: show the signup UI (name + confirm password fields)
 function switchToSignupUI(subtitleMsg) {
   authMode = 'signup'
@@ -1952,7 +1955,12 @@ if (typeof getPrizePool !== 'function') {
   }
 }
 
-    init()
+    (async function() {
+  await init();
+  if (typeof getUser === 'function' && getUser()) {
+    await showApp();
+  }
+})();
   </script>
 </body>
 </html>
