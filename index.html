@@ -188,42 +188,60 @@
   <!-- AUTH SCREEN -->
   <div id="auth-screen" class="min-h-screen flex items-center justify-center p-5">
     <div class="w-full max-w-sm">
-      <div class="text-center mb-10">
-        <div class="inline-flex items-center justify-center w-25 h-25 rounded-3xl  text-white text-4xl shadow-lifted mb-5"><img src="/image/logo.svg" alt="WC Predictions Logo" class="w-20 h-20"></div>
-        <h1 class="text-3xl font-bold tracking-tight text-ink-900">Prediction League</h1>
-        <p class="text-sm text-ink-500 mt-1.5">FIFA World Cup 2026</p>
-      </div>
+     <div class="text-center mb-10">
+  <div class="inline-flex items-center justify-center w-25 h-25 rounded-3xl text-white text-4xl shadow-lifted mb-5">
+    <img src="/image/logo.svg" alt="WC Predictions Logo" class="w-20 h-20">
+  </div>
+  <h1 class="text-3xl font-bold tracking-tight text-ink-900">Prediction League</h1>
+  <p class="text-sm text-ink-500 mt-1.5" id="auth-subtitle">Enter your details to continue</p>
+</div>
 
       <div class="bg-white rounded-3xl shadow-card p-6 border border-paper-border">
         <form id="auth-form" class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Email</label>
-            <input type="email" id="email" required
-              class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
-              placeholder="you@company.com">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Password</label>
-            <div class="relative">
-              <input type="password" id="password" required minlength="6"
-                class="w-full px-4 py-3.5 pr-12 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
-                placeholder="Create or enter password">
-              <button type="button" onclick="togglePassword()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-ink-400">
-                <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                <svg id="eye-slash-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.887m2.197-2.197A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.05 10.05 0 01-1.574 2.887m-2.197 2.197L4.5 19.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18"/></svg>
-              </button>
-            </div>
-            <p class="text-xs text-ink-400 mt-2">First time? Pick any password — we'll create your account.</p>
-          </div>
-          <label class="flex items-center gap-2.5 cursor-pointer pt-1">
-            <input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-paper-border text-brand-700 focus:ring-brand-500">
-            <span class="text-sm text-ink-700">Remember me</span>
-          </label>
-          <button type="submit"
-            class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-2">
-            Continue
-          </button>
-        </form>
+  <div>
+    <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Email</label>
+    <input type="email" id="email" required
+      class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
+      placeholder="you@company.com">
+  </div>
+
+  <div>
+    <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Password</label>
+    <div class="relative">
+      <input type="password" id="password" required minlength="6"
+        class="w-full px-4 py-3.5 pr-12 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
+        placeholder="Enter password">
+      <button type="button" onclick="togglePassword()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-ink-400">
+        <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <svg id="eye-slash-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.887m2.197-2.197A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.05 10.05 0 01-1.574 2.887m-2.197 2.197L4.5 19.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Confirm password – shown only for new users -->
+  <div id="confirm-password-wrap" class="hidden">
+    <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Confirm Password</label>
+    <div class="relative">
+      <input type="password" id="confirm-password" minlength="6"
+        class="w-full px-4 py-3.5 pr-12 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
+        placeholder="Re-enter password">
+      <button type="button" onclick="toggleConfirmPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-ink-400">
+        <svg id="confirm-eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <svg id="confirm-eye-slash-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.887m2.197-2.197A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.05 10.05 0 01-1.574 2.887m-2.197 2.197L4.5 19.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <label class="flex items-center gap-2.5 cursor-pointer pt-1">
+    <input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-paper-border text-brand-700 focus:ring-brand-500">
+    <span class="text-sm text-ink-700">Remember me</span>
+  </label>
+
+  <button type="submit" id="auth-submit-btn"
+    class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-2">
+    Continue
+  </button>
+</form>
         <div id="auth-message" class="mt-4 text-sm text-center hidden"></div>
       </div>
 
@@ -429,14 +447,15 @@
           <p class="text-sm text-ink-500 mt-2">Complete your entry fee to unlock predictions and leaderboard.</p>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-6 mb-5">
-          <div class="text-center mb-5">
-            <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-1">Entry Fee</div>
-            <div class="text-4xl font-bold text-brand-700" id="gate-fee-amount">Nu. 500</div>
-          </div>
-          
-          <!-- Payment Methods -->
-          <div class="space-y-4 mb-5">
+                <div class="bg-white rounded-3xl shadow-card border border-paper-border p-6 mb-5">
+          <div id="payment-form-content">
+            <div class="text-center mb-5">
+              <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-1">Entry Fee</div>
+              <div class="text-4xl font-bold text-brand-700" id="gate-fee-amount">Nu. 500</div>
+            </div>
+            
+            <!-- Payment Methods -->
+            <div class="space-y-4 mb-5">
             <div class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Payment Methods</div>
 
             <!-- Bank Transfer -->
@@ -452,7 +471,7 @@
                 <!-- Replace src with your actual QR code image -->
                 <img src="/image/dk.png" alt="DK Bank QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
-                  <span>📷<br>Upload your QR code<br>to /image/dkqrcode.jpeg/</span>
+                  <span>📷<<br>Upload your QR code<br>to /image/dkqrcode.jpeg/</span>
                 </div>
               </div>
               <div class="space-y-2">
@@ -488,7 +507,7 @@
                 <!-- Replace src with your actual QR code image -->
                 <img src="/image/bob.png" alt="BOB QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
-                  <span>📷<br>Upload your QR code<br>to /image/qr-bob.png</span>
+                  <span>📷<<br>Upload your QR code<br>to /image/qr-bob.png</span>
                 </div>
               </div>
               <div class="space-y-2">
@@ -522,9 +541,10 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-            <button onclick="submitPaymentProof()" id="submit-payment-btn" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
+                       <button onclick="submitPaymentProof()" id="submit-payment-btn" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
               Submit Payment Proof
             </button>
+          </div>
           </div>
 
           <div id="pending-state" class="hidden text-center py-4">
@@ -539,6 +559,83 @@
   </div>
 
   <script>
+    // ============== FLAGS ==============
+    const FLAG_MAP = {
+      'argentina': { code: 'ar', emoji: '🇦🇷' }, 'brazil': { code: 'br', emoji: '🇧🇷' },
+      'canada': { code: 'ca', emoji: '🇨🇦' }, 'mexico': { code: 'mx', emoji: '🇲🇽' },
+      'usa': { code: 'us', emoji: '🇺🇸' }, 'france': { code: 'fr', emoji: '🇫🇷' },
+      'germany': { code: 'de', emoji: '🇩🇪' }, 'spain': { code: 'es', emoji: '🇪🇸' },
+      'portugal': { code: 'pt', emoji: '🇵🇹' }, 'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      'netherlands': { code: 'nl', emoji: '🇳🇱' }, 'belgium': { code: 'be', emoji: '🇧🇪' },
+      'italy': { code: 'it', emoji: '🇮🇹' }, 'croatia': { code: 'hr', emoji: '🇭🇷' },
+      'uruguay': { code: 'uy', emoji: '🇺🇾' }, 'colombia': { code: 'co', emoji: '🇨🇴' },
+      'ecuador': { code: 'ec', emoji: '🇪🇨' }, 'chile': { code: 'cl', emoji: '🇨🇱' },
+      'paraguay': { code: 'py', emoji: '🇵🇾' }, 'peru': { code: 'pe', emoji: '🇵🇪' },
+      'bolivia': { code: 'bo', emoji: '🇧🇴' }, 'venezuela': { code: 've', emoji: '🇻🇪' },
+      'japan': { code: 'jp', emoji: '🇯🇵' }, 'south korea': { code: 'kr', emoji: '🇰🇷' },
+      'korea republic': { code: 'kr', emoji: '🇰🇷' }, 'australia': { code: 'au', emoji: '🇦🇺' },
+      'iran': { code: 'ir', emoji: '🇮🇷' }, 'saudi arabia': { code: 'sa', emoji: '🇸🇦' },
+      'qatar': { code: 'qa', emoji: '🇶🇦' }, 'morocco': { code: 'ma', emoji: '🇲🇦' },
+      'senegal': { code: 'sn', emoji: '🇸🇳' }, 'tunisia': { code: 'tn', emoji: '🇹🇳' },
+      'algeria': { code: 'dz', emoji: '🇩🇿' }, 'egypt': { code: 'eg', emoji: '🇪🇬' },
+      'nigeria': { code: 'ng', emoji: '🇳🇬' }, 'cameroon': { code: 'cm', emoji: '🇨🇲' },
+      'ghana': { code: 'gh', emoji: '🇬🇭' }, 'ivory coast': { code: 'ci', emoji: '🇨🇮' },
+      "côte d'ivoire": { code: 'ci', emoji: '🇨🇮' }, 'costa rica': { code: 'cr', emoji: '🇨🇷' },
+      'panama': { code: 'pa', emoji: '🇵🇦' }, 'honduras': { code: 'hn', emoji: '🇭🇳' },
+      'jamaica': { code: 'jm', emoji: '🇯🇲' }, 'new zealand': { code: 'nz', emoji: '🇳🇿' },
+      'ukraine': { code: 'ua', emoji: '🇺🇦' }, 'poland': { code: 'pl', emoji: '🇵🇱' },
+      'wales': { code: 'gb-wls', emoji: '🏴󠁧󠁢󠁷󠁬󠁳󠁿' }, 'scotland': { code: 'gb-sct', emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+      'serbia': { code: 'rs', emoji: '🇷🇸' }, 'switzerland': { code: 'ch', emoji: '🇨🇭' },
+      'denmark': { code: 'dk', emoji: '🇩🇰' }, 'sweden': { code: 'se', emoji: '🇸🇪' },
+      'norway': { code: 'no', emoji: '🇳🇴' }, 'austria': { code: 'at', emoji: '🇦🇹' },
+      'czech republic': { code: 'cz', emoji: '🇨🇿' }, 'czechia': { code: 'cz', emoji: '🇨🇿' },
+      'hungary': { code: 'hu', emoji: '🇭🇺' }, 'romania': { code: 'ro', emoji: '🇷🇴' },
+      'slovakia': { code: 'sk', emoji: '🇸🇰' }, 'slovenia': { code: 'si', emoji: '🇸🇮' },
+      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
+      'republic of ireland': { code: 'ie', emoji: '🇮🇪' }, 'ireland': { code: 'ie', emoji: '🇮🇪' },
+      'finland': { code: 'fi', emoji: '🇫🇮' }, 'turkey': { code: 'tr', emoji: '🇹🇷' },
+      'greece': { code: 'gr', emoji: '🇬🇷' }, 'russia': { code: 'ru', emoji: '🇷🇺' },
+      'china': { code: 'cn', emoji: '🇨🇳' }, 'indonesia': { code: 'id', emoji: '🇮🇩' },
+      'thailand': { code: 'th', emoji: '🇹🇭' }, 'uzbekistan': { code: 'uz', emoji: '🇺🇿' },
+      'iraq': { code: 'iq', emoji: '🇮🇶' }, 'jordan': { code: 'jo', emoji: '🇯🇴' },
+      'bahrain': { code: 'bh', emoji: '🇧🇭' }, 'kuwait': { code: 'kw', emoji: '🇰🇼' },
+      'lebanon': { code: 'lb', emoji: '🇱🇧' }, 'syria': { code: 'sy', emoji: '🇸🇾' },
+      'oman': { code: 'om', emoji: '🇴🇲' }, 'emirates': { code: 'ae', emoji: '🇦🇪' },
+      'united arab emirates': { code: 'ae', emoji: '🇦🇪' }, 'uae': { code: 'ae', emoji: '🇦🇪' },
+      'south africa': { code: 'za', emoji: '🇿🇦' }, 'dr congo': { code: 'cd', emoji: '🇨🇩' },
+      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
+      'burkina faso': { code: 'bf', emoji: '🇧🇫' }, 'guinea': { code: 'gn', emoji: '🇬🇳' },
+      'zambia': { code: 'zm', emoji: '🇿🇲' }, 'equatorial guinea': { code: 'gq', emoji: '🇬🇶' },
+      'gabon': { code: 'ga', emoji: '🇬🇦' }, 'angola': { code: 'ao', emoji: '🇦🇴' },
+      'tanzania': { code: 'tz', emoji: '🇹🇿' }, 'uganda': { code: 'ug', emoji: '🇺🇬' },
+      'kenya': { code: 'ke', emoji: '🇰🇪' }, 'zimbabwe': { code: 'zw', emoji: '🇿🇼' },
+      'namibia': { code: 'na', emoji: '🇳🇦' }, 'mauritania': { code: 'mr', emoji: '🇲🇷' },
+      'libya': { code: 'ly', emoji: '🇱🇾' }, 'sudan': { code: 'sd', emoji: '🇸🇩' },
+      'ethiopia': { code: 'et', emoji: '🇪🇹' }, 'india': { code: 'in', emoji: '🇮🇳' },
+      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' },
+      'turkmenistan': { code: 'tm', emoji: '🇹🇲' }, 'philippines': { code: 'ph', emoji: '🇵🇭' },
+      'vietnam': { code: 'vn', emoji: '🇻🇳' }, 'malaysia': { code: 'my', emoji: '🇲🇾' },
+      'singapore': { code: 'sg', emoji: '🇸🇬' }, 'tbd': { code: null, emoji: '❓' },
+      'to be determined': { code: null, emoji: '❓' }, 'tbc': { code: null, emoji: '❓' }
+    }
+
+    function getFlag(name) {
+      const key = (name || '').toLowerCase().trim()
+      const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
+      return {
+        emoji: mapped.emoji,
+        img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null
+      }
+    }
+
+    function flagHtml(name, size = 24) {
+      const f = getFlag(name)
+      if (f.img) {
+        return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" class="rounded-sm shadow-sm inline-block object-cover" style="border:1px solid #EEEDE7">`
+      }
+      return `<span class="text-xl">${f.emoji}</span>`
+    }
+
     // ============== PWA ==============
     let deferredPrompt = null
     window.addEventListener('beforeinstallprompt', e => {
@@ -598,43 +695,148 @@
     document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') hideModal() })
 
     // ============== AUTH UI ==============
-    function togglePassword() {
-      const input = document.getElementById('password')
-      document.getElementById('eye-icon').classList.toggle('hidden')
-      document.getElementById('eye-slash-icon').classList.toggle('hidden')
-      input.type = input.type === 'password' ? 'text' : 'password'
-    }
-    function loadRememberedEmail() {
-      const r = localStorage.getItem('remembered-email')
-      if (r) { document.getElementById('email').value = r; document.getElementById('remember-me').checked = true }
-    }
-    function saveRememberMe(email, checked) {
-      if (checked) localStorage.setItem('remembered-email', email)
-      else localStorage.removeItem('remembered-email')
-    }
+let authMode = 'login' // 'login' | 'signup'
 
-    // ============== STATE ==============
-    let fixtures = []
-    let predictions = []
-    const pendingPredictions = {}
+function togglePassword() {
+  const input = document.getElementById('password')
+  document.getElementById('eye-icon').classList.toggle('hidden')
+  document.getElementById('eye-slash-icon').classList.toggle('hidden')
+  input.type = input.type === 'password' ? 'text' : 'password'
+}
 
-    // ============== INIT ==============
-    async function init() {
-      loadRememberedEmail()
-      const auth = await initAuth()
-      auth ? showApp() : showAuth()
-    }
+function toggleConfirmPassword() {
+  const input = document.getElementById('confirm-password')
+  document.getElementById('confirm-eye-icon').classList.toggle('hidden')
+  document.getElementById('confirm-eye-slash-icon').classList.toggle('hidden')
+  input.type = input.type === 'password' ? 'text' : 'password'
+}
 
-   document.getElementById('auth-form').addEventListener('submit', async (e) => {
+function loadRememberedEmail() {
+  const r = localStorage.getItem('remembered-email')
+  if (r) {
+    document.getElementById('email').value = r
+    document.getElementById('remember-me').checked = true
+    // Trigger the existence check for pre-filled emails
+    handleEmailBlur()
+  }
+}
+
+function saveRememberMe(email, checked) {
+  if (checked) localStorage.setItem('remembered-email', email)
+  else localStorage.removeItem('remembered-email')
+}
+
+// Check if email is already registered
+async function handleEmailBlur() {
+  const email = document.getElementById('email').value.trim()
+  if (!email || !email.includes('@')) return
+
+  const { exists, error } = await checkEmailExists(email)
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const submitBtn = document.getElementById('auth-submit-btn')
+  const subtitle = document.getElementById('auth-subtitle')
+
+  // If RLS/network error, don't flip the UI — stay in default state
+  if (error && !exists) {
+    console.warn('Could not check email existence:', error)
+    return
+  }
+
+  if (exists) {
+    authMode = 'login'
+    confirmWrap.classList.add('hidden')
+    document.getElementById('confirm-password').required = false
+    submitBtn.textContent = 'Sign In'
+    subtitle.textContent = 'Welcome back! Enter your password.'
+  } else {
+    authMode = 'signup'
+    confirmWrap.classList.remove('hidden')
+    document.getElementById('confirm-password').required = true
+    submitBtn.textContent = 'Create Account'
+    subtitle.textContent = 'New here? Create your account below.'
+  }
+}
+
+// Wire up blur detection
+document.getElementById('email').addEventListener('blur', handleEmailBlur)
+
+// Helper: show the signup UI (confirm password field)
+function switchToSignupUI(subtitleMsg) {
+  authMode = 'signup'
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const confirmInput = document.getElementById('confirm-password')
+  confirmWrap.classList.remove('hidden')
+  confirmInput.required = true
+  document.getElementById('auth-submit-btn').textContent = 'Create Account'
+  if (subtitleMsg) document.getElementById('auth-subtitle').textContent = subtitleMsg
+  confirmInput.focus()
+}
+
+// Helper: show the login UI
+function switchToLoginUI() {
+  authMode = 'login'
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const confirmInput = document.getElementById('confirm-password')
+  confirmWrap.classList.add('hidden')
+  confirmInput.required = false
+  document.getElementById('auth-submit-btn').textContent = 'Sign In'
+}
+
+// Form submission
+document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault()
   const email = document.getElementById('email').value.trim()
   const password = document.getElementById('password').value
   const remember = document.getElementById('remember-me').checked
-  const { error } = await signInOrSignUp(email, password)
-  if (error) {
-    showToast(error.message, 'error')
-    return
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const confirmVisible = !confirmWrap.classList.contains('hidden')
+
+  // Path A: confirm-password field is visible => user is creating an account
+  if (confirmVisible) {
+    const confirmPassword = document.getElementById('confirm-password').value
+    if (password !== confirmPassword) {
+      showToast('Passwords do not match', 'error')
+      return
+    }
+    if (password.length < 6) {
+      showToast('Password must be at least 6 characters', 'error')
+      return
+    }
+
+    const { error } = await signUpUser(email, password)
+    if (error) {
+      if (error.message.includes('already registered') || error.message.includes('already exists')) {
+        showToast('Account already exists. Please sign in.', 'info')
+        switchToLoginUI()
+        return
+      }
+      showToast(error.message, 'error')
+      return
+    }
+  } else {
+    // Path B: login form. Try sign-in first.
+    const { error } = await signInUser(email, password)
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      // If credentials are invalid, the email might not exist yet.
+      // Re-check existence; if it's a new email, prompt to confirm password
+      // so we can create the account. This handles both the race condition
+      // (blur check didn't finish before submit) and RLS blocking the check.
+      if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+        const { exists } = await checkEmailExists(email)
+        if (!exists) {
+          switchToSignupUI('New here? Confirm your password to create your account.')
+          showToast('No account found — confirm your password to create one', 'info')
+          return
+        }
+        showToast('Wrong password. Please try again.', 'error')
+        return
+      }
+      showToast(error.message, 'error')
+      return
+    }
   }
+
   saveRememberMe(email, remember)
   await showApp()
 })
@@ -663,7 +865,7 @@
     // ============== PAYMENT GATE ==============
     let pendingPaymentFile = null
 
-    function showPaymentGate() {
+        function showPaymentGate() {
       document.getElementById('app-main').classList.add('hidden')
       document.getElementById('app-nav').classList.add('hidden')
       const gate = document.getElementById('payment-gate')
@@ -672,9 +874,31 @@
       loadGateFee()
       const profile = getProfile()
       if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
-        document.getElementById('upload-section').classList.add('hidden')
+        document.getElementById('payment-form-content').classList.add('hidden')
         document.getElementById('pending-state').classList.remove('hidden')
+      } else {
+        document.getElementById('payment-form-content').classList.remove('hidden')
+        document.getElementById('pending-state').classList.add('hidden')
       }
+      setupPaymentRealtime()
+    }
+
+        function setupPaymentRealtime() {
+      const user = getUser()
+      if (!user) return
+      supabaseClient.channel('payment-status-' + user.id)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        }, (payload) => {
+          if (payload.new?.fee_paid === true && payload.old?.fee_paid !== true) {
+            showToast('Payment verified! Welcome aboard.', 'success')
+            showNormalApp().then(() => switchTab('home'))
+          }
+        })
+        .subscribe()
     }
 
     async function showNormalApp() {
@@ -791,8 +1015,8 @@
           await supabaseClient.from('profiles').update({ payment_proof_url: publicUrl }).eq('id', user.id)
         }
 
-        showToast('Payment proof submitted!', 'success')
-        document.getElementById('upload-section').classList.add('hidden')
+                showToast('Payment proof submitted!', 'success')
+        document.getElementById('payment-form-content').classList.add('hidden')
         document.getElementById('pending-state').classList.remove('hidden')
       } catch (e) {
         console.error(e)
@@ -822,6 +1046,11 @@
         showToast('Still pending admin verification.', 'info')
       }
     }
+
+    // ============== STATE ==============
+let fixtures = []
+let predictions = []
+let pendingPredictions = {}
 
     // ============== FIXTURES ==============
     async function loadFixtures() {
@@ -871,7 +1100,10 @@
 
           <div class="flex items-center gap-3 mb-3">
             <div class="flex-1 text-center min-w-0">
-              <div class="font-bold text-[15px] truncate">${f.home_team}</div>
+              <div class="flex flex-col items-center gap-1">
+                ${flagHtml(f.home_team, 32)}
+                <div class="font-bold text-[15px] truncate">${f.home_team}</div>
+              </div>
               <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -880,7 +1112,10 @@
                 : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
             </div>
             <div class="flex-1 text-center min-w-0">
-              <div class="font-bold text-[15px] truncate">${f.away_team}</div>
+              <div class="flex flex-col items-center gap-1">
+                ${flagHtml(f.away_team, 32)}
+                <div class="font-bold text-[15px] truncate">${f.away_team}</div>
+              </div>
               <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
             </div>
           </div>
@@ -996,11 +1231,13 @@
             <div class="p-5">
               <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-4">${f.stage}</div>
               <div class="flex items-center justify-between mb-4">
-                <div class="flex-1 text-center">
+                <div class="flex-1 text-center flex flex-col items-center gap-1">
+                  ${flagHtml(f.home_team, 40)}
                   <div class="font-bold text-lg truncate">${f.home_team}</div>
                 </div>
                 <div class="px-3 text-ink-300 font-bold text-sm">VS</div>
-                <div class="flex-1 text-center">
+                <div class="flex-1 text-center flex flex-col items-center gap-1">
+                  ${flagHtml(f.away_team, 40)}
                   <div class="font-bold text-lg truncate">${f.away_team}</div>
                 </div>
               </div>
@@ -1031,9 +1268,18 @@
           const pts = pred?.points_awarded || 0
           return `
           <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
-            <div class="flex-1 min-w-0">
-              <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-400 font-normal">${f.home_score}–${f.away_score}</span> ${f.away_team}</div>
-              <div class="text-xs text-ink-500 mt-0.5">${pred ? `You: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
+            <div class="flex items-center gap-2 shrink-0">
+              ${flagHtml(f.home_team, 28)}
+              <span class="font-bold text-sm">${f.home_score}</span>
+            </div>
+            <span class="text-ink-300 text-xs font-bold">–</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-bold text-sm">${f.away_score}</span>
+              ${flagHtml(f.away_team, 28)}
+            </div>
+            <div class="flex-1 min-w-0 ml-1">
+              <div class="font-semibold text-sm truncate">${f.home_team} vs ${f.away_team}</div>
+              <div class="text-xs text-ink-500 mt-0.5">${pred ? `You predicted: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
             </div>
             <div class="${pts > 0 ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-400'} text-xs font-bold px-2.5 py-1 rounded-full shrink-0">+${pts}</div>
           </div>`
@@ -1085,45 +1331,59 @@
     // ============== REALTIME ==============
     let prizePollInterval = null
 
-    function setupRealtime() {
-      // Leaderboard updates from predictions
-      supabaseClient.channel('lb')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'predictions' }, () => { 
-          loadLeaderboard(); loadFixtures(); loadHome() 
-        })
-        .subscribe((status) => { 
-          if (status !== 'SUBSCRIBED') console.log('LB channel status:', status) 
-        })
+   function setupRealtime() {
+  // 1) Predictions: ALL events (INSERT, UPDATE, DELETE)
+  //    Admin deleting a user/fixture wipes predictions → leaderboard must refresh
+  supabaseClient.channel('lb')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => { 
+      loadLeaderboard(); loadFixtures(); loadHome() 
+    })
+    .subscribe((status) => { 
+      if (status !== 'SUBSCRIBED') console.log('LB channel status:', status) 
+    })
 
-      // Fixture updates
-      supabaseClient.channel('fx')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, async () => { 
-          await loadFixtures()
-          loadLeaderboard()
-          loadHome()
-        })
-        .subscribe((status) => { 
-          if (status !== 'SUBSCRIBED') console.log('FX channel status:', status) 
-        })
+  // 2) Fixtures: ALL events (INSERT, UPDATE, DELETE)
+  //    Admin adds, deletes, or enters scores → everything refreshes
+  supabaseClient.channel('fx')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, async () => { 
+      await loadFixtures()
+      loadLeaderboard()
+      loadHome()
+    })
+    .subscribe((status) => { 
+      if (status !== 'SUBSCRIBED') console.log('FX channel status:', status) 
+    })
 
-      // Prize pool updates from profiles (fee_paid changes)
-      supabaseClient.channel('prize-pool')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-          console.log('[Realtime] Profile change detected:', payload.eventType, payload.new?.id)
-          loadHome()
-        })
-        .subscribe((status) => { 
-          console.log('[Realtime] Prize pool channel status:', status)
-        })
+  // 3) Profiles: ALL events (fee_paid, new user, user deleted, name changed)
+  //    Affects prize pool AND leaderboard rankings
+  supabaseClient.channel('prize-pool')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+      console.log('[Realtime] Profile change detected:', payload.eventType, payload.new?.id)
+      loadHome()
+      loadLeaderboard()
+    })
+    .subscribe((status) => { 
+      console.log('[Realtime] Prize pool channel status:', status)
+    })
 
-      // Fallback: poll prize pool every 10 seconds in case realtime fails
-      if (prizePollInterval) clearInterval(prizePollInterval)
-      prizePollInterval = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          loadHomePrizePoolOnly()
-        }
-      }, 10000)
+  // 4) Prize settings: ALL events (entry fee, manual override, currency)
+  //    Admin edits pool settings → home prize card updates instantly
+  supabaseClient.channel('prize-settings')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'prize_settings' }, () => {
+      loadHome()
+    })
+    .subscribe((status) => {
+      console.log('[Realtime] Prize settings channel status:', status)
+    })
+
+  // Fallback: poll prize pool every 10 seconds in case realtime fails
+  if (prizePollInterval) clearInterval(prizePollInterval)
+  prizePollInterval = setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadHomePrizePoolOnly()
     }
+  }, 10000)
+}
 
     // Lightweight prize pool refresh without re-rendering everything
     async function loadHomePrizePoolOnly() {

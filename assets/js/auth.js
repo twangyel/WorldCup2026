@@ -123,6 +123,69 @@ function getUser() { return currentUser }
 function getProfile() { return currentProfile }
 function isAdmin() { return currentProfile?.role === 'admin' }
 
+// =====================
+// AUTH HELPERS
+// =====================
+
+async function checkEmailExists(email) {
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single()
+
+    // PGRST116 = no rows returned (new user)
+    if (error && error.code === 'PGRST116') {
+        return { exists: false, error: null }
+    }
+    return { exists: !!data, error }
+}
+
+async function signInUser(email, password) {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
+    if (data?.session) {
+        currentUser = data.user
+        await loadProfile()
+        return { data, error: null }
+    }
+    return { data: null, error }
+}
+
+async function signUpUser(email, password) {
+    const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { data: { name: email.split('@')[0] } }
+    })
+
+    if (error) return { data: null, error }
+
+    if (!data.session) {
+        return {
+            data: null,
+            error: { message: 'Sign up succeeded but no session was returned. In Supabase, turn OFF "Confirm email" in Auth > Providers > Email.' }
+        }
+    }
+
+    currentUser = data.user
+    await loadProfile()
+    if (!currentProfile) {
+        const { data: newProfile } = await supabaseClient
+            .from('profiles')
+            .insert({
+                id: data.user.id,
+                email,
+                name: email.split('@')[0],
+                fee_paid: false,
+                role: 'user'
+            })
+            .select()
+            .single()
+        if (newProfile) currentProfile = newProfile
+    }
+    return { data, error: null }
+}
+
 async function updateProfile(updates) {
     if (!currentUser) return { error: new Error('Not authenticated') }
 

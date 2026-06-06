@@ -308,7 +308,7 @@
         <div class="card overflow-hidden">
           <div class="p-5 pb-3">
             <h2 class="font-bold text-lg tracking-tight">Enter Final Scores</h2>
-            <p class="text-xs text-ink-500 mt-0.5">Points calculate automatically.</p>
+            <p class="text-xs text-ink-500 mt-0.5">Points will calculate automatically.</p>
           </div>
           <div id="admin-fixtures" class="divide-y divide-paper-border"></div>
         </div>
@@ -364,6 +364,83 @@
   </div>
 
   <script>
+    // ============== FLAGS ==============
+    const FLAG_MAP = {
+      'argentina': { code: 'ar', emoji: '🇦🇷' }, 'brazil': { code: 'br', emoji: '🇧🇷' },
+      'canada': { code: 'ca', emoji: '🇨🇦' }, 'mexico': { code: 'mx', emoji: '🇲🇽' },
+      'usa': { code: 'us', emoji: '🇺🇸' }, 'france': { code: 'fr', emoji: '🇫🇷' },
+      'germany': { code: 'de', emoji: '🇩🇪' }, 'spain': { code: 'es', emoji: '🇪🇸' },
+      'portugal': { code: 'pt', emoji: '🇵🇹' }, 'england': { code: 'gb-eng', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      'netherlands': { code: 'nl', emoji: '🇳🇱' }, 'belgium': { code: 'be', emoji: '🇧🇪' },
+      'italy': { code: 'it', emoji: '🇮🇹' }, 'croatia': { code: 'hr', emoji: '🇭🇷' },
+      'uruguay': { code: 'uy', emoji: '🇺🇾' }, 'colombia': { code: 'co', emoji: '🇨🇴' },
+      'ecuador': { code: 'ec', emoji: '🇪🇨' }, 'chile': { code: 'cl', emoji: '🇨🇱' },
+      'paraguay': { code: 'py', emoji: '🇵🇾' }, 'peru': { code: 'pe', emoji: '🇵🇪' },
+      'bolivia': { code: 'bo', emoji: '🇧🇴' }, 'venezuela': { code: 've', emoji: '🇻🇪' },
+      'japan': { code: 'jp', emoji: '🇯🇵' }, 'south korea': { code: 'kr', emoji: '🇰🇷' },
+      'korea republic': { code: 'kr', emoji: '🇰🇷' }, 'australia': { code: 'au', emoji: '🇦🇺' },
+      'iran': { code: 'ir', emoji: '🇮🇷' }, 'saudi arabia': { code: 'sa', emoji: '🇸🇦' },
+      'qatar': { code: 'qa', emoji: '🇶🇦' }, 'morocco': { code: 'ma', emoji: '🇲🇦' },
+      'senegal': { code: 'sn', emoji: '🇸🇳' }, 'tunisia': { code: 'tn', emoji: '🇹🇳' },
+      'algeria': { code: 'dz', emoji: '🇩🇿' }, 'egypt': { code: 'eg', emoji: '🇪🇬' },
+      'nigeria': { code: 'ng', emoji: '🇳🇬' }, 'cameroon': { code: 'cm', emoji: '🇨🇲' },
+      'ghana': { code: 'gh', emoji: '🇬🇭' }, 'ivory coast': { code: 'ci', emoji: '🇨🇮' },
+      "côte d'ivoire": { code: 'ci', emoji: '🇨🇮' }, 'costa rica': { code: 'cr', emoji: '🇨🇷' },
+      'panama': { code: 'pa', emoji: '🇵🇦' }, 'honduras': { code: 'hn', emoji: '🇭🇳' },
+      'jamaica': { code: 'jm', emoji: '🇯🇲' }, 'new zealand': { code: 'nz', emoji: '🇳🇿' },
+      'ukraine': { code: 'ua', emoji: '🇺🇦' }, 'poland': { code: 'pl', emoji: '🇵🇱' },
+      'wales': { code: 'gb-wls', emoji: '🏴󠁧󠁢󠁷󠁬󠁳󠁿' }, 'scotland': { code: 'gb-sct', emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+      'serbia': { code: 'rs', emoji: '🇷🇸' }, 'switzerland': { code: 'ch', emoji: '🇨🇭' },
+      'denmark': { code: 'dk', emoji: '🇩🇰' }, 'sweden': { code: 'se', emoji: '🇸🇪' },
+      'norway': { code: 'no', emoji: '🇳🇴' }, 'austria': { code: 'at', emoji: '🇦🇹' },
+      'czech republic': { code: 'cz', emoji: '🇨🇿' }, 'czechia': { code: 'cz', emoji: '🇨🇿' },
+      'hungary': { code: 'hu', emoji: '🇭🇺' }, 'romania': { code: 'ro', emoji: '🇷🇴' },
+      'slovakia': { code: 'sk', emoji: '🇸🇰' }, 'slovenia': { code: 'si', emoji: '🇸🇮' },
+      'bosnia and herzegovina': { code: 'ba', emoji: '🇧🇦' }, 'northern ireland': { code: 'gb-nir', emoji: '🇬🇧' },
+      'republic of ireland': { code: 'ie', emoji: '🇮🇪' }, 'ireland': { code: 'ie', emoji: '🇮🇪' },
+      'finland': { code: 'fi', emoji: '🇫🇮' }, 'turkey': { code: 'tr', emoji: '🇹🇷' },
+      'greece': { code: 'gr', emoji: '🇬🇷' }, 'russia': { code: 'ru', emoji: '🇷🇺' },
+      'china': { code: 'cn', emoji: '🇨🇳' }, 'indonesia': { code: 'id', emoji: '🇮🇩' },
+      'thailand': { code: 'th', emoji: '🇹🇭' }, 'uzbekistan': { code: 'uz', emoji: '🇺🇿' },
+      'iraq': { code: 'iq', emoji: '🇮🇶' }, 'jordan': { code: 'jo', emoji: '🇯🇴' },
+      'bahrain': { code: 'bh', emoji: '🇧🇭' }, 'kuwait': { code: 'kw', emoji: '🇰🇼' },
+      'lebanon': { code: 'lb', emoji: '🇱🇧' }, 'syria': { code: 'sy', emoji: '🇸🇾' },
+      'oman': { code: 'om', emoji: '🇴🇲' }, 'emirates': { code: 'ae', emoji: '🇦🇪' },
+      'united arab emirates': { code: 'ae', emoji: '🇦🇪' }, 'uae': { code: 'ae', emoji: '🇦🇪' },
+      'south africa': { code: 'za', emoji: '🇿🇦' }, 'dr congo': { code: 'cd', emoji: '🇨🇩' },
+      'democratic republic of congo': { code: 'cd', emoji: '🇨🇩' }, 'mali': { code: 'ml', emoji: '🇲🇱' },
+      'burkina faso': { code: 'bf', emoji: '🇧🇫' }, 'guinea': { code: 'gn', emoji: '🇬🇳' },
+      'zambia': { code: 'zm', emoji: '🇿🇲' }, 'equatorial guinea': { code: 'gq', emoji: '🇬🇶' },
+      'gabon': { code: 'ga', emoji: '🇬🇦' }, 'angola': { code: 'ao', emoji: '🇦🇴' },
+      'tanzania': { code: 'tz', emoji: '🇹🇿' }, 'uganda': { code: 'ug', emoji: '🇺🇬' },
+      'kenya': { code: 'ke', emoji: '🇰🇪' }, 'zimbabwe': { code: 'zw', emoji: '🇿🇼' },
+      'namibia': { code: 'na', emoji: '🇳🇦' }, 'mauritania': { code: 'mr', emoji: '🇲🇷' },
+      'libya': { code: 'ly', emoji: '🇱🇾' }, 'sudan': { code: 'sd', emoji: '🇸🇩' },
+      'ethiopia': { code: 'et', emoji: '🇪🇹' }, 'india': { code: 'in', emoji: '🇮🇳' },
+      'tajikistan': { code: 'tj', emoji: '🇹🇯' }, 'kyrgyzstan': { code: 'kg', emoji: '🇰🇬' },
+      'turkmenistan': { code: 'tm', emoji: '🇹🇲' }, 'philippines': { code: 'ph', emoji: '🇵🇭' },
+      'vietnam': { code: 'vn', emoji: '🇻🇳' }, 'malaysia': { code: 'my', emoji: '🇲🇾' },
+      'singapore': { code: 'sg', emoji: '🇸🇬' }, 'tbd': { code: null, emoji: '❓' },
+      'to be determined': { code: null, emoji: '❓' }, 'tbc': { code: null, emoji: '❓' }
+    }
+
+    function getFlag(name) {
+      const key = (name || '').toLowerCase().trim()
+      const mapped = FLAG_MAP[key] || { code: null, emoji: '🏳️' }
+      return {
+        emoji: mapped.emoji,
+        img: mapped.code ? `https://flagcdn.com/w40/${mapped.code}.png` : null
+      }
+    }
+
+    function flagHtml(name, size = 24) {
+      const f = getFlag(name)
+      if (f.img) {
+        return `<img src="${f.img}" alt="${name}" width="${size}" height="${size}" class="rounded-sm shadow-sm inline-block object-cover" style="border:1px solid #EEEDE7">`
+      }
+      return `<span class="text-xl">${f.emoji}</span>`
+    }
+
     // ============== STATE ==============
     let allFixtures = []
     let allUsers = []
@@ -862,7 +939,11 @@
         <div class="px-5 py-4 space-y-3">
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
-              <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-300">vs</span> ${f.away_team}</div>
+              <div class="font-semibold text-sm truncate flex items-center gap-2">
+                ${flagHtml(f.home_team, 20)} ${f.home_team}
+                <span class="text-ink-300">vs</span>
+                ${flagHtml(f.away_team, 20)} ${f.away_team}
+              </div>
               <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}</div>
             </div>
             <button onclick="confirmDeleteFixture('${f.id}')" class="text-ink-400 hover:text-red-500 p-1.5 tap shrink-0">
@@ -982,7 +1063,11 @@
       list.innerHTML = displayFixtures.map(f => `
         <div class="px-5 py-4">
           <div class="mb-3">
-            <div class="font-semibold text-sm truncate">${f.home_team} <span class="text-ink-300">vs</span> ${f.away_team}</div>
+            <div class="font-semibold text-sm truncate flex items-center gap-2">
+              ${flagHtml(f.home_team, 20)} ${f.home_team}
+              <span class="text-ink-300">vs</span>
+              ${flagHtml(f.away_team, 20)} ${f.away_team}
+            </div>
             <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <div class="flex items-center gap-2">
