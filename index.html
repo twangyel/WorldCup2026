@@ -110,6 +110,12 @@
     .install-slide { animation: slideDown 400ms cubic-bezier(0.32, 0.72, 0, 1); }
     @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     /* Tab fade */
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -250,6 +256,7 @@
     }
     .enter-league-btn:hover { filter: brightness(1.08); }
   </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -1600,7 +1607,7 @@ let pendingPredictions = {}
         <div class="flex-1 text-center min-w-0">
           <div class="flex flex-col items-center gap-1 w-full">
             ${flagHtml(f.home_team, 32)}
-            <div class="font-bold text-[15px] truncate w-full">${f.home_team}</div>
+            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.home_team}</div>
           </div>
           <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
         </div>
@@ -1612,7 +1619,7 @@ let pendingPredictions = {}
         <div class="flex-1 text-center min-w-0">
           <div class="flex flex-col items-center gap-1 w-full">
             ${flagHtml(f.away_team, 32)}
-            <div class="font-bold text-[15px] truncate w-full">${f.away_team}</div>
+            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.away_team}</div>
           </div>
           <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
         </div>
@@ -1765,12 +1772,12 @@ let pendingPredictions = {}
           <div class="flex items-center justify-between mb-4">
          <div class="flex-1 text-center flex flex-col items-center gap-1">
   ${flagHtml(f.home_team, 40)}
-  <div class="font-bold text-lg truncate w-full">${f.home_team}</div>
+  <div class="font-bold text-lg line-clamp-2 leading-tight w-full">${f.home_team}</div>
 </div>
             <div class="px-3 text-ink-300 font-bold text-sm">VS</div>
           <div class="flex-1 text-center flex flex-col items-center gap-1">
   ${flagHtml(f.away_team, 40)}
-  <div class="font-bold text-lg truncate w-full">${f.away_team}</div>
+  <div class="font-bold text-lg line-clamp-2 leading-tight w-full">${f.away_team}</div>
 </div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium pb-1">
@@ -1810,7 +1817,7 @@ let pendingPredictions = {}
           ${flagHtml(f.away_team, 28)}
         </div>
         <div class="flex-1 min-w-0 ml-1">
-          <div class="font-semibold text-sm truncate">${f.home_team} vs ${f.away_team}</div>
+          <div class="font-semibold text-sm line-clamp-2 leading-tight">${f.home_team} vs ${f.away_team}</div>
           <div class="text-xs text-ink-500 mt-0.5">${pred ? `You predicted: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
         </div>
         <div class="${pts > 0 ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-400'} text-xs font-bold px-2.5 py-1 rounded-full shrink-0">+${pts}</div>
