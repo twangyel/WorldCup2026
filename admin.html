@@ -219,11 +219,12 @@
           </div>
         </div>
         <div class="card overflow-hidden">
-          <div class="p-5 pb-3 flex items-center justify-between">
+          <div class="p-5 pb-3 flex items-center justify-between gap-3">
             <div>
               <h2 class="font-bold text-lg tracking-tight">Members</h2>
               <p class="text-xs text-ink-500 mt-0.5" id="user-stats">— total · — paid</p>
             </div>
+            <button onclick="openBulkPaidMenu()" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap bg-paper border border-paper-border text-ink-700 shrink-0">Bulk ▾</button>
           </div>
           <div id="users-list" class="divide-y divide-paper-border"></div>
         </div>
@@ -947,6 +948,76 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
     }
 
+    // ===== Bulk paid actions =====
+    function openBulkPaidMenu() {
+      const filterLabel = usersFilter ? ` (filtered: "${usersFilter}")` : ''
+      const targetUsers = usersFilter
+        ? allUsers.filter(u =>
+            (u.name || '').toLowerCase().includes(usersFilter) ||
+            (u.email || '').toLowerCase().includes(usersFilter) ||
+            (u.department || '').toLowerCase().includes(usersFilter) ||
+            (u.phone || '').toLowerCase().includes(usersFilter))
+        : allUsers
+      const unpaidCount = targetUsers.filter(u => !u.fee_paid).length
+      const paidCount = targetUsers.filter(u => u.fee_paid).length
+
+      showModal({
+        icon: '💰',
+        title: `Bulk update${filterLabel}`,
+        message: `${targetUsers.length} member(s) in scope. ${unpaidCount} unpaid, ${paidCount} paid.`,
+        actions: [
+          { text: `Mark ${unpaidCount} paid`, onclick: `hideModal(); bulkSetFeePaid(true)`, class: 'bg-brand-500 text-white' },
+          { text: `Mark ${paidCount} unpaid`, onclick: `hideModal(); bulkSetFeePaid(false)`, class: 'bg-paper border border-paper-border text-ink-700' }
+        ]
+      })
+    }
+
+    async function bulkSetFeePaid(paid) {
+      if (typeof setFeePaid !== 'function') { showToast('setFeePaid helper missing', 'error'); return }
+      const scope = usersFilter
+        ? allUsers.filter(u =>
+            (u.name || '').toLowerCase().includes(usersFilter) ||
+            (u.email || '').toLowerCase().includes(usersFilter) ||
+            (u.department || '').toLowerCase().includes(usersFilter) ||
+            (u.phone || '').toLowerCase().includes(usersFilter))
+        : allUsers
+      const toUpdate = scope.filter(u => u.fee_paid !== paid)
+      if (!toUpdate.length) { showToast('Nothing to update', 'info'); return }
+
+      // Confirm before mass-changing
+      showModal({
+        icon: paid ? '✅' : '↩️',
+        title: paid ? `Mark ${toUpdate.length} as paid?` : `Mark ${toUpdate.length} as unpaid?`,
+        message: paid
+          ? 'This will count them all toward the prize pool.'
+          : 'This will remove them from the prize pool count.',
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Apply', onclick: `hideModal(); applyBulkFeePaid(${paid})`, class: paid ? 'bg-brand-500 text-white' : 'bg-red-600 text-white' }
+        ]
+      })
+    }
+
+    async function applyBulkFeePaid(paid) {
+      const scope = usersFilter
+        ? allUsers.filter(u =>
+            (u.name || '').toLowerCase().includes(usersFilter) ||
+            (u.email || '').toLowerCase().includes(usersFilter) ||
+            (u.department || '').toLowerCase().includes(usersFilter) ||
+            (u.phone || '').toLowerCase().includes(usersFilter))
+        : allUsers
+      const toUpdate = scope.filter(u => u.fee_paid !== paid)
+      let ok = 0, fail = 0
+      for (const u of toUpdate) {
+        const { error } = await setFeePaid(u.id, paid)
+        if (error) { fail++; continue }
+        u.fee_paid = paid
+        ok++
+      }
+      renderUsers(); renderPrize()
+      showToast(`${ok} updated${fail ? `, ${fail} failed` : ''}`, fail ? 'warning' : 'success')
+    }
+
         // FORCE override removeUser — deletes auth user via Edge Function, then cleans up data
     window.removeUser = async function(id) {
       try {
@@ -1223,6 +1294,28 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     function confirmSaveScore(id) {
       const s = pendingScores[id] || {}
       if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
+
+      const f = allFixtures.find(x => x.id === id)
+      const alreadyScored = f && f.home_score !== null && f.home_score !== undefined &&
+                                 f.away_score !== null && f.away_score !== undefined
+
+      // If this fixture already has a final score, this is an EDIT — points will be
+      // recomputed for every prediction. Make the admin acknowledge that explicitly.
+      if (alreadyScored) {
+        const newHome = s.home !== undefined ? s.home : f.home_score
+        const newAway = s.away !== undefined ? s.away : f.away_score
+        showModal({
+          icon: '⚠️',
+          title: 'Overwrite final score?',
+          message: `${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team} is already saved. Changing it to ${newHome}–${newAway} will recalculate points for every prediction on this match.`,
+          actions: [
+            { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+            { text: 'Overwrite', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-red-600 text-white' }
+          ]
+        })
+        return
+      }
+
       showModal({
         icon: '⚽', title: 'Confirm score?', message: 'Points will be calculated and pushed to all players in real time.',
         actions: [
@@ -1304,12 +1397,20 @@ async function executeSaveScore(id) {
     }
 
 
-    // Fallback prize settings helpers if auth.js doesn't provide them
+    // Fallback prize settings helpers if auth.js doesn't provide them.
+    // IMPORTANT: these read/write the `prize_settings` table directly so the
+    // admin panel and the player app never disagree about the pool/entry fee.
+    // (Earlier versions used localStorage here, which caused the admin's view
+    //  to drift from what players saw on index.html.)
     if (typeof setPrizeSettings !== 'function') {
       window.setPrizeSettings = async function(payload) {
         try {
-          localStorage.setItem('wc_prize_settings', JSON.stringify({ id: 1, ...payload }))
-          return { data: payload, error: null }
+          const { data, error } = await supabaseClient
+            .from('prize_settings')
+            .upsert({ id: 1, ...payload }, { onConflict: 'id' })
+            .select()
+            .single()
+          return { data, error }
         } catch (e) {
           return { data: null, error: e }
         }
@@ -1318,9 +1419,12 @@ async function executeSaveScore(id) {
     if (typeof getPrizeSettings !== 'function') {
       window.getPrizeSettings = async function() {
         try {
-          const raw = localStorage.getItem('wc_prize_settings')
-          const data = raw ? JSON.parse(raw) : null
-          return { data, error: null }
+          const { data, error } = await supabaseClient
+            .from('prize_settings')
+            .select('*')
+            .eq('id', 1)
+            .single()
+          return { data, error }
         } catch (e) {
           return { data: null, error: e }
         }

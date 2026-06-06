@@ -1953,22 +1953,29 @@ async function showApp() {
       }
     }
 
-    // Fallback: ensure getPrizePool works even if auth.js doesn't define it
+    // Fallback: ensure getPrizePool works even if auth.js doesn't define it.
+    // Always read settings from Supabase so the player view matches what the
+    // admin saved. (Previously this read from localStorage, which only
+    // contained the admin's own browser state — players saw stale/empty data.)
 if (typeof getPrizePool !== 'function') {
   window.getPrizePool = async function() {
     try {
-      const raw = localStorage.getItem('wc_prize_settings')
-      const settings = raw ? JSON.parse(raw) : { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0 }
+      const { data: settings } = await supabaseClient
+        .from('prize_settings')
+        .select('*')
+        .eq('id', 1)
+        .single()
+      const s = settings || { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0 }
       const { data: profiles, error } = await supabaseClient
         .from('profiles')
         .select('fee_paid')
         .eq('fee_paid', true)
       if (error) throw error
       const paidCount = profiles?.length || 0
-      const fee = Number(settings.entry_fee) || 0
-      const amount = settings.manual_override ? (Number(settings.manual_amount) || 0) : paidCount * fee
+      const fee = Number(s.entry_fee) || 0
+      const amount = s.manual_override ? (Number(s.manual_amount) || 0) : paidCount * fee
       return {
-        data: { amount, currency: settings.currency || 'Nu.', paid_count: paidCount },
+        data: { amount, currency: s.currency || 'Nu.', paid_count: paidCount },
         error: null
       }
     } catch (e) {
