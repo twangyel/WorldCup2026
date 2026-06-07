@@ -1,16 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- CRITICAL: Prevent white flash during PWA launch -->
-  <meta name="theme-color" content="#0A1628">
-  <style>
-    /* Force dark background BEFORE any content loads */
-    html, body { background-color: #0A1628 !important; }
-    /* Hide all content except splash until ready */
-    body > *:not(#loading-screen):not(#install-banner) { visibility: hidden; }
-    #loading-screen { visibility: visible !important; }
-  </style>
-
+  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>WC Predictions</title>
@@ -48,9 +39,7 @@
     }
   </script>
   <style>
-    html, body { background: #0A1628; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
-    body.app-ready { background: #FAFAF7 !important; }
-    body.app-ready > *:not(#loading-screen) { visibility: visible; }
+    html, body { background: #FAFAF7; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
     body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
     * { -webkit-font-smoothing: antialiased; }
 
@@ -709,7 +698,6 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -818,11 +806,7 @@
       setTimeout(() => {
         if (screen) {
           screen.classList.add('splash-exit');
-          setTimeout(() => {
-            screen.remove();
-            // Switch body to app background after splash exits
-            document.body.classList.add('app-ready');
-          }, 500);
+          setTimeout(() => screen.remove(), 500);
         }
       }, 400);
     }
@@ -3897,16 +3881,9 @@ if (typeof getPrizePool !== 'function') {
   }
 }
 
-    (async function() {
+  (async function() {
   await initAuth();
 
-  // After init() resolves, getUser() can still be null because auth.js
-  // (custom WhatsApp+password auth) may restore its in-memory user state
-  // asynchronously — sometimes via a microtask, sometimes from a fetch
-  // against the profiles table. We don't know the exact mechanism, so
-  // we poll for up to ~1.5s. This is what fixes the "logged out after
-  // returning from admin" bug: the session token is still in localStorage,
-  // we just have to wait a beat for auth.js to read it.
   async function waitForUser(maxMs = 1500, stepMs = 50) {
     const start = Date.now();
     while (Date.now() - start < maxMs) {
@@ -3917,9 +3894,6 @@ if (typeof getPrizePool !== 'function') {
     return (typeof getUser === 'function') ? getUser() : null;
   }
 
-  // Heuristic: if localStorage contains anything that looks like a saved
-  // session, it's worth waiting the full window. If not, we can show the
-  // login screen sooner.
   function looksLikeSavedSession() {
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -3940,11 +3914,14 @@ if (typeof getPrizePool !== 'function') {
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden')
-    await showApp(); if (typeof window.finishSplash === 'function') window.finishSplash();
+    await showApp();
   } else {
     if (typeof showAuth === 'function') showAuth();
     else if (typeof loadAuthStats === 'function') loadAuthStats();
   }
+
+  // ALWAYS finish the splash — whether logged in or not
+  if (typeof window.finishSplash === 'function') window.finishSplash();
 })();
   </script>
 </body>

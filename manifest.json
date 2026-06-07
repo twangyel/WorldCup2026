@@ -9,10 +9,16 @@
   "orientation": "portrait",
   "icons": [
     {
+      "src": "/image/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
       "src": "/image/pwa.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ],
   "categories": ["sports", "games"],
