@@ -1968,10 +1968,15 @@ async function updateProfileHeader() {
 
   const nameEl = document.getElementById('profile-header-name')
   const adminBadge = document.getElementById('profile-admin-badge')
+  const verifiedBadge = document.getElementById('profile-verified-badge')
   if (nameEl) nameEl.textContent = name
   if (adminBadge) {
     if (isAdmin()) adminBadge.classList.remove('hidden')
     else adminBadge.classList.add('hidden')
+  }
+  if (verifiedBadge) {
+    if (profile.fee_paid && !previewMode) verifiedBadge.classList.remove('hidden')
+    else verifiedBadge.classList.add('hidden')
   }
 
   const deptEl = document.getElementById('profile-header-dept')
@@ -2008,28 +2013,14 @@ async function updateProfileCards() {
 
   await updateProfileHeader()
 
-  const paidCard = document.getElementById('payment-status-card')
-  const pendingCard = document.getElementById('payment-pending-card')
-
-  if (!profile || previewMode) {
-    paidCard?.classList.add('hidden')
-    pendingCard?.classList.add('hidden')
-  } else if (profile.fee_paid) {
-    paidCard?.classList.remove('hidden')
-    pendingCard?.classList.add('hidden')
-    try {
-      const { data: ps } = await (getPrizeSettings?.() || Promise.resolve({ data: null }))
-      const fee = ps?.entry_fee || 500
-      const cur = ps?.currency || 'Nu.'
-      const amountEl = document.getElementById('payment-status-amount')
-      if (amountEl) amountEl.textContent = cur + ' ' + Number(fee).toLocaleString() + ' · Verified'
-    } catch (e) {}
-  } else if (profile.payment_proof_url || profile.payment_status === 'pending') {
-    paidCard?.classList.add('hidden')
-    pendingCard?.classList.remove('hidden')
-  } else {
-    paidCard?.classList.add('hidden')
-    pendingCard?.classList.add('hidden')
+  // Verified badge on profile header
+  const verifiedBadge = document.getElementById('profile-verified-badge')
+  if (verifiedBadge) {
+    if (profile?.fee_paid && !previewMode) {
+      verifiedBadge.classList.remove('hidden')
+    } else {
+      verifiedBadge.classList.add('hidden')
+    }
   }
 
   const shareCard = document.getElementById('share-rank-card')
@@ -2079,16 +2070,16 @@ async function updateProfileCards() {
 }
 
 function togglePredictionHistory() {
-  const content = document.getElementById('history-content')
+  const wrapper = document.getElementById('history-content-wrap')
   const chevron = document.getElementById('history-chevron')
-  const isHidden = content.classList.contains('hidden')
+  const isOpen = wrapper.classList.contains('open')
 
-  if (isHidden) {
-    content.classList.remove('hidden')
+  if (!isOpen) {
+    wrapper.classList.add('open')
     chevron.style.transform = 'rotate(180deg)'
     renderPredictionHistory()
   } else {
-    content.classList.add('hidden')
+    wrapper.classList.remove('open')
     chevron.style.transform = 'rotate(0deg)'
   }
 }
