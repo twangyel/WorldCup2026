@@ -990,6 +990,26 @@
     </div>
   </div>
 
+    <!-- Create League Modal -->
+  <div id="league-modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+    <div id="league-modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+      <div class="text-4xl text-center mb-3">🏆</div>
+      <h3 class="text-xl font-bold text-center mb-2">Create Private League</h3>
+      <p class="text-sm text-ink-500 text-center mb-6">Invite friends and compete in your own mini-leaderboard.</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">League Name</label>
+          <input type="text" id="new-league-name" placeholder="e.g. Office Squad" 
+            class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+        </div>
+        <button onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
+        <button onclick="hideLeagueModal()" class="w-full bg-paper border border-paper-border text-ink-700 font-semibold py-4 rounded-2xl tap">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Rules & Regulations Sheet -->
 <div id="rules-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
   <div id="rules-panel" class="sheet-panel bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-lifted max-h-[90vh] flex flex-col">
@@ -1462,6 +1482,26 @@
         <div class="text-xl font-bold text-white" id="profile-header-predictions">—</div>
         <div class="text-[10px] text-white/40 uppercase tracking-wider font-semibold mt-0.5">Predictions</div>
       </div>
+    </div>
+  </div>
+
+    <!-- My Leagues Card -->
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold tracking-tight">My Leagues</h3>
+      <button onclick="showCreateLeagueModal()" class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">+ Create</button>
+    </div>
+    
+    <!-- Join by code -->
+    <div class="flex gap-2 mb-4">
+      <input type="text" id="league-join-code" placeholder="Enter invite code" 
+        class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-paper text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+      <button onclick="handleJoinLeague()" class="bg-ink-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm">Join</button>
+    </div>
+    
+    <!-- League list -->
+    <div id="my-leagues-list" class="space-y-2">
+      <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
     </div>
   </div>
 
