@@ -25,7 +25,7 @@ self.addEventListener('activate', event => {
 })
 
 self.addEventListener('fetch', event => {
-  // Network-first for HTML and JS (so updates show immediately)
+  // Network-first for HTML and JS (instant updates)
   if (event.request.mode === 'navigate' || event.request.url.match(/\.(html|js)$/)) {
     event.respondWith(
       fetch(event.request)
@@ -39,21 +39,26 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Special handling for the root page (/) so the black background NEVER shows
+  // === CRITICAL: Prevent black background from EVER showing ===
+  // Only show black for 50ms max (then instantly replace with gradient)
   if (event.request.url === self.origin || event.request.url.endsWith('/')) {
     event.respondWith(
-      fetch(event.request)
-        .then(res => {
-          const clone = res.clone()
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
-          return res
-        })
-        .catch(() => new Response(null, { status: 204 }))
+      new Promise(resolve => {
+        setTimeout(() => {
+          fetch(event.request)
+            .then(res => {
+              const clone = res.clone()
+              caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
+              resolve(res)
+            })
+            .catch(() => resolve(new Response(null, { status: 204 })))
+        }, 50) // 50ms max delay — instant flash prevention
+      })
     )
     return
   }
 
-  // Cache-first for everything else (images, manifest, etc.)
+  // Cache-first for images, manifest, etc.
   event.respondWith(
     caches.match(event.request).then(res => res || fetch(event.request))
   )
