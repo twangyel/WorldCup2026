@@ -549,141 +549,139 @@
     .enter-league-btn:hover { filter: brightness(1.08); }
 
     /* ========== SPLASH SCREEN ("The Tunnel") ========== */
-   /* ========== SPLASH SCREEN ("The Tunnel") ========== */
-.splash-screen {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #FAFAF7 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.5s;
-}
-.splash-screen.splash-exit {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
+    .splash-screen {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.5s;
+    }
+    .splash-screen.splash-exit {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
 
-/* Logo card — ensures contrast on any background */
-.splash-logo-wrap {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  margin-bottom: 32px;
-  background: #ffffff;
-  border-radius: 36px;
-  padding: 20px;
-  box-shadow: 0 12px 40px rgba(11, 18, 33, 0.10), 0 4px 12px rgba(11, 18, 33, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.splash-logo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  position: relative;
-  z-index: 2;
-  animation: breathe 3s ease-in-out infinite;
-  filter: drop-shadow(0 4px 20px rgba(212, 162, 76, 0.20));
-}
-/* Stronger radial glow behind the logo card */
-.splash-glow {
-  position: absolute;
-  inset: -30%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 162, 76, 0.25), transparent 70%);
-  animation: glowPulse 3s ease-in-out infinite;
-  z-index: 1;
-}
+    /* Ambient floating particles */
+    .splash-particles {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .splash-particles span {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(212, 162, 76, 0.25);
+      border-radius: 50%;
+      animation: particleFloat 8s ease-in-out infinite;
+    }
+    .splash-particles span:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 7s; }
+    .splash-particles span:nth-child(2) { left: 25%; top: 60%; animation-delay: 1s; animation-duration: 9s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(3) { left: 45%; top: 15%; animation-delay: 2s; animation-duration: 6s; }
+    .splash-particles span:nth-child(4) { left: 65%; top: 70%; animation-delay: 0.5s; animation-duration: 8s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(5) { left: 80%; top: 30%; animation-delay: 1.5s; animation-duration: 10s; }
+    .splash-particles span:nth-child(6) { left: 15%; top: 80%; animation-delay: 3s; animation-duration: 7s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(7) { left: 55%; top: 45%; animation-delay: 2.5s; animation-duration: 9s; }
+    .splash-particles span:nth-child(8) { left: 90%; top: 55%; animation-delay: 1s; animation-duration: 8s; width: 2px; height: 2px; }
+    @keyframes particleFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
+      50% { transform: translateY(-30px) scale(1.3); opacity: 0.7; }
+    }
 
-/* Ambient floating particles */
-.splash-particles {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.splash-particles span {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  background: rgba(212, 162, 76, 0.25);
-  border-radius: 50%;
-  animation: particleFloat 8s ease-in-out infinite;
-}
-/* ... keep your existing particle nth-child rules ... */
+    /* Logo container */
+    .splash-logo-wrap {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin-bottom: 32px;
+    }
+    .splash-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      position: relative;
+      z-index: 2;
+      animation: breathe 3s ease-in-out infinite;
+      filter: drop-shadow(0 4px 20px rgba(212, 162, 76, 0.15));
+    }
+    .splash-glow {
+      position: absolute;
+      inset: -20%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 162, 76, 0.18), transparent 70%);
+      animation: glowPulse 3s ease-in-out infinite;
+      z-index: 1;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
 
-/* Progress bar */
-.splash-progress-wrap {
-  width: 160px;
-  margin-bottom: 24px;
-}
-.splash-progress-track {
-  width: 100%;
-  height: 3px;
-  background: rgba(11, 18, 33, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.splash-progress-bar {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #D4A24C, #E8C878);
-  border-radius: 999px;
-  transition: width 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  box-shadow: 0 0 10px rgba(212, 162, 76, 0.35);
-}
+    /* Progress bar */
+    .splash-progress-wrap {
+      width: 160px;
+      margin-bottom: 24px;
+    }
+    .splash-progress-track {
+      width: 100%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .splash-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #D4A24C, #E8C878);
+      border-radius: 999px;
+      transition: width 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 0 8px rgba(212, 162, 76, 0.4);
+    }
 
-/* Rotating tip */
-.splash-tip {
-  color: #5C6B75;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: center;
-  max-width: 280px;
-  line-height: 1.5;
-  margin: 0;
-  transition: opacity 0.3s ease;
-  min-height: 40px;
-}
+    /* Rotating tip */
+    .splash-tip {
+      color: #6B7B8F;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.5;
+      margin: 0;
+      transition: opacity 0.3s ease;
+      min-height: 40px;
+    }
 
-/* Version text */
-.splash-version {
-  position: absolute;
-  bottom: 32px;
-  color: #B5BDC5;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+    /* Version text */
+    .splash-version {
+      position: absolute;
+      bottom: 32px;
+      color: rgba(255, 255, 255, 0.15);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
-@keyframes breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
-}
-@keyframes glowPulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
-@keyframes particleFloat {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
-  50% { transform: translateY(-30px) scale(1.3); opacity: 0.7; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .splash-logo, .splash-glow, .splash-particles span {
-    animation: none !important;
-  }
-  .splash-progress-bar {
-    transition: none;
-  }
-}
+    @media (prefers-reduced-motion: reduce) {
+      .splash-logo, .splash-glow, .splash-particles span {
+        animation: none !important;
+      }
+      .splash-progress-bar {
+        transition: none;
+      }
+    }
   </style>
 <base target="_blank">
 <base target="_blank">
