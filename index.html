@@ -864,26 +864,18 @@
   </div>
 
   <!-- ========== SPLASH SCREEN ("The Tunnel") ========== -->
-<!-- ========== CUSTOM SPLASH SCREEN ("The Tunnel") ========== -->
-<!-- ========== CUSTOM SPLASH SCREEN ("The Tunnel") ========== -->
-<div id="loading-screen" class="splash-screen" style="background:linear-gradient(180deg,#0a0a0a 0%,#1a1a1a 100%);">
-  <!-- Subtle ambient particles (gold glow) -->
+<div id="loading-screen" class="splash-screen">
+  <!-- Subtle ambient particles -->
   <div class="splash-particles" aria-hidden="true">
-    <span style="background:rgba(212,162,76,0.3);"></span>
-    <span style="background:rgba(212,162,76,0.25);"></span>
-    <span style="background:rgba(212,162,76,0.2);"></span>
-    <span style="background:rgba(212,162,76,0.35);"></span>
-    <span style="background:rgba(212,162,76,0.25);"></span>
-    <span style="background:rgba(212,162,76,0.28);"></span>
-    <span style="background:rgba(212,162,76,0.22);"></span>
-    <span style="background:rgba(212,162,76,0.30);"></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
   </div>
 
   <!-- Logo with breathing pulse -->
-  <div class="splash-logo-wrap" style="margin-bottom:32px;">
+  <div class="splash-logo-wrap">
     <img src="/image/player.png" alt="WC 2026" class="splash-logo">
-    <!-- Soft radial gold glow -->
-    <div class="splash-glow" aria-hidden="true" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;height:180px;background:radial-gradient(circle,rgba(212,162,76,0.35),transparent 70%);border-radius:50%;opacity:0.6;"></div>
+    <!-- Soft radial glow behind logo -->
+    <div class="splash-glow" aria-hidden="true"></div>
   </div>
 
   <!-- Progress bar -->
@@ -896,8 +888,8 @@
   <!-- Rotating trivia tip -->
   <p class="splash-tip" id="splash-tip">Loading your league…</p>
 
-  <!-- Version / build info -->
-  <div class="splash-version" style="color:rgba(255,255,255,0.12);">WC26 Prediction League</div>
+  <!-- Version / build info (subtle) -->
+  <div class="splash-version">WC26 Prediction League</div>
 </div>
 
 <script>
