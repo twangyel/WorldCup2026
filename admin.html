@@ -1446,7 +1446,7 @@ Good luck! ⚽🔥`
 
       // Build email from WhatsApp (required for Supabase auth)
       const cleanWa = whatsapp.replace(/\D/g, '')
-      const email = `${cleanWa}@wc-predictions.local`
+     const email = whatsappToEmail(`+975${cleanWa}`);  // Uses auth.js helper → @wa.predict.local
 
       setAuthButtonLoadingForAddUser(true)
 
