@@ -120,6 +120,35 @@
     .tab-content { animation: fadeIn 240ms ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
+    /* ========== SMOOTH LOGIN / LOGOUT TRANSITIONS ========== */
+    /* Screens fade in/out instead of snapping. While preloading after login,
+       the app shell is laid out off-screen so all data + images are ready
+       before the fade-in plays. */
+    #auth-screen, #app-shell { transition: opacity 380ms cubic-bezier(0.32, 0.72, 0, 1); }
+    .screen-fading-out { opacity: 0 !important; pointer-events: none; }
+    .screen-fading-in  { opacity: 0; }
+    .screen-preloading {
+      position: fixed !important;
+      inset: 0;
+      opacity: 0 !important;
+      pointer-events: none;
+      visibility: visible !important;
+    }
+    /* Button spinner during auth */
+    .auth-btn-loading { pointer-events: none; opacity: 0.85; }
+    .auth-btn-loading > svg, .auth-btn-loading > span { display: none; }
+    .auth-spinner {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      animation: authSpin 720ms linear infinite;
+    }
+    @keyframes authSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #auth-screen, #app-shell { transition: none; }
+      .auth-spinner { animation-duration: 1.4s; }
+    }
+
     /* ===== Lock warning banner (predictions tab) ===== */
     .lock-warn {
       background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
@@ -1556,6 +1585,56 @@ function switchToLoginUI() {
   document.getElementById('auth-submit-btn').querySelector('span').textContent = 'Sign In'
 }
 
+// ============== SMOOTH SCREEN TRANSITIONS ==============
+// Adds a spinner to the auth button while we preload data, so users
+// get clear feedback that something is happening.
+function setAuthButtonLoading(loading) {
+  const btn = document.getElementById('auth-submit-btn')
+  if (!btn) return
+  if (loading) {
+    btn.disabled = true
+    btn.classList.add('auth-btn-loading')
+    if (!btn.querySelector('.auth-spinner')) {
+      const s = document.createElement('span')
+      s.className = 'auth-spinner'
+      btn.appendChild(s)
+    }
+  } else {
+    btn.disabled = false
+    btn.classList.remove('auth-btn-loading')
+    const s = btn.querySelector('.auth-spinner')
+    if (s) s.remove()
+  }
+}
+
+// Wait two animation frames so the browser has actually committed
+// the previous style change before we start the next one. Without this,
+// adding `screen-fading-in` and removing it in the same tick causes the
+// transition to be skipped.
+function nextFrame() {
+  return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+}
+
+// Crossfade from one screen element to another. The "to" element is
+// mounted invisibly first, given a frame to lay out, then faded in
+// while the "from" element fades out.
+async function crossfadeScreens(fromEl, toEl) {
+  if (!toEl) return
+  // Prepare destination: visible in the DOM but transparent.
+  toEl.classList.remove('hidden')
+  toEl.classList.add('screen-fading-in')
+  await nextFrame()
+  // Trigger both fades together.
+  toEl.classList.remove('screen-fading-in')
+  if (fromEl) fromEl.classList.add('screen-fading-out')
+  // Wait for the fade to finish, then fully detach the old screen.
+  await new Promise(r => setTimeout(r, 400))
+  if (fromEl) {
+    fromEl.classList.add('hidden')
+    fromEl.classList.remove('screen-fading-out')
+  }
+}
+
 // Form submission
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault()
@@ -1571,19 +1650,24 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     return
   }
 
+  setAuthButtonLoading(true)
+
   // Path A: confirm-password field is visible => user is creating an account
   if (confirmVisible) {
     if (!name) {
       showToast('Please enter your name', 'error')
+      setAuthButtonLoading(false)
       return
     }
     const confirmPassword = document.getElementById('confirm-password').value
     if (password !== confirmPassword) {
       showToast('Passwords do not match', 'error')
+      setAuthButtonLoading(false)
       return
     }
     if (password.length < 6) {
       showToast('Password must be at least 6 characters', 'error')
+      setAuthButtonLoading(false)
       return
     }
 
@@ -1592,9 +1676,11 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       if (error.message.includes('already registered') || error.message.includes('already exists')) {
         showToast('Account already exists. Please sign in.', 'info')
         switchToLoginUI()
+        setAuthButtonLoading(false)
         return
       }
       showToast(error.message, 'error')
+      setAuthButtonLoading(false)
       return
     }
   } else {
@@ -1608,19 +1694,29 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         const { exists, error: checkErr } = await checkWhatsappExists(whatsapp)
         if (checkErr || exists) {
           showToast('Wrong password. Please try again.', 'error')
+          setAuthButtonLoading(false)
           return
         }
         switchToSignupUI('New here? Enter your name and confirm your password.')
         showToast('No account found — fill in your details to create one', 'info')
+        setAuthButtonLoading(false)
         return
       }
       showToast(error.message, 'error')
+      setAuthButtonLoading(false)
       return
     }
   }
 
   saveRememberMe(whatsapp, remember)
-  await showApp()
+  // showApp() handles its own fade. We keep the button in loading state
+  // until the transition completes so the user can't double-submit and
+  // the auth screen feels stable until the home is fully ready.
+  try {
+    await showApp()
+  } finally {
+    setAuthButtonLoading(false)
+  }
 })
 
     function confirmLogout() {
@@ -1684,6 +1780,11 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
 
     async function showNormalApp() {
+      // Make sure the shell is mounted in the DOM (even if invisible) so
+      // images/layout can render while we fetch data.
+      const shell = document.getElementById('app-shell')
+      shell.classList.remove('hidden')
+
       document.getElementById('app-main').classList.remove('hidden')
       document.getElementById('app-nav').classList.remove('hidden')
       const gate = document.getElementById('payment-gate')
@@ -1694,9 +1795,16 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       document.getElementById('profile-dept').value = profile?.department || ''
       document.getElementById('profile-phone').value = profile?.phone || ''
       if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
-      await loadFixtures()
-      await loadLeaderboard()
-      await loadHome()
+
+      // Load all home-screen data IN PARALLEL so the user doesn't wait for
+      // sequential network round-trips. We wrap each call in catch() so one
+      // slow/failing source can't block the rest of the home from rendering.
+      await Promise.all([
+        Promise.resolve().then(() => loadFixtures()).catch(e => console.error('loadFixtures', e)),
+        Promise.resolve().then(() => loadLeaderboard()).catch(e => console.error('loadLeaderboard', e)),
+        Promise.resolve().then(() => loadHome()).catch(e => console.error('loadHome', e)),
+      ])
+
       renderBadges()
       startCountdownTicker()
       setupRealtime()
@@ -3163,22 +3271,84 @@ function msToCountdown(ms) {
       showToast('Please message the admin on WhatsApp to reset your password.', 'info')
     }
 async function showApp() {
-  try {
-    document.getElementById('auth-screen').classList.add('hidden')
-    document.getElementById('app-shell').classList.remove('hidden')
+  const authScreen = document.getElementById('auth-screen')
+  const shell = document.getElementById('app-shell')
+  const authVisible = authScreen && !authScreen.classList.contains('hidden')
 
+  try {
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
 
-    if (!profile?.fee_paid && !isAdmin()) {
-      showPaymentGate()
-      return
+    // Strategy: preload the entire app shell while the auth screen is still
+    // visible on top. We mount the shell using `screen-preloading` so it
+    // renders (layout + paint) but stays invisible behind the auth screen.
+    // Once data + DOM are ready we crossfade, so the user never sees a
+    // half-empty home screen.
+    if (authVisible) {
+      shell.classList.remove('hidden')
+      shell.classList.add('screen-preloading')
+    } else {
+      shell.classList.remove('hidden')
     }
 
-    await showNormalApp()
+    if (!profile?.fee_paid && !isAdmin()) {
+      showPaymentGate()
+    } else {
+      await showNormalApp()
+    }
+
+    // Give the browser one frame to paint the now-populated shell before
+    // we start the crossfade — this is what makes the transition feel
+    // instant on the other side.
+    if (authVisible) {
+      shell.classList.remove('screen-preloading')
+      await nextFrame()
+      await crossfadeScreens(authScreen, shell)
+    }
   } catch (err) {
     console.error('showApp error:', err)
+    // Recover gracefully: make sure something is visible.
+    shell.classList.remove('screen-preloading', 'screen-fading-in')
+    if (authScreen) authScreen.classList.remove('screen-fading-out')
     showToast('Something went wrong loading the app. Please refresh.', 'error')
+  }
+}
+
+// Smooth logout: fade the app shell out first, then sign out. Wrapping
+// auth.js's signOut() means we don't have to touch that file.
+window.__rawSignOut = window.__rawSignOut || window.signOut
+window.signOut = async function smoothSignOut() {
+  try {
+    const shell = document.getElementById('app-shell')
+    const authScreen = document.getElementById('auth-screen')
+    // Fade the shell out before we tear down the session, so the user
+    // sees a clean exit instead of a flash to the login screen.
+    if (shell && !shell.classList.contains('hidden')) {
+      shell.classList.add('screen-fading-out')
+      await new Promise(r => setTimeout(r, 380))
+      shell.classList.add('hidden')
+      shell.classList.remove('screen-fading-out')
+    }
+    // Pre-mount the auth screen invisibly so it fades in cleanly after
+    // the session is cleared.
+    if (authScreen) {
+      authScreen.classList.remove('hidden')
+      authScreen.classList.add('screen-fading-in')
+    }
+    // Now actually sign out. auth.js's signOut typically clears the
+    // session and either reloads or triggers showAuth().
+    if (typeof window.__rawSignOut === 'function') {
+      await window.__rawSignOut()
+    }
+    // If we're still on the page (no reload happened), fade the auth in.
+    if (authScreen) {
+      await nextFrame()
+      authScreen.classList.remove('screen-fading-in')
+      // Refresh login-screen stats so they're up to date.
+      if (typeof loadAuthStats === 'function') loadAuthStats()
+    }
+  } catch (err) {
+    console.error('smoothSignOut error:', err)
   }
 }
     function switchTab(tab) {
@@ -3259,6 +3429,10 @@ if (typeof getPrizePool !== 'function') {
     (async function() {
   await init();
   if (typeof getUser === 'function' && getUser()) {
+    // User already has a session — hide the auth screen up front so
+    // showApp() reveals the home directly under the loading overlay
+    // (no crossfade from a screen the user never saw).
+    document.getElementById('auth-screen').classList.add('hidden')
     await showApp();
   }
 })();
