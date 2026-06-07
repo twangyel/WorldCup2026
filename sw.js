@@ -48,7 +48,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
           return res
         })
-        .catch(() => new Response(null, { status: 204 })) // instant fallback (no black screen)
+        .catch(() => new Response(null, { status: 204 }))
     )
     return
   }
