@@ -5,7 +5,7 @@ const urlsToCache = [
   '/admin.html',
   '/assets/js/auth.js',
   '/manifest.json',
-  '/image/pwa.png'
+  '/image/logo-splash.svg'
 ]
 
 self.addEventListener('install', event => {
