@@ -503,6 +503,24 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* Glassmorphism card entrance */
+.glass-enter {
+  animation: glassFadeIn 500ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes glassFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Subtle pulse for active indicator */
+@keyframes softPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.animate-pulse {
+  animation: softPulse 2s ease-in-out infinite;
+}
+
     /* ========== AUTH SCREEN (Prediction League) ========== */
     :root {
       /* 🎨 REPLACE THIS URL WITH YOUR OWN BACKGROUND IMAGE */
@@ -1244,79 +1262,189 @@
       </div>
 
       <!-- PROFILE -->
-      <div id="tab-profile" class="tab-content hidden space-y-5">
-        <div class="px-1">
-          <h2 class="text-2xl font-bold tracking-tight">Profile</h2>
-          <p class="text-sm text-ink-500 mt-1">Manage your info and preferences.</p>
+    <!-- PROFILE -->
+<div id="tab-profile" class="tab-content hidden space-y-5">
+  <div class="px-1">
+    <h2 class="text-2xl font-bold tracking-tight">Profile</h2>
+    <p class="text-sm text-ink-500 mt-1">Manage your info and preferences.</p>
+  </div>
+
+  <!-- Payment Status Card (Glassmorphism) -->
+  <div id="payment-status-card" class="hidden">
+    <div class="relative overflow-hidden rounded-3xl border border-white/20 p-5" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.85) 0%, rgba(5, 150, 105, 0.75) 100%); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(6, 78, 59, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);">
+      <!-- Subtle shine effect -->
+      <div class="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-20" style="background: radial-gradient(circle, rgba(255,255,255,0.4), transparent 70%);"></div>
+      
+      <div class="relative flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl backdrop-blur-sm border border-white/10">
+          ✅
         </div>
-
-        <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
-          <div class="p-5 space-y-4">
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Name</label>
-              <input type="text" id="profile-name" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Department</label>
-              <input type="text" id="profile-dept" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Phone</label>
-              <input type="tel" id="profile-phone" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
-            </div>
-            <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Profile</button>
-          </div>
-
-          <div id="admin-link" class="hidden border-t border-paper-border p-5">
-            <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
-              <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
-          </div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-white/90">Entry Fee Paid</div>
+          <div class="text-xs text-emerald-100/80 mt-0.5" id="payment-status-amount">Nu. 500 · Verified</div>
         </div>
-
-        <!-- Badges & streaks -->
-        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold tracking-tight">Achievements</h3>
-            <span id="profile-streak" class="hidden"></span>
-          </div>
-          <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
-            <div class="skel h-24 rounded-2xl"></div>
-            <div class="skel h-24 rounded-2xl"></div>
-            <div class="skel h-24 rounded-2xl"></div>
-          </div>
-          <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
-        </div>
-
-        <!-- Scoring rules -->
-        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
-          <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
-          <div class="space-y-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold">5</div>
-              <div>
-                <div class="text-sm font-semibold">Exact score</div>
-                <div class="text-xs text-ink-500">e.g. you said 2–1, result was 2–1</div>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">3</div>
-              <div>
-                <div class="text-sm font-semibold">Correct goal difference</div>
-                <div class="text-xs text-ink-500">Right margin, wrong scoreline</div>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">2</div>
-              <div>
-                <div class="text-sm font-semibold">Correct outcome</div>
-                <div class="text-xs text-ink-500">Right winner or draw</div>
-              </div>
-            </div>
+        <div class="text-right">
+          <div class="inline-flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full border border-white/10">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+            <span class="text-[11px] font-bold text-white/90 uppercase tracking-wider">Active</span>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Pending Payment Card (Glassmorphism - Amber) -->
+  <div id="payment-pending-card" class="hidden">
+    <div class="relative overflow-hidden rounded-3xl border border-white/20 p-5" style="background: linear-gradient(135deg, rgba(180, 83, 9, 0.85) 0%, rgba(217, 119, 6, 0.75) 100%); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(180, 83, 9, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);">
+      <div class="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-20" style="background: radial-gradient(circle, rgba(255,255,255,0.4), transparent 70%);"></div>
+      
+      <div class="relative flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl backdrop-blur-sm border border-white/10">
+          ⏳
+        </div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-white/90">Payment Pending</div>
+          <div class="text-xs text-amber-100/80 mt-0.5">Admin verification in progress</div>
+        </div>
+        <button onclick="checkPaymentStatus()" class="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition tap">
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
+    <div class="p-5 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Name</label>
+        <input type="text" id="profile-name" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Department</label>
+        <input type="text" id="profile-dept" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]" placeholder="e.g. Engineering">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Phone</label>
+        <input type="tel" id="profile-phone" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+      </div>
+      <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Profile</button>
+    </div>
+
+    <div id="admin-link" class="hidden border-t border-paper-border p-5">
+      <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
+        <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Share Rank Card (Glassmorphism) -->
+  <div id="share-rank-card" class="hidden">
+    <div class="relative overflow-hidden rounded-3xl border border-white/20 p-5" style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.9) 0%, rgba(11, 18, 33, 0.85) 100%); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(11, 18, 33, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);">
+      <!-- Ambient glow -->
+      <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full opacity-30" style="background: radial-gradient(circle, rgba(212, 162, 76, 0.5), transparent 70%);"></div>
+      <div class="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-15" style="background: radial-gradient(circle, rgba(255,255,255,0.3), transparent 70%);"></div>
+      
+      <div class="relative">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl backdrop-blur-sm border border-white/10">
+            🏆
+          </div>
+          <div>
+            <div class="text-sm font-bold text-white/90">Your Standing</div>
+            <div class="text-xs text-white/50 mt-0.5" id="share-rank-subtitle">Share your progress</div>
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-between bg-white/5 rounded-2xl p-4 border border-white/10 mb-4">
+          <div>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Current Rank</div>
+            <div class="text-3xl font-bold text-gold" id="share-rank-value" style="font-variant-numeric: tabular-nums;">—</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Points</div>
+            <div class="text-3xl font-bold text-white" id="share-points-value" style="font-variant-numeric: tabular-nums;">—</div>
+          </div>
+        </div>
+
+        <button onclick="shareRankOnWhatsApp()" class="w-full flex items-center justify-center gap-2 bg-emerald-500/90 hover:bg-emerald-500 text-white font-semibold py-3.5 rounded-2xl tap border border-white/10 transition backdrop-blur-sm">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.13 1.58 5.943L0 24l6.335-1.652a11.897 11.897 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <span>Share on WhatsApp</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction History (Glassmorphism Accordion) -->
+  <div id="prediction-history-card" class="hidden">
+    <div class="relative overflow-hidden rounded-3xl border border-white/15" style="background: linear-gradient(180deg, rgba(250, 250, 247, 0.7) 0%, rgba(255, 255, 255, 0.85) 100%); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 4px 24px rgba(10, 15, 13, 0.06), inset 0 1px 0 rgba(255,255,255,0.6);">
+      <!-- Subtle top highlight -->
+      <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+      
+      <button onclick="togglePredictionHistory()" class="w-full flex items-center justify-between p-5 tap">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl border border-brand-500/20">
+            📋
+          </div>
+          <div class="text-left">
+            <div class="font-bold text-sm text-ink-900">Prediction History</div>
+            <div class="text-xs text-ink-500 mt-0.5" id="history-summary">Tap to view all matches</div>
+          </div>
+        </div>
+        <svg id="history-chevron" class="w-5 h-5 text-ink-400 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      
+      <div id="history-content" class="hidden px-5 pb-5">
+        <div class="h-px bg-gradient-to-r from-transparent via-paper-border to-transparent mb-4"></div>
+        <div id="history-list" class="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Badges & streaks -->
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold tracking-tight">Achievements</h3>
+      <span id="profile-streak" class="hidden"></span>
+    </div>
+    <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
+      <div class="skel h-24 rounded-2xl"></div>
+      <div class="skel h-24 rounded-2xl"></div>
+      <div class="skel h-24 rounded-2xl"></div>
+    </div>
+    <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
+  </div>
+
+  <!-- Scoring rules -->
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+    <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
+    <div class="space-y-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold">5</div>
+        <div>
+          <div class="text-sm font-semibold">Exact score</div>
+          <div class="text-xs text-ink-500">e.g. you said 2–1, result was 2–1</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">3</div>
+        <div>
+          <div class="text-sm font-semibold">Correct goal difference</div>
+          <div class="text-xs text-ink-500">Right margin, wrong scoreline</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">2</div>
+        <div>
+          <div class="text-sm font-semibold">Correct outcome</div>
+          <div class="text-xs text-ink-500">Right winner or draw</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
     </main>
 
     <!-- Bottom Nav -->
@@ -1817,6 +1945,22 @@ async function handleWhatsappBlur() {
     }
   }
 
+  // Add near other fallback functions
+if (typeof getPrizeSettings !== 'function') {
+  window.getPrizeSettings = async function() {
+    try {
+      const { data, error } = await supabaseClient
+        .from('prize_settings')
+        .select('*')
+        .eq('id', 1)
+        .single()
+      return { data, error }
+    } catch (e) {
+      return { data: null, error: e }
+    }
+  }
+}
+
   if (exists === true) {
     // Confirmed existing user → LOGIN UI (password only, no name / confirm)
     authMode = 'login'
@@ -2136,6 +2280,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       document.getElementById('profile-dept').value = profile?.department || ''
       document.getElementById('profile-phone').value = profile?.phone || ''
       if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
+        await updateProfileCards()
 
       // Load all home-screen data IN PARALLEL so the user doesn't wait for
       // sequential network round-trips. We wrap each call in catch() so one
@@ -3088,6 +3233,230 @@ function msToCountdown(ms) {
       })
     }
 
+    // ============== PROFILE ENHANCEMENTS ==============
+
+// Toggle prediction history accordion
+function togglePredictionHistory() {
+  const content = document.getElementById('history-content')
+  const chevron = document.getElementById('history-chevron')
+  const isHidden = content.classList.contains('hidden')
+  
+  if (isHidden) {
+    content.classList.remove('hidden')
+    chevron.style.transform = 'rotate(180deg)'
+    renderPredictionHistory()
+  } else {
+    content.classList.add('hidden')
+    chevron.style.transform = 'rotate(0deg)'
+  }
+}
+
+// Render prediction history list
+async function renderPredictionHistory() {
+  const list = document.getElementById('history-list')
+  const summary = document.getElementById('history-summary')
+  const myId = getUser()?.id
+  
+  if (!myId) {
+    list.innerHTML = '<div class="text-center text-sm text-ink-500 py-4">Sign in to view history</div>'
+    return
+  }
+
+  // Ensure fixtures and predictions are loaded
+  if (!fixtures.length || !predictions.length) {
+    list.innerHTML = '<div class="flex items-center justify-center py-6"><span class="auth-spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(10,15,13,0.15);border-top-color:#D4A24C;"></span></div>'
+    // Try to load data
+    try {
+      const [{ data: fxData }, { data: predData }] = await Promise.all([
+        getFixtures(),
+        getMyPredictions()
+      ])
+      fixtures = fxData || []
+      predictions = predData || []
+    } catch (e) {
+      list.innerHTML = '<div class="text-center text-sm text-ink-500 py-4">Failed to load history</div>'
+      return
+    }
+  }
+
+  // Match predictions to fixtures
+  const history = predictions
+    .map(p => {
+      const f = fixtures.find(x => x.id === p.fixture_id)
+      if (!f) return null
+      const hasResult = f.home_score !== null && f.away_score !== null
+      const pts = p.points_awarded || 0
+      return {
+        ...p,
+        fixture: f,
+        hasResult,
+        pts,
+        predicted: p.home_prediction !== null && p.away_prediction !== null
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.fixture.kickoff) - new Date(a.fixture.kickoff))
+
+  const totalPredicted = history.filter(h => h.predicted).length
+  const totalScored = history.filter(h => h.hasResult).length
+  const totalPoints = history.reduce((sum, h) => sum + h.pts, 0)
+
+  summary.textContent = `${totalPredicted} predicted · ${totalScored} scored · ${totalPoints} pts`
+
+  if (!history.length) {
+    list.innerHTML = `
+      <div class="text-center py-6">
+        <div class="text-3xl mb-2 opacity-40">📋</div>
+        <div class="text-sm font-semibold text-ink-700">No predictions yet</div>
+        <p class="text-xs text-ink-500 mt-1">Start predicting to build your history</p>
+      </div>`
+    return
+  }
+
+  list.innerHTML = history.map(h => {
+    const f = h.fixture
+    const pts = h.pts
+    const predicted = h.predicted
+    
+    let statusBadge, scoreDisplay
+    
+    if (!predicted) {
+      statusBadge = `<span class="text-[10px] font-bold bg-gray-100 text-gray-400 px-2 py-1 rounded-full">MISSED</span>`
+      scoreDisplay = `<span class="text-xs text-ink-400">No prediction</span>`
+    } else if (!h.hasResult) {
+      statusBadge = `<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full">PENDING</span>`
+      scoreDisplay = `<span class="text-sm font-bold text-ink-900">${h.home_prediction} – ${h.away_prediction}</span>`
+    } else {
+      const ptsColor = pts === 5 ? 'bg-emerald-500 text-white' : pts === 3 ? 'bg-blue-500 text-white' : pts === 2 ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-500'
+      const ptsLabel = pts === 5 ? '+5 EXACT' : pts === 3 ? '+3 GD' : pts === 2 ? '+2 WIN' : '0 PTS'
+      statusBadge = `<span class="text-[10px] font-bold ${ptsColor} px-2 py-1 rounded-full">${ptsLabel}</span>`
+      scoreDisplay = `
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold ${pts > 0 ? 'text-ink-900' : 'text-ink-400'}">${h.home_prediction} – ${h.away_prediction}</span>
+          <span class="text-ink-300 text-xs">vs</span>
+          <span class="text-sm font-bold text-ink-900">${f.home_score} – ${f.away_score}</span>
+        </div>`
+    }
+
+    return `
+      <div class="flex items-center gap-3 p-3 rounded-2xl ${h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border'}">
+        <div class="flex items-center gap-1.5 shrink-0">
+          ${flagHtml(f.home_team, 20)}
+          <span class="text-xs font-bold text-ink-400">vs</span>
+          ${flagHtml(f.away_team, 20)}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-xs font-semibold text-ink-700 truncate">${f.home_team} vs ${f.away_team}</span>
+            ${statusBadge}
+          </div>
+          <div class="text-[11px] text-ink-500">${new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${f.stage}</div>
+          ${predicted ? `<div class="mt-1">${scoreDisplay}</div>` : ''}
+        </div>
+      </div>`
+  }).join('')
+}
+
+// Share rank on WhatsApp
+async function shareRankOnWhatsApp() {
+  const myId = getUser()?.id
+  if (!myId) {
+    showToast('Sign in to share your rank', 'info')
+    return
+  }
+
+  try {
+    const { data: stats } = await getLeaderboard()
+    if (!stats?.length) {
+      showToast('Leaderboard not ready yet', 'info')
+      return
+    }
+
+    let myIdx = stats.findIndex(s => s.user_id === myId || s.id === myId)
+    if (myIdx === -1) myIdx = stats.findIndex(s => s.id === myId)
+    
+    const me = myIdx >= 0 ? stats[myIdx] : null
+    const rank = myIdx >= 0 ? myIdx + 1 : '?'
+    const points = me?.points || 0
+    const total = stats.length
+
+    const appUrl = window.location.origin + '/index.html'
+    const message = `🏆 WC 2026 Prediction League\n\nI'm ranked *#${rank}* of ${total} with *${points} points*!\n\nThink you can beat me? Join the league 👇\n${appUrl}`
+
+    const encoded = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encoded}`, '_blank')
+    
+    showToast('Opening WhatsApp...', 'success')
+  } catch (e) {
+    showToast('Could not generate share text', 'error')
+  }
+}
+
+// Update profile tab UI with payment status and share card
+async function updateProfileCards() {
+  const profile = getProfile()
+  const myId = getUser()?.id
+  
+  // Payment status cards
+  const paidCard = document.getElementById('payment-status-card')
+  const pendingCard = document.getElementById('payment-pending-card')
+  
+  if (!profile || previewMode) {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.add('hidden')
+  } else if (profile.fee_paid) {
+    paidCard?.classList.remove('hidden')
+    pendingCard?.classList.add('hidden')
+    // Update amount from prize settings
+    try {
+      const { data: ps } = await getPrizeSettings?.() || {}
+      const fee = ps?.entry_fee || 500
+      const cur = ps?.currency || 'Nu.'
+      const amountEl = document.getElementById('payment-status-amount')
+      if (amountEl) amountEl.textContent = `${cur} ${Number(fee).toLocaleString()} · Verified`
+    } catch (e) {}
+  } else if (profile.payment_proof_url || profile.payment_status === 'pending') {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.remove('hidden')
+  } else {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.add('hidden')
+  }
+
+  // Share rank card
+  const shareCard = document.getElementById('share-rank-card')
+  const historyCard = document.getElementById('prediction-history-card')
+  
+  if (!myId || previewMode) {
+    shareCard?.classList.add('hidden')
+    historyCard?.classList.add('hidden')
+    return
+  }
+
+  shareCard?.classList.remove('hidden')
+  historyCard?.classList.remove('hidden')
+
+  // Populate share card with current stats
+  try {
+    const { data: stats } = await getLeaderboard()
+    if (stats?.length) {
+      let myIdx = stats.findIndex(s => s.user_id === myId || s.id === myId)
+      if (myIdx === -1) myIdx = stats.findIndex(s => s.id === myId)
+      const me = myIdx >= 0 ? stats[myIdx] : null
+      
+      const rankEl = document.getElementById('share-rank-value')
+      const ptsEl = document.getElementById('share-points-value')
+      const subtitle = document.getElementById('share-rank-subtitle')
+      
+      if (rankEl) rankEl.textContent = myIdx >= 0 ? `#${myIdx + 1}` : '—'
+      if (ptsEl) ptsEl.textContent = me?.points || 0
+      if (subtitle) subtitle.textContent = myIdx >= 0 ? `of ${stats.length} players` : 'Make predictions to rank'
+    }
+  } catch (e) {
+    console.warn('Could not load stats for share card:', e)
+  }
+}
+
     // ============== REALTIME ==============
     let prizePollInterval = null
 
@@ -3810,6 +4179,7 @@ window.signOut = async function smoothSignOut() {
       if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
       if (tab === 'predictions') previewMode ? renderFixtures() : loadFixtures()
       if (tab === 'profile' && !previewMode) renderBadges()
+      updateProfileCards()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
