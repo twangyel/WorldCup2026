@@ -394,18 +394,37 @@
     /* Each row is a positioned element so FLIP transforms read cleanly */
     .lb-row {
       will-change: transform;
-      transition: box-shadow 600ms cubic-bezier(0.32, 0.72, 0, 1),
-                  border-color 600ms cubic-bezier(0.32, 0.72, 0, 1);
+      transition: all 500ms cubic-bezier(0.32, 0.72, 0, 1);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      box-shadow: 0 4px 20px rgba(10, 15, 13, 0.05), 
+                  0 1px 2px rgba(10, 15, 13, 0.03), 
+                  inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    }
+    .lb-row:hover {
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 8px 32px rgba(10, 15, 13, 0.08), 
+                  0 2px 4px rgba(10, 15, 13, 0.04), 
+                  inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      transform: translateY(-1px);
     }
     /* Glow when rank improves */
     .lb-row.lb-up {
-      box-shadow: 0 0 0 2px rgba(34,197,94,0.55), 0 12px 28px rgba(34,197,94,0.18);
-      border-color: rgba(34,197,94,0.6) !important;
+      background: rgba(240, 253, 244, 0.85);
+      box-shadow: 0 0 0 2px rgba(34,197,94,0.45), 
+                  0 12px 28px rgba(34,197,94,0.12),
+                  inset 0 1px 0 rgba(255,255,255,0.8);
+      border-color: rgba(34,197,94,0.5) !important;
     }
     /* Soft red when rank drops */
     .lb-row.lb-down {
-      box-shadow: 0 0 0 2px rgba(239,68,68,0.35), 0 8px 20px rgba(239,68,68,0.12);
-      border-color: rgba(239,68,68,0.45) !important;
+      background: rgba(254, 242, 242, 0.85);
+      box-shadow: 0 0 0 2px rgba(239,68,68,0.3), 
+                  0 8px 20px rgba(239,68,68,0.08),
+                  inset 0 1px 0 rgba(255,255,255,0.8);
+      border-color: rgba(239,68,68,0.4) !important;
     }
     /* Points number pulse when the score changes */
     .pts-pulse {
@@ -447,11 +466,12 @@
       display: inline-block;
       width: 8px; height: 8px;
       border-radius: 999px;
-      background: #16a34a;
-      box-shadow: 0 0 0 0 rgba(34,197,94,0.55);
+      background: #22c55e;
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.5), inset 0 1px 2px rgba(255,255,255,0.3);
       animation: liveDot 2s ease-out infinite;
       margin-right: 6px;
       vertical-align: middle;
+      border: 1px solid rgba(255,255,255,0.3);
     }
     .live-dot.flash { animation: liveDotFlash 900ms cubic-bezier(0.32, 0.72, 0, 1); }
     @keyframes liveDot {
@@ -473,27 +493,69 @@
     /* ===== LB SUB-TABS (Overall / Latest Matchday) ===== */
     .lb-subtabs {
       display: inline-flex; gap: 4px;
-      background: #F4F3EE; border: 1px solid #EEEDE7;
+      background: rgba(244, 243, 238, 0.85); 
+      border: 1px solid rgba(238, 237, 231, 0.8);
       padding: 4px; border-radius: 14px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
     .lb-subtab {
       font-size: 12px; font-weight: 700;
       padding: 8px 14px; border-radius: 10px;
-      color: #6b6b66; cursor: pointer;
-      transition: all 180ms ease;
+      color: #8A9590; cursor: pointer;
+      transition: all 300ms cubic-bezier(0.32, 0.72, 0, 1);
       white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+    }
+    .lb-subtab::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #fff 0%, #FAFAF7 100%);
+      border-radius: 10px;
+      opacity: 0;
+      transform: scale(0.9);
+      transition: all 300ms cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: -1;
     }
     .lb-subtab.active {
-      background: #fff; color: #0a0f0d;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      color: #0B1221;
+    }
+    .lb-subtab.active::before {
+      opacity: 1;
+      transform: scale(1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .lb-subtab:hover:not(.active) {
+      color: #1F2A35;
+      background: rgba(255,255,255,0.5);
+    }
+    /* Smooth tab content transition */
+    .tab-content {
+      animation: fadeIn 240ms ease;
+    }
+    @keyframes fadeIn { 
+      from { opacity: 0; transform: translateY(4px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+    .tab-switching {
+      animation: tabSwitchOut 200ms ease forwards;
+    }
+    @keyframes tabSwitchOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-4px); }
     }
     /* ===== Next-match CTA card on leaderboard ===== */
     .lb-cta-card {
-      background: linear-gradient(135deg, #0B1221 0%, #1E3A5F 100%);
+      background: linear-gradient(135deg, rgba(11, 18, 33, 0.92) 0%, rgba(30, 58, 95, 0.88) 100%);
       color: #fff; border-radius: 20px;
       padding: 14px 16px;
       display: flex; align-items: center; gap: 12px;
-      box-shadow: 0 8px 20px rgba(11,18,33,0.18);
+      box-shadow: 0 8px 32px rgba(11,18,33,0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+      backdrop-filter: blur(20px) saturate(150%);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      border: 1px solid rgba(255,255,255,0.12);
     }
     .lb-cta-card .lb-cta-pulse {
       width: 8px; height: 8px; border-radius: 999px;
@@ -509,9 +571,14 @@
     }
     /* ===== Prize strip (compact, leaderboard) ===== */
     .lb-prize-strip {
-      background: #fff; border: 1px solid #EEEDE7;
+      background: rgba(255, 255, 255, 0.75); 
+      border: 1px solid rgba(255, 255, 255, 0.6);
       border-radius: 16px; padding: 12px 14px;
       display: flex; align-items: center; gap: 10px;
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      box-shadow: 0 4px 16px rgba(10, 15, 13, 0.04), 
+                  inset 0 1px 0 rgba(255, 255, 255, 0.8);
     }
     .lb-prize-strip .pool {
       font-weight: 800; color: #0a0f0d; font-size: 15px;
@@ -537,30 +604,43 @@
     .rank-trend {
       display: inline-flex; align-items: center; gap: 2px;
       font-size: 10px; font-weight: 800;
-      padding: 2px 5px; border-radius: 999px;
+      padding: 3px 7px; border-radius: 999px;
       margin-left: 4px;
       vertical-align: middle;
       line-height: 1;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.4);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    .rank-trend.up   { background: #DCFCE7; color: #15803D; }
-    .rank-trend.down { background: #FEE2E2; color: #B91C1C; }
-    .rank-trend.new  { background: #FEF3C7; color: #92400E; }
+    .rank-trend.up   { background: rgba(220, 252, 231, 0.85); color: #15803D; }
+    .rank-trend.down { background: rgba(254, 226, 226, 0.85); color: #B91C1C; }
+    .rank-trend.new  { background: rgba(254, 243, 199, 0.85); color: #92400E; }
     /* ===== Streak flame ===== */
     .lb-streak {
       display: inline-flex; align-items: center; gap: 2px;
       font-size: 11px; font-weight: 800; color: #B45309;
-      background: linear-gradient(135deg, #FEF3C7, #FED7AA);
-      border-radius: 999px; padding: 2px 7px 2px 5px;
+      background: linear-gradient(135deg, rgba(254, 243, 199, 0.9), rgba(254, 215, 170, 0.85));
+      border-radius: 999px; padding: 3px 8px 3px 6px;
       margin-left: 4px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 1px 4px rgba(180, 83, 9, 0.1);
     }
     /* ===== Projected winnings inline on row ===== */
     .lb-projected {
       font-size: 10px; font-weight: 700; color: #15803D;
-      background: #DCFCE7; border-radius: 6px;
-      padding: 2px 5px;
+      background: rgba(220, 252, 231, 0.85); 
+      border-radius: 6px;
+      padding: 3px 7px;
       display: inline-block;
       margin-top: 3px;
       font-variant-numeric: tabular-nums;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
 
     /* ========== AUTH SCREEN (Prediction League) ========== */
@@ -1295,6 +1375,9 @@
           <p class="text-sm text-ink-500 mt-1">Live rankings, updated as results come in.</p>
         </div>
 
+        <!-- Glass leaderboard container -->
+        <div class="rounded-3xl p-1" style="background: linear-gradient(135deg, rgba(250,250,247,0.9) 0%, rgba(255,255,255,0.95) 50%, rgba(250,250,247,0.9) 100%);">
+
         <!-- Next-match CTA card -->
         <div id="lb-cta" class="hidden"></div>
 
@@ -1310,10 +1393,11 @@
           <span id="lb-subtab-meta" class="text-[11px] text-ink-400 font-medium"></span>
         </div>
 
-        <div id="leaderboard-list" class="space-y-2.5">
+        <div id="leaderboard-list" class="space-y-3 p-2">
           <div class="skel h-20 rounded-2xl"></div>
           <div class="skel h-20 rounded-2xl"></div>
           <div class="skel h-20 rounded-2xl"></div>
+        </div>
         </div>
       </div>
 

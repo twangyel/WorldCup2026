@@ -25,7 +25,7 @@ self.addEventListener('activate', event => {
 })
 
 self.addEventListener('fetch', event => {
-  // Network-first for HTML and JS so updates show immediately
+  // Network-first for HTML and JS (so updates show immediately)
   if (event.request.mode === 'navigate' || event.request.url.match(/\.(html|js)$/)) {
     event.respondWith(
       fetch(event.request)
@@ -38,7 +38,22 @@ self.addEventListener('fetch', event => {
     )
     return
   }
-  // Cache-first for everything else (images, manifest)
+
+  // Special handling for the root page (/) so the black background NEVER shows
+  if (event.request.url === self.origin || event.request.url.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(res => {
+          const clone = res.clone()
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
+          return res
+        })
+        .catch(() => new Response(null, { status: 204 })) // instant fallback (no black screen)
+    )
+    return
+  }
+
+  // Cache-first for everything else (images, manifest, etc.)
   event.respondWith(
     caches.match(event.request).then(res => res || fetch(event.request))
   )
