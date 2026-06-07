@@ -3283,23 +3283,34 @@ function msToCountdown(ms) {
       loadAuthStats()
     }
 
-    // Load Matches / Teams counts from Supabase for the login screen
+    // Load Matches / Teams counts from Supabase for the login screen.
+    // The real table is `fixtures` (not `matches`), and there is no `teams`
+    // table — teams are stored as home_team/away_team strings on fixture
+    // rows, so we derive the team count by collecting distinct names.
     async function loadAuthStats() {
       const mEl = document.getElementById('auth-stat-matches')
       const tEl = document.getElementById('auth-stat-teams')
       if (!mEl || !tEl) return
       try {
-        // Fetch counts in parallel. Adjust table names if yours differ.
-        const [matchesRes, teamsRes] = await Promise.all([
-          supabaseClient.from('matches').select('*', { count: 'exact', head: true }),
-          supabaseClient.from('teams').select('*', { count: 'exact', head: true })
-        ])
-        if (typeof matchesRes.count === 'number') mEl.textContent = matchesRes.count
-        else mEl.textContent = 64  // fallback
-        if (typeof teamsRes.count === 'number') tEl.textContent = teamsRes.count
-        else tEl.textContent = 48  // fallback
+        // One query gets us both numbers: the row count (matches) and the
+        // team names (which we de-dupe locally).
+        const { data, count, error } = await supabaseClient
+          .from('fixtures')
+          .select('home_team, away_team', { count: 'exact' })
+        if (error) throw error
+
+        const matchCount = (typeof count === 'number') ? count : (data?.length || 0)
+        mEl.textContent = matchCount
+
+        const teamSet = new Set()
+        ;(data || []).forEach(f => {
+          if (f.home_team && f.home_team !== 'TBD') teamSet.add(f.home_team)
+          if (f.away_team && f.away_team !== 'TBD') teamSet.add(f.away_team)
+        })
+        tEl.textContent = teamSet.size
       } catch (e) {
         // Graceful fallback to official WC 2026 numbers
+        console.warn('loadAuthStats failed, using fallback:', e)
         mEl.textContent = 64
         tEl.textContent = 48
       }
@@ -3469,12 +3480,42 @@ if (typeof getPrizePool !== 'function') {
 
     (async function() {
   await init();
-  if (typeof getUser === 'function' && getUser()) {
+
+  // getUser() can return null immediately after init() because Supabase
+  // restores its session asynchronously from localStorage. If we have no
+  // user yet but a session DOES exist in storage, poll briefly while
+  // auth.js finishes wiring up its in-memory state. This was the cause
+  // of the "logged out after returning from admin.html" bug — the
+  // session was fine, the UI just gave up too early.
+  let user = (typeof getUser === 'function') ? getUser() : null;
+
+  if (!user && window.supabaseClient?.auth) {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        for (let i = 0; i < 30 && !user; i++) {
+          await new Promise(r => setTimeout(r, 50));
+          user = (typeof getUser === 'function') ? getUser() : null;
+        }
+      }
+    } catch (e) {
+      console.warn('Session restore check failed:', e);
+    }
+  }
+
+  if (user) {
     // User already has a session — hide the auth screen up front so
     // showApp() reveals the home directly under the loading overlay
     // (no crossfade from a screen the user never saw).
     document.getElementById('auth-screen').classList.add('hidden')
     await showApp();
+  } else {
+    // No session — show login screen explicitly. This also loads the
+    // Matches/Teams stats, which otherwise stay as em-dashes because
+    // the auth screen is visible by default but loadAuthStats() only
+    // runs from inside showAuth().
+    if (typeof showAuth === 'function') showAuth();
+    else if (typeof loadAuthStats === 'function') loadAuthStats();
   }
 })();
   </script>
