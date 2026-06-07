@@ -917,7 +917,7 @@ function msToCountdown(ms) {
   }
 
   if (!fixtures.length) {
-    c.innerHTML = `<div class="bg-white rounded-3xl shadow-card border border-paper-border p-10 text-center">
+    c.innerHTML = `<div class="glass-fixture rounded-3xl p-10 text-center">
       <div class="text-5xl mb-3">⚽</div>
       <div class="font-bold text-ink-900">No fixtures yet</div>
       <p class="text-sm text-ink-500 mt-1">Matches will appear here once added.</p>
@@ -957,7 +957,7 @@ function msToCountdown(ms) {
       : ''
 
     return `
-    <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5 relative" data-fixture="${f.id}">
+    <div class="glass-fixture rounded-3xl p-5 relative" data-fixture="${f.id}">
       ${ptsBadge}
       <div class="flex items-center justify-between mb-4">
         <span class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em]">${f.stage}</span>
@@ -1171,27 +1171,28 @@ function msToCountdown(ms) {
   if (!finished.length) {
     recentEl.innerHTML = `<div class="glass-light rounded-2xl border border-white/30 p-8 text-center"><div class="text-2xl mb-2 opacity-60">⏳</div><div class="text-sm font-semibold text-ink-700">No results yet</div><p class="text-xs text-ink-500 mt-1">Match results will appear here</p></div>`
   } else {
-    recentEl.innerHTML = finished.map(f => {
-      const pred = getPrediction(f.id)
-      const pts = pred?.points_awarded || 0
-      return `
-      <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
-        <div class="flex items-center gap-2 shrink-0">
-          ${flagHtml(f.home_team, 28)}
-          <span class="font-bold text-sm">${f.home_score}</span>
-        </div>
-        <span class="text-ink-300 text-xs font-bold">–</span>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="font-bold text-sm">${f.away_score}</span>
-          ${flagHtml(f.away_team, 28)}
-        </div>
-        <div class="flex-1 min-w-0 ml-1">
-          <div class="font-semibold text-sm line-clamp-2 leading-tight">${f.home_team} vs ${f.away_team}</div>
-          <div class="text-xs text-ink-500 mt-0.5">${pred ? `You predicted: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
-        </div>
-        <div class="${pts > 0 ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-400'} text-xs font-bold px-2.5 py-1 rounded-full shrink-0">+${pts}</div>
-      </div>`
-    }).join('')
+   // AFTER (glass-light)
+recentEl.innerHTML = finished.map(f => {
+  const pred = getPrediction(f.id)
+  const pts = pred?.points_awarded || 0
+  return `
+  <div class="glass-light rounded-2xl p-4 flex items-center gap-3">
+    <div class="flex items-center gap-2 shrink-0">
+      ${flagHtml(f.home_team, 28)}
+      <span class="font-bold text-sm">${f.home_score}</span>
+    </div>
+    <span class="text-ink-300 text-xs font-bold">–</span>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="font-bold text-sm">${f.away_score}</span>
+      ${flagHtml(f.away_team, 28)}
+    </div>
+    <div class="flex-1 min-w-0 ml-1">
+      <div class="font-semibold text-sm line-clamp-2 leading-tight">${f.home_team} vs ${f.away_team}</div>
+      <div class="text-xs text-ink-500 mt-0.5">${pred ? `You predicted: ${pred.home_prediction}–${pred.away_prediction}` : 'No prediction'}</div>
+    </div>
+    <div class="${pts > 0 ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-400'} text-xs font-bold px-2.5 py-1 rounded-full shrink-0">+${pts}</div>
+  </div>`
+}).join('')
   }
 }
 
