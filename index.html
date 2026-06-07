@@ -828,7 +828,30 @@
       from { opacity: 0; transform: translateY(-8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* ===== Smooth Accordion Animation ===== */
+    .history-grid-wrapper {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 350ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .history-grid-wrapper.open {
+      grid-template-rows: 1fr;
+    }
+    .history-grid-inner {
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ===== Verified Badge on Profile Header ===== */
+    #profile-verified-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
 </style>
+<base target="_blank">
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -1123,6 +1146,26 @@
       <button onclick="hideRulesSheet()" class="w-full bg-ink-900 text-white font-semibold py-3.5 rounded-2xl tap">Got it — Let's Play</button>
     </div>
   </div>
+
+  <!-- Create League Modal -->
+  <div id="league-modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+    <div id="league-modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+      <div class="text-4xl text-center mb-3">🏆</div>
+      <h3 class="text-xl font-bold text-center mb-2">Create Private League</h3>
+      <p class="text-sm text-ink-500 text-center mb-6">Invite friends and compete in your own mini-leaderboard.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">League Name</label>
+          <input type="text" id="new-league-name" placeholder="e.g. Office Squad" 
+            class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+        </div>
+        <button onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
+        <button onclick="hideLeagueModal()" class="w-full bg-paper border border-paper-border text-ink-700 font-semibold py-4 rounded-2xl tap">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
   <!-- AUTH SCREEN -->
@@ -1426,9 +1469,10 @@
       </div>
 
       <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <h2 class="text-lg font-bold text-white truncate" id="profile-header-name">Tandin Wangyel</h2>
           <span id="profile-admin-badge" class="hidden text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/30">Admin</span>
+          <span id="profile-verified-badge" class="hidden text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">✓ Verified</span>
         </div>
         <div class="text-sm text-white/60 mt-0.5" id="profile-header-dept">No department</div>
         <div class="flex items-center gap-3 mt-2">
@@ -1436,12 +1480,10 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <span id="profile-header-phone">17364171</span>
           </div>
+          <div id="profile-header-streak" class="hidden text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30"></div>
         </div>
       </div>
 
-      <a id="admin-link" href="admin.html" class="hidden w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 transition tap border border-white/10" title="Admin Panel">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      </a>
       <button onclick="toggleEditProfile()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 transition tap border border-white/10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </button>
@@ -1465,7 +1507,7 @@
     </div>
   </div>
 
-  <!-- Collapsible Edit Form -->
+<!-- Collapsible Edit Form -->
   <div id="profile-edit-panel" class="hidden">
     <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
       <div class="p-5 space-y-4">
@@ -1490,41 +1532,39 @@
         <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Changes</button>
       </div>
 
-      </div>
-    </div>
-  <!-- Payment Status Card (Compact) -->
-  <div id="payment-status-card" class="hidden">
-    <div class="relative overflow-hidden rounded-2xl border border-emerald-500/20 p-4" 
-         style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.08) 0%, rgba(5, 150, 105, 0.06) 100%); 
-                backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-lg border border-emerald-500/20">✅</div>
-        <div class="flex-1">
-          <div class="text-sm font-semibold text-emerald-800">Entry Fee Paid</div>
-          <div class="text-xs text-emerald-600/70 mt-0.5" id="payment-status-amount">Nu. 500 · Verified</div>
-        </div>
-        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Active</span>
+      <div id="admin-link" class="hidden border-t border-paper-border p-5">
+        <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
+          <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Pending Payment Card (Compact) -->
-  <div id="payment-pending-card" class="hidden">
-    <div class="relative overflow-hidden rounded-2xl border border-amber-500/20 p-4" 
-         style="background: linear-gradient(135deg, rgba(180, 83, 9, 0.08) 0%, rgba(217, 119, 6, 0.06) 100%); 
-                backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center text-lg border border-amber-500/20">⏳</div>
-        <div class="flex-1">
-          <div class="text-sm font-semibold text-amber-800">Payment Pending</div>
-          <div class="text-xs text-amber-600/70 mt-0.5">Admin verification in progress</div>
-        </div>
-        <button onclick="checkPaymentStatus()" class="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full tap">Refresh</button>
-      </div>
+  
+<!-- My Leagues Card -->
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5" id="leagues-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold tracking-tight">My Leagues</h3>
+      <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">+ Create</button>
+    </div>
+
+    <!-- Join by code -->
+    <div class="flex gap-2 mb-4" id="league-join-wrap">
+      <input type="text" id="league-join-code" placeholder="Enter invite code" 
+        class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-paper text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+      <button onclick="handleJoinLeague()" class="bg-ink-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm">Join</button>
+    </div>
+
+    <!-- League list -->
+    <div id="my-leagues-list" class="space-y-2">
+      <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
     </div>
   </div>
 
-  <!-- Share Rank Card (Glassmorphism) -->
+
+  
+<!-- Share Rank Card (Glassmorphism) -->
   <div id="share-rank-card" class="hidden">
     <div class="relative overflow-hidden rounded-3xl border border-white/15 p-5" 
          style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.9) 0%, rgba(11, 18, 33, 0.85) 100%); 
@@ -1571,7 +1611,8 @@
     </div>
   </div>
 
-  <!-- Prediction History (Glassmorphism Accordion) -->
+  
+<!-- Prediction History (Glassmorphism Accordion) -->
   <div id="prediction-history-card" class="hidden">
     <div class="relative overflow-hidden rounded-3xl border border-white/15" 
          style="background: linear-gradient(180deg, rgba(250, 250, 247, 0.7) 0%, rgba(255, 255, 255, 0.85) 100%); 
@@ -1591,16 +1632,19 @@
         <svg id="history-chevron" class="w-5 h-5 text-ink-400 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
       </button>
 
-      <div id="history-content" class="hidden px-5 pb-5">
-        <div class="h-px bg-gradient-to-r from-transparent via-paper-border to-transparent mb-4"></div>
-        <div id="history-list" class="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar">
-          <!-- Populated by JS -->
+      <div id="history-content-wrap" class="history-grid-wrapper">
+        <div class="history-grid-inner">
+          <div class="px-5 pb-5">
+            <div class="h-px bg-gradient-to-r from-transparent via-paper-border to-transparent mb-4"></div>
+            <div id="history-list" class="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar">
+              <!-- Populated by JS -->
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Badges & streaks -->
+<!-- Badges & streaks -->
   <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
     <div class="flex items-center justify-between mb-4">
       <h3 class="font-bold tracking-tight">Achievements</h3>
@@ -1614,7 +1658,8 @@
     <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
   </div>
 
-  <!-- Scoring rules -->
+  
+<!-- Scoring rules -->
   <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
     <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
     <div class="space-y-3">
@@ -1787,6 +1832,7 @@
       </div>
     </div>
   </div>
+  <script src="/assets/js/bonus-engine.js"></script>
   <script type="text/javascript" src="/assets/js/index.js"></script>
 </body>
 </html>
