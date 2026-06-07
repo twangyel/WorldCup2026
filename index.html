@@ -261,7 +261,7 @@
       background: radial-gradient(circle at top right, #1E3A5F 0%, #0B1221 60%, #060C18 100%);
       color: #fff;
       border-radius: 24px;
-      padding: 16px 18px;
+      padding: 16px 18px 12px;
       position: relative;
       overflow: hidden;
       box-shadow: 0 8px 24px rgba(10,15,13,0.12);
@@ -2952,11 +2952,14 @@ function msToCountdown(ms) {
             `).join('')}
           </div>
 
-          <button onclick="togglePrizeDashboard()" id="prize-dash-toggle"
-            class="w-full bg-white/10 hover:bg-white/15 text-white/90 text-xs font-semibold py-2 rounded-xl tap flex items-center justify-center gap-1.5">
-            <span id="prize-dash-toggle-label">Show breakdown</span>
-            <svg id="prize-dash-toggle-icon" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-          </button>
+          <div class="flex justify-center">
+            <button onclick="togglePrizeDashboard()" id="prize-dash-toggle"
+              aria-label="Toggle breakdown"
+              class="bg-white/10 hover:bg-white/15 text-white/80 rounded-full tap flex items-center justify-center"
+              style="width:34px;height:22px;">
+              <svg id="prize-dash-toggle-icon" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+          </div>
 
           <div id="prize-dash-details" class="${prizeDashExpanded ? '' : 'hidden'} mt-4">
             <div class="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-1">Where the money goes</div>
