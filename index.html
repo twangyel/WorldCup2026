@@ -557,6 +557,9 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -810,7 +813,7 @@
               <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.52 3.48A11.78 11.78 0 0012.04 0C5.46 0 .12 5.34.12 11.92c0 2.1.55 4.15 1.6 5.96L0 24l6.3-1.66a11.86 11.86 0 005.74 1.46h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.45-8.4zM12.05 21.8h-.01a9.86 9.86 0 01-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 01-1.52-5.25c0-5.46 4.45-9.9 9.91-9.9 2.65 0 5.14 1.03 7.01 2.9a9.83 9.83 0 012.9 7c0 5.46-4.45 9.88-9.92 9.88z"/></svg>
               <input type="tel" id="whatsapp" required class="auth-input" placeholder="17123456" inputmode="numeric" autocomplete="tel">
             </div>
-            <p class="text-[11px] text-ink-500 mt-1.5 ml-1">Country code +975 added automatically. We'll send match reminders here.</p>
+            <p class="text-[11px] text-ink-500 mt-1.5 ml-1">Must be 8 digits starting with 16, 17, or 77. Country code +975 added automatically.</p>
           </div>
 
           <!-- Name field – shown only when creating an account -->
@@ -1505,6 +1508,11 @@ function toggleConfirmPassword() {
 }
 
 function loadRememberedEmail() {
+  // Always start in login mode — the blur handler will switch to signup
+  // if the number doesn't exist. This prevents the signup UI from showing
+  // for existing users when the RPC check fails or is slow.
+  switchToLoginUI()
+
   const r = localStorage.getItem('remembered-whatsapp')
   if (r) {
     document.getElementById('whatsapp').value = r
@@ -1520,24 +1528,82 @@ function saveRememberMe(whatsapp, checked) {
 }
 
 // Check if WhatsApp number is already registered
+// ============== WHATSAPP VALIDATION ==============
+function isValidWhatsapp(num) {
+  const clean = num.replace(/\D/g, '')
+  return /^\d{8}$/.test(clean)
+}
+
+function isEligibleForSignup(num) {
+  const clean = num.replace(/\D/g, '')
+  return /^\d{8}$/.test(clean) && /^(16|17|77)/.test(clean)
+}
+
 async function handleWhatsappBlur() {
   const wa = document.getElementById('whatsapp').value.trim()
-  if (!wa || !isValidWhatsapp(wa)) return
+  if (!wa) return
 
-  const { exists, error } = await checkWhatsappExists(wa)
+  // First check basic format (8 digits)
+  const clean = wa.replace(/\D/g, '')
+  if (!/^\d{8}$/.test(clean)) {
+    showToast('Enter a valid 8-digit WhatsApp number', 'error')
+    switchToLoginUI()
+    return
+  }
+
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const nameWrap = document.getElementById('name-wrap')
   const submitBtn = document.getElementById('auth-submit-btn')
   const subtitle = document.getElementById('auth-subtitle')
 
-  // If the existence check failed, don't flip the UI — stay in default
-  // (login) state. The form submit handler will recover gracefully.
-  if (error) {
-    console.warn('Could not check WhatsApp existence:', error)
-    return
+  // Check if number is eligible for new account (starts with 16, 17, or 77)
+  const eligible = /^(16|17|77)/.test(clean)
+
+  // Try to check if user exists. We track THREE states, not two:
+  //   exists === true   → registered → show LOGIN UI
+  //   exists === false  → POSITIVELY confirmed not registered → show SIGNUP UI
+  //   exists === null   → could not determine (RPC + fallback both failed) → default to LOGIN UI
+  // Defaulting to login when uncertain prevents the bug where an admin-registered
+  // user sees "Create Account" just because anon RLS blocks the profiles SELECT.
+  let exists = null
+  let checkError = null
+
+  try {
+    const rpcResult = await checkWhatsappExists(wa)
+    if (!rpcResult.error) {
+      exists = !!rpcResult.exists   // trust RPC only when no error
+    } else {
+      checkError = rpcResult.error
+    }
+  } catch (e) {
+    checkError = e
   }
 
-  if (exists) {
+  // Fallback: if RPC inconclusive, try direct profiles query.
+  // Match on phone (with/without +), whatsapp column, AND email — the admin
+  // panel generates `${cleanDigits}@wc-predictions.local` as the email.
+  if (exists === null && supabaseClient) {
+    try {
+      const normalized = '975' + clean  // DEFAULT_COUNTRY_CODE + digits
+      const adminEmail = `${clean}@wc-predictions.local`
+      const { data: found, error: fbErr } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .or(`phone.eq.+${normalized},phone.eq.${normalized},whatsapp.eq.${normalized},email.eq.${adminEmail}`)
+        .limit(1)
+      if (!fbErr) {
+        exists = (found && found.length > 0)   // trust query — positive OR negative
+      } else {
+        console.warn('Fallback profile check failed (likely RLS):', fbErr)
+        // exists stays null → uncertain
+      }
+    } catch (e2) {
+      console.warn('Fallback profile check threw:', e2)
+    }
+  }
+
+  if (exists === true) {
+    // Confirmed existing user → LOGIN UI (password only, no name / confirm)
     authMode = 'login'
     confirmWrap.classList.add('hidden')
     nameWrap.classList.add('hidden')
@@ -1545,7 +1611,14 @@ async function handleWhatsappBlur() {
     document.getElementById('name').required = false
     submitBtn.querySelector('span').textContent = 'Sign In'
     if (subtitle) subtitle.textContent = 'Welcome back! Enter your password.'
-  } else {
+  } else if (exists === false) {
+    // Confirmed NEW user → signup UI
+    if (!eligible) {
+      showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+      switchToLoginUI()
+      if (subtitle) subtitle.textContent = 'This number is not eligible for new registration.'
+      return
+    }
     authMode = 'signup'
     confirmWrap.classList.remove('hidden')
     nameWrap.classList.remove('hidden')
@@ -1553,6 +1626,12 @@ async function handleWhatsappBlur() {
     document.getElementById('name').required = true
     submitBtn.querySelector('span').textContent = 'Create Account'
     if (subtitle) subtitle.textContent = 'New here? Create your account below.'
+  } else {
+    // UNCERTAIN (exists === null) → default to LOGIN UI.
+    // If the user truly doesn't exist, the sign-in attempt will fail and the
+    // submit handler can prompt them to register at that point.
+    switchToLoginUI()
+    if (subtitle) subtitle.textContent = 'Enter your password to sign in.'
   }
 }
 
@@ -1564,6 +1643,11 @@ loadRememberedEmail()
 
 // Helper: show the signup UI (name + confirm password fields)
 function switchToSignupUI(subtitleMsg) {
+  const whatsapp = document.getElementById('whatsapp').value.trim()
+  if (!isEligibleForSignup(whatsapp)) {
+    showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+    return
+  }
   authMode = 'signup'
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const confirmInput = document.getElementById('confirm-password')
@@ -1667,18 +1751,34 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   const whatsapp = document.getElementById('whatsapp').value.trim()
   const password = document.getElementById('password').value
   const remember = document.getElementById('remember-me').checked
-  const confirmWrap = document.getElementById('confirm-password-wrap')
-  const confirmVisible = !confirmWrap.classList.contains('hidden')
 
-  if (!isValidWhatsapp(whatsapp)) {
-    showToast('Enter a valid WhatsApp number', 'error')
+  // Validate WhatsApp format: must be exactly 8 digits
+  const clean = whatsapp.replace(/\D/g, '')
+  if (!/^\d{8}$/.test(clean)) {
+    showToast('Enter a valid 8-digit WhatsApp number', 'error')
     return
   }
 
   setAuthButtonLoading(true)
 
-  // Path A: confirm-password field is visible => user is creating an account
-  if (confirmVisible) {
+  // ALWAYS check if the user exists in the DB — don't trust the visible form state.
+  // The blur handler may have raced, or the user may have clicked submit before
+  // blur finished. The database is the single source of truth.
+  const { exists, error: checkErr } = await checkWhatsappExists(whatsapp)
+
+  // If we can't reach the DB, fall back to the visible form state as a best-effort guess
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const confirmVisible = !confirmWrap.classList.contains('hidden')
+  const isSignupMode = checkErr ? confirmVisible : !exists
+
+  if (isSignupMode) {
+    // ===== SIGNUP PATH =====
+    if (!isEligibleForSignup(whatsapp)) {
+      showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+      switchToLoginUI()
+      setAuthButtonLoading(false)
+      return
+    }
     if (!name) {
       showToast('Please enter your name', 'error')
       setAuthButtonLoading(false)
@@ -1709,21 +1809,15 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       return
     }
   } else {
-    // Path B: login form. Try sign-in first.
+    // ===== LOGIN PATH =====
+    // Force UI to login mode in case blur handler left us in a weird state
+    switchToLoginUI()
+
     const { error } = await signInUser(whatsapp, password)
     if (error) {
       const msg = (error.message || '').toLowerCase()
-      // If credentials are invalid, the number might not be registered yet.
-      // Re-check existence; if it's new, prompt to create the account.
       if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
-        const { exists, error: checkErr } = await checkWhatsappExists(whatsapp)
-        if (checkErr || exists) {
-          showToast('Wrong password. Please try again.', 'error')
-          setAuthButtonLoading(false)
-          return
-        }
-        switchToSignupUI('New here? Enter your name and confirm your password.')
-        showToast('No account found — fill in your details to create one', 'info')
+        showToast('Wrong password. Please try again.', 'error')
         setAuthButtonLoading(false)
         return
       }
@@ -1734,9 +1828,6 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   }
 
   saveRememberMe(whatsapp, remember)
-  // showApp() handles its own fade. We keep the button in loading state
-  // until the transition completes so the user can't double-submit and
-  // the auth screen feels stable until the home is fully ready.
   try {
     await showApp()
   } finally {
@@ -3191,12 +3282,17 @@ function msToCountdown(ms) {
 
       // Fetch fixtures anonymously
       try {
-        const { data } = await supabaseClient
-          .from('matches')
-          .select('*')
-          .order('kickoff', { ascending: true })
-        fixtures = data || []
+        if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+          fixtures = []
+        } else {
+          const { data } = await supabaseClient
+            .from('fixtures')
+            .select('*')
+            .order('kickoff', { ascending: true })
+          fixtures = data || []
+        }
       } catch (e) {
+        console.warn('[Preview] Could not load fixtures:', e)
         fixtures = []
       }
       predictions = []
@@ -3495,7 +3591,7 @@ if (typeof getPrizePool !== 'function') {
 }
 
     (async function() {
-  await init();
+  await initAuth();
 
   // After init() resolves, getUser() can still be null because auth.js
   // (custom WhatsApp+password auth) may restore its in-memory user state

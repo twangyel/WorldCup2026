@@ -99,6 +99,17 @@
     .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; background: #fff; border-radius: 50%; transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .switch.on::after { transform: translateX(20px); }
 
+    /* Auth button spinner */
+    .auth-spinner {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      animation: authSpin 720ms linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    @keyframes authSpin { to { transform: rotate(360deg); } }
+
     /* Prize dashboard preview (mirror of player view) */
     .prize-dash-light {
       background: #fff; color: #1F2A26;
@@ -140,6 +151,8 @@
     .split-sum-ok { color: #047857; }
     .split-sum-bad { color: #B91C1C; }
   </style>
+<base target="_blank">
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -236,30 +249,52 @@
           </div>
           <form id="add-user-form" class="hidden space-y-3">
             <div>
-              <label class="fld-label">Name</label>
-              <input type="text" id="new-user-name" required class="fld">
+              <label class="fld-label">WhatsApp Number</label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 font-semibold text-sm">+975</span>
+                <input type="tel" id="new-user-whatsapp" required class="fld pl-14" placeholder="17123456" inputmode="numeric" autocomplete="tel">
+              </div>
+              <p class="text-[11px] text-ink-500 mt-1.5 ml-1">8 digits starting with 16, 17, or 77. This becomes their login ID.</p>
             </div>
             <div>
-              <label class="fld-label">Email</label>
-              <input type="email" id="new-user-email" required class="fld">
+              <label class="fld-label">Full Name</label>
+              <input type="text" id="new-user-name" required class="fld" placeholder="John Doe">
             </div>
             <div>
               <label class="fld-label">Department</label>
-              <input type="text" id="new-user-dept" class="fld">
+              <input type="text" id="new-user-dept" class="fld" placeholder="e.g. Engineering">
             </div>
             <div>
-              <label class="fld-label">Phone</label>
-              <input type="text" id="new-user-phone" class="fld">
+              <label class="fld-label">Temporary Password</label>
+              <input type="text" id="new-user-password" required class="fld" placeholder="Min 6 characters" minlength="6">
+              <p class="text-[11px] text-ink-500 mt-1.5 ml-1">User can change this after first login.</p>
             </div>
-            <button type="submit" class="btn-primary tap">Send Invite</button>
-            <p class="text-xs text-ink-400 text-center">User receives a magic-link email to set password.</p>
+
+            <!-- WhatsApp preview + send -->
+            <div id="wa-preview" class="hidden bg-paper rounded-2xl p-4 border border-paper-border space-y-3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">💬</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-ink-500">WhatsApp Preview</span>
+              </div>
+              <div class="bg-white rounded-xl p-3 border border-paper-border text-sm whitespace-pre-wrap leading-relaxed" id="wa-message-preview" style="font-family: system-ui, sans-serif;"></div>
+              <div class="flex gap-2">
+                <button type="button" onclick="copyWaMessage()" class="flex-1 btn-ghost text-xs py-2.5">📋 Copy Message</button>
+                <a id="wa-send-link" href="#" target="_blank" class="flex-1 btn-primary text-center text-xs py-2.5 flex items-center justify-center gap-1.5 no-underline" style="width:auto;">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.13 1.58 5.943L0 24l6.335-1.652a11.897 11.897 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  Open WhatsApp
+                </a>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary tap">Create Account & Generate Invite</button>
+            <p class="text-xs text-ink-400 text-center">Account is created immediately. Send the generated WhatsApp message to the user.</p>
           </form>
         </div>
 
         <div class="card p-4 mb-4">
           <div class="relative">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="users-search" placeholder="Search users by name, email, department..." 
+            <input type="text" id="users-search" placeholder="Search users by name, WhatsApp, department..." 
               class="w-full pl-11 pr-10 py-3 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]"
               oninput="filterUsers(this.value)">
             <button onclick="document.getElementById('users-search').value=''; filterUsers('')" 
@@ -302,8 +337,11 @@
         </div>
 
         <div class="card p-5">
-          <h2 class="font-bold text-lg tracking-tight mb-4">Add Manually</h2>
-          <form id="add-fixture-form" class="space-y-3">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg tracking-tight">Add Manually</h2>
+            <button onclick="toggleAddFixtureForm()" id="toggle-add-fixture" class="text-xs font-semibold text-brand-700 tap">+ New</button>
+          </div>
+          <form id="add-fixture-form" class="hidden space-y-3">
             <div>
               <label class="fld-label">Home Team</label>
               <input type="text" id="home-team" required class="fld">
@@ -1223,23 +1261,205 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       showToast('User removed permanently', 'success')
     }
 
+    // ============== ADD USER (WhatsApp-aligned) ==============
+    function isValidAdminWhatsapp(num) {
+      const clean = num.replace(/\D/g, '')
+      return /^\d{8}$/.test(clean) && /^(16|17|77)/.test(clean)
+    }
+
+    function buildWaMessage(name, whatsapp, password, feeAmount, currency) {
+      const appUrl = typeof window !== 'undefined' ? (window.location.origin + '/index.html') : 'https://your-app-url.com'
+      const cleanWa = whatsapp.replace(/\D/g, '')
+      return `Hi ${name || 'there'}! 👋
+
+You've been added to the *WC 2026 Prediction League*! 🏆
+
+*Your login details:*
+📱 WhatsApp: +975 ${cleanWa}
+🔑 Password: ${password}
+
+*Entry Fee:* ${currency} ${feeAmount}
+Please pay via bank transfer or mobile wallet and your admin will verify you.
+
+*Bank Transfer:*
+🏦 DK Bank
+Acct: 110148910019
+Name: Tandin Wangyel
+
+*Mobile Wallet:*
+📱 BOB
+Acct: 203149951
+
+*Next step:*
+1️⃣ Pay the entry fee
+2️⃣ Screenshot your payment
+3️⃣ Login at: ${appUrl}
+4️⃣ Upload proof in the app
+
+Good luck! ⚽🔥`
+    }
+
+    function updateWaPreview() {
+      const name = document.getElementById('new-user-name').value.trim()
+      const wa = document.getElementById('new-user-whatsapp').value.trim()
+      const pw = document.getElementById('new-user-password').value
+      const previewEl = document.getElementById('wa-message-preview')
+      const linkEl = document.getElementById('wa-send-link')
+      const wrapEl = document.getElementById('wa-preview')
+
+      if (!name || !isValidAdminWhatsapp(wa) || pw.length < 6) {
+        wrapEl.classList.add('hidden')
+        return
+      }
+
+      const fee = Number(prizeSettings?.entry_fee || 500)
+      const cur = prizeSettings?.currency || 'Nu.'
+      const msg = buildWaMessage(name, wa, pw, fee, cur)
+      previewEl.textContent = msg
+
+      const cleanWa = wa.replace(/\D/g, '')
+      const encoded = encodeURIComponent(msg)
+      linkEl.href = `https://wa.me/975${cleanWa}?text=${encoded}`
+
+      wrapEl.classList.remove('hidden')
+    }
+
+    function copyWaMessage() {
+      const text = document.getElementById('wa-message-preview').textContent
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Message copied to clipboard', 'success')
+      }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        showToast('Message copied to clipboard', 'success')
+      })
+    }
+
+    // Live update preview as admin types
+    ['new-user-name', 'new-user-whatsapp', 'new-user-password'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.addEventListener('input', updateWaPreview)
+    })
+
     document.getElementById('add-user-form').addEventListener('submit', async (e) => {
       e.preventDefault()
-      if (typeof inviteUser !== 'function') { showToast('inviteUser helper missing', 'error'); return }
-      const payload = {
-        name: document.getElementById('new-user-name').value,
-        email: document.getElementById('new-user-email').value,
-        department: document.getElementById('new-user-dept').value,
-        phone: document.getElementById('new-user-phone').value
+
+      const name = document.getElementById('new-user-name').value.trim()
+      const whatsapp = document.getElementById('new-user-whatsapp').value.trim()
+      const dept = document.getElementById('new-user-dept').value.trim()
+      const password = document.getElementById('new-user-password').value
+
+      // Validate WhatsApp
+      if (!isValidAdminWhatsapp(whatsapp)) {
+        showToast('Enter a valid 8-digit WhatsApp number starting with 16, 17, or 77', 'error')
+        return
       }
-      const { data, error } = await inviteUser(payload)
-      if (error) return showToast(error.message, 'error')
-      showToast('Invite sent', 'success')
-      e.target.reset()
-      document.getElementById('add-user-form').classList.add('hidden')
-      if (data) allUsers.push(data)
-      renderUsers()
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'error')
+        return
+      }
+
+      // Build email from WhatsApp (required for Supabase auth)
+      const cleanWa = whatsapp.replace(/\D/g, '')
+      const email = `${cleanWa}@wc-predictions.local`
+
+      setAuthButtonLoadingForAddUser(true)
+
+      try {
+        // Step 1: Create auth user via Supabase signUp
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: { name: name, phone: `+975${cleanWa}` }
+          }
+        })
+
+        if (authError) {
+          if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+            showToast('A user with this WhatsApp number already exists', 'error')
+          } else {
+            showToast(authError.message, 'error')
+          }
+          setAuthButtonLoadingForAddUser(false)
+          return
+        }
+
+        const userId = authData?.user?.id
+        if (!userId) {
+          showToast('Account created but user ID missing — check Supabase', 'error')
+          setAuthButtonLoadingForAddUser(false)
+          return
+        }
+
+        // Step 2: Upsert profile row (in case the trigger didn't fire or we need extra fields)
+        const { error: profileError } = await supabaseClient
+          .from('profiles')
+          .upsert({
+            id: userId,
+            name: name,
+            email: email,
+            department: dept || null,
+            phone: `+975${cleanWa}`,
+            fee_paid: false,
+            is_admin: false
+          }, { onConflict: 'id' })
+
+        if (profileError) {
+          console.warn('Profile upsert warning:', profileError)
+          // Non-fatal — the DB trigger may have already created it
+        }
+
+        // Step 3: Add to local list and refresh
+        const newUser = {
+          id: userId,
+          name: name,
+          email: email,
+          department: dept || '',
+          phone: `+975${cleanWa}`,
+          fee_paid: false,
+          is_admin: false
+        }
+        allUsers.push(newUser)
+        renderUsers()
+
+        // Step 4: Show WhatsApp preview (already generated by live preview)
+        updateWaPreview()
+        showToast('Account created! Send the WhatsApp message below.', 'success')
+
+        // Auto-scroll to preview
+        setTimeout(() => {
+          const preview = document.getElementById('wa-preview')
+          if (preview) preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }, 100)
+
+      } catch (err) {
+        console.error('Add user error:', err)
+        showToast('Something went wrong creating the account', 'error')
+      } finally {
+        setAuthButtonLoadingForAddUser(false)
+      }
     })
+
+    function setAuthButtonLoadingForAddUser(loading) {
+      const btn = document.querySelector('#add-user-form button[type="submit"]')
+      if (!btn) return
+      if (loading) {
+        btn.disabled = true
+        btn.dataset.originalText = btn.textContent
+        btn.innerHTML = '<span class="auth-spinner" style="width:18px;height:18px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:8px;"></span>Creating…'
+      } else {
+        btn.disabled = false
+        btn.textContent = btn.dataset.originalText || 'Create Account & Generate Invite'
+      }
+    }
 
     // ============== FIXTURES MANAGE ==============
     function renderFixturesManage() {
@@ -1344,7 +1564,14 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     ]
 
     function toggleCSV() { document.getElementById('csv-area').classList.toggle('hidden') }
-    async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
+    
+    function toggleAddFixtureForm() {
+      const form = document.getElementById('add-fixture-form')
+      const btn = document.getElementById('toggle-add-fixture')
+      form.classList.toggle('hidden')
+      btn.textContent = form.classList.contains('hidden') ? '+ New' : '− Hide'
+    }
+async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
     async function importCSV() {
       const raw = document.getElementById('csv-input').value.trim()
       if (!raw) return showToast('Paste some rows first', 'warning')
@@ -1375,6 +1602,14 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     // ============== RESULTS ==============
     function renderResults() {
       const list = document.getElementById('admin-fixtures')
+      const now = new Date()
+
+      // Find the single next upcoming match (not yet scored, earliest kickoff in future)
+      const upcoming = allFixtures
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const nextMatchId = upcoming[0]?.id || null
+
       let displayFixtures = allFixtures
       if (resultsFilter) {
         displayFixtures = allFixtures.filter(f =>
@@ -1384,26 +1619,71 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
         )
       }
       if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
-      list.innerHTML = displayFixtures.map(f => `
-        <div class="px-5 py-4">
-          <div class="mb-3">
-          <div class="font-semibold text-sm flex items-start gap-1.5 flex-wrap leading-tight">
-  ${flagHtml(f.home_team, 20)}
-  <span class="line-clamp-2">${f.home_team}</span>
-  <span class="text-ink-300 mt-0.5">vs</span>
-  ${flagHtml(f.away_team, 20)}
-  <span class="line-clamp-2">${f.away_team}</span>
-</div>
-            <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      list.innerHTML = displayFixtures.map(f => {
+        const isNext = f.id === nextMatchId
+        const hasScore = f.home_score !== null && f.away_score !== null
+        const timeLocked = new Date() >= new Date(f.kickoff)
+        // Only the next upcoming match is editable. Everything else is locked.
+        const locked = !isNext || timeLocked
+
+        // Status badge
+        let statusBadge
+        if (hasScore) {
+          statusBadge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
+        } else if (locked) {
+          if (timeLocked && !hasScore) {
+            statusBadge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">⏱ PAST — needs score</span>`
+          } else if (!isNext) {
+            statusBadge = `<span class="text-[11px] font-bold bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+          } else {
+            statusBadge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+          }
+        } else {
+          statusBadge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">✏️ OPEN</span>`
+        }
+
+        // Next-match highlight banner
+        const nextBanner = isNext && !timeLocked
+          ? `<div class="mb-3 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 flex items-center gap-2">
+               <span class="text-sm">⚡</span>
+               <span class="text-xs font-bold text-brand-700">Next match — only this fixture is editable right now</span>
+             </div>`
+          : ''
+
+        // Score inputs: editable only for the next match, read-only for everything else
+        const scoreInputs = locked
+          ? `<div class="flex items-center gap-2">
+               <div class="mini-score flex items-center justify-center bg-gray-100 text-gray-500 font-bold" style="border-color:#E5E7EB;">${f.home_score !== null ? f.home_score : '–'}</div>
+               <span class="text-ink-300 font-bold">–</span>
+               <div class="mini-score flex items-center justify-center bg-gray-100 text-gray-500 font-bold" style="border-color:#E5E7EB;">${f.away_score !== null ? f.away_score : '–'}</div>
+               <span class="ml-auto text-xs font-semibold text-gray-400 px-3 py-1.5 rounded-xl bg-gray-100">Locked</span>
+             </div>`
+          : `<div class="flex items-center gap-2">
+               <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
+               <span class="text-ink-300 font-bold">–</span>
+               <input type="number" min="0" placeholder="A" class="mini-score" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}','away',this.value)">
+               <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 h-11 rounded-xl tap flex items-center">Save</button>
+             </div>`
+
+        return `
+        <div class="px-5 py-4 ${isNext && !timeLocked ? 'bg-brand-50/30' : ''}">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-sm flex items-start gap-1.5 flex-wrap leading-tight">
+                ${flagHtml(f.home_team, 20)}
+                <span class="line-clamp-2">${f.home_team}</span>
+                <span class="text-ink-300 mt-0.5">vs</span>
+                ${flagHtml(f.away_team, 20)}
+                <span class="line-clamp-2">${f.away_team}</span>
+              </div>
+              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage} · ${new Date(f.kickoff).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+            ${statusBadge}
           </div>
-          <div class="flex items-center gap-2">
-            <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
-            <span class="text-ink-300 font-bold">–</span>
-            <input type="number" min="0" placeholder="A" class="mini-score" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}','away',this.value)">
-            <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 h-11 rounded-xl tap flex items-center">Save</button>
-          </div>
-        </div>
-      `).join('')
+          ${nextBanner}
+          ${scoreInputs}
+        </div>`
+      }).join('')
     }
 
     function updateScore(id, side, val) {
@@ -1413,6 +1693,17 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     function confirmSaveScore(id) {
       const s = pendingScores[id] || {}
       if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
+
+      // Enforce: only the next upcoming match can be scored
+      const now = new Date()
+      const upcoming = allFixtures
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const nextMatchId = upcoming[0]?.id
+      if (id !== nextMatchId) {
+        showToast('This match is locked. Only the next upcoming match can be scored.', 'error')
+        return
+      }
 
       const f = allFixtures.find(x => x.id === id)
       const alreadyScored = f && f.home_score !== null && f.home_score !== undefined &&
@@ -1444,6 +1735,17 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       })
     }
 async function executeSaveScore(id) {
+  // Double-check: only the next upcoming match can be scored
+  const now = new Date()
+  const upcoming = allFixtures
+    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  const nextMatchId = upcoming[0]?.id
+  if (id !== nextMatchId) {
+    showToast('This match is locked. Only the next upcoming match can be scored.', 'error')
+    return
+  }
+
   const s = pendingScores[id] || {}
   const { error } = await updateFixtureScore(id, s.home, s.away)
   if (error) return showToast(error.message, 'error')
