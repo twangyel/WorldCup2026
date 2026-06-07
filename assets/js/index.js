@@ -1057,22 +1057,79 @@ function msToCountdown(ms) {
     // ============== HOME ==============
     // ── Bonus Engine Helpers ──
 async function getLeaderboardFromResults() {
-  const { data: results, error } = await supabaseClient
-    .from('prediction_results')
-    .select('*, profiles!inner(id, full_name, department)')
+  // Fetch prediction_results and profiles separately (no FK relationship between them)
+  const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
+    supabaseClient.from('prediction_results').select('*'),
+    supabaseClient.from('profiles').select('id, full_name, department')
+  ])
 
-  if (error) {
-    console.error('getLeaderboardFromResults error:', error)
-    return { data: [], error }
+  // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
+  if (resError || !results || results.length === 0) {
+    console.log('[Leaderboard] prediction_results empty or error, falling back to profiles:', resError?.message || 'no data')
+
+    // Try the original getLeaderboard from auth.js if available
+    if (typeof getLeaderboard === 'function') {
+      try {
+        const fallback = await getLeaderboard()
+        if (fallback?.data && fallback.data.length > 0) {
+          return fallback
+        }
+      } catch (e) {
+        console.warn('[Leaderboard] getLeaderboard fallback failed:', e)
+      }
+    }
+
+    // Ultimate fallback: build from profiles with zero points
+    if (profiles && profiles.length > 0) {
+      const stats = profiles.map(p => ({
+        user_id: p.id,
+        id: p.id,
+        name: p.full_name || 'Unknown',
+        full_name: p.full_name || 'Unknown',
+        department: p.department || '',
+        points: 0,
+        exact: 0,
+        gd: 0,
+        result: 0,
+        total_predictions: 0
+      }))
+      return { data: stats, error: null }
+    }
+
+    return { data: [], error: resError }
+  }
+
+  const profileMap = {}
+  if (profiles) {
+    profiles.forEach(p => { profileMap[p.id] = p })
   }
 
   const userIds = [...new Set((results || []).map(r => r.user_id))]
   const stats = userIds.map(uid => {
     const userResults = results.filter(r => r.user_id === uid)
-    const engineStats = BonusEngine.aggregateUserStats(uid, userResults)
-    const profile = userResults[0]?.profiles || {}
+    let engineStats
+    try {
+      if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
+        engineStats = BonusEngine.aggregateUserStats(uid, userResults)
+      } else {
+        // Fallback: calculate stats manually if BonusEngine is not loaded
+        let points = 0, exact = 0, gd = 0, result = 0
+        userResults.forEach(r => {
+          points += r.final_points || r.points_awarded || 0
+          if (r.final_points === 5 || r.points_awarded === 5) exact++
+          else if (r.final_points === 3 || r.points_awarded === 3) gd++
+          else if (r.final_points === 2 || r.points_awarded === 2) result++
+        })
+        engineStats = { points, exact, gd, result, total_predictions: userResults.length }
+      }
+    } catch (e) {
+      console.warn('[Leaderboard] BonusEngine failed for user', uid, e)
+      engineStats = { points: 0, exact: 0, gd: 0, result: 0, total_predictions: userResults.length }
+    }
+    const profile = profileMap[uid] || {}
     return {
       user_id: uid,
+      name: profile.full_name || 'Unknown',
       full_name: profile.full_name || 'Unknown',
       department: profile.department || '',
       ...engineStats
@@ -1408,7 +1465,10 @@ recentEl.innerHTML = finished.map(f => {
     // ===== Next-match CTA card =====
     function renderLbCta() {
       const host = document.getElementById('lb-cta')
-      if (!host) return
+      if (!host) {
+        console.warn('[Leaderboard] lb-cta element not found in DOM')
+        return
+      }
       if (previewMode) { host.classList.add('hidden'); host.innerHTML = ''; return }
       const now = new Date()
       const upcoming = (fixtures || [])
@@ -1436,7 +1496,10 @@ recentEl.innerHTML = finished.map(f => {
     // ===== Prize strip =====
     function renderLbPrize(myRank) {
       const host = document.getElementById('lb-prize')
-      if (!host) return
+      if (!host) {
+        console.warn('[Leaderboard] lb-prize element not found in DOM')
+        return
+      }
       const b = lbPrizeBreakdown
       if (!b || b.gross <= 0) { host.classList.add('hidden'); host.innerHTML = ''; return }
       host.classList.remove('hidden')
@@ -1465,11 +1528,19 @@ recentEl.innerHTML = finished.map(f => {
       const myId = getUser()?.id
 
       // Fetch core stats for current sub-tab in parallel with enrichments
-      const [overallRes, streaks, prizeBd] = await Promise.all([
-        getLeaderboardFromResults(),
-        computeStreaks(),
-        fetchPrizeBreakdown().catch(() => null)
-      ])
+      let overallRes, streaks, prizeBd
+      try {
+        [overallRes, streaks, prizeBd] = await Promise.all([
+          getLeaderboardFromResults(),
+          computeStreaks().catch(() => ({})),
+          fetchPrizeBreakdown().catch(() => null)
+        ])
+      } catch (e) {
+        console.error('[Leaderboard] Failed to load:', e)
+        overallRes = { data: [] }
+        streaks = {}
+        prizeBd = null
+      }
       lbStreakMap = streaks || {}
       lbPrizeBreakdown = prizeBd
 
@@ -1499,16 +1570,44 @@ recentEl.innerHTML = finished.map(f => {
       renderLbPrize(myOverallRank)
 
       if (!stats?.length) {
-        if (lbSubtab === 'matchday') {
-          c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-            <div class="text-4xl mb-2">⏳</div><div class="font-semibold">No matchday yet</div><p class="text-sm text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
-          </div>`
-        } else {
-          c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-            <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
-          </div>`
+        // Try to show users from profiles even if no predictions exist yet
+        try {
+          const { data: allProfiles } = await supabaseClient
+            .from('profiles')
+            .select('id, full_name, department, name')
+            .order('created_at', { ascending: false })
+
+          if (allProfiles && allProfiles.length > 0) {
+            stats = allProfiles.map(p => ({
+              user_id: p.id,
+              id: p.id,
+              name: p.full_name || p.name || 'Unknown',
+              full_name: p.full_name || p.name || 'Unknown',
+              department: p.department || '',
+              points: 0,
+              exact: 0,
+              gd: 0,
+              result: 0,
+              total_predictions: 0
+            }))
+            console.log('[Leaderboard] Showing', stats.length, 'members from profiles (no predictions yet)')
+          }
+        } catch (e) {
+          console.warn('[Leaderboard] Could not load profiles fallback:', e)
         }
-        return
+
+        if (!stats?.length) {
+          if (lbSubtab === 'matchday') {
+            c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+              <div class="text-4xl mb-2">⏳</div><div class="font-semibold">No matchday yet</div><p class="text-sm text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
+            </div>`
+          } else {
+            c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+              <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
+            </div>`
+          }
+          return
+        }
       }
 
       // ===== FLIP: capture old positions + points BEFORE we touch the DOM =====

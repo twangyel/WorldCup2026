@@ -272,20 +272,44 @@ async function savePrediction(fixtureId, home, away) {
 }
 
 async function getLeaderboard() {
-    const { data: profiles } = await supabaseClient.from('profiles').select('*')
-    const { data: allPredictions } = await supabaseClient.from('predictions').select('*')
+    // Fetch profiles and results separately (prediction_results.user_id references auth.users, not profiles)
+    const [{ data: profiles }, { data: allResults }] = await Promise.all([
+        supabaseClient.from('profiles').select('*'),
+        supabaseClient.from('prediction_results').select('*')
+    ])
 
     if (!profiles) return { data: [], error: new Error('No profiles') }
 
-    const stats = profiles.map(p => {
-        const userPreds = allPredictions?.filter(pred => pred.user_id === p.id) || []
-        const points = userPreds.reduce((sum, pred) => sum + (pred.points_awarded || 0), 0)
-        const exact = userPreds.filter(pred => pred.points_awarded === 5).length
-        const gd = userPreds.filter(pred => pred.points_awarded === 3).length
-        const result = userPreds.filter(pred => pred.points_awarded === 2).length
+    let stats
 
-        return { ...p, points, exact, gd, result }
-    })
+    if (allResults && allResults.length > 0) {
+        // Use bonus engine aggregation
+        const userIds = [...new Set(allResults.map(r => r.user_id))]
+        stats = userIds.map(uid => {
+            const userResults = allResults.filter(r => r.user_id === uid)
+            const profile = profiles.find(p => p.id === uid) || {}
+            const engineStats = BonusEngine.aggregateUserStats(uid, userResults)
+            return {
+                ...profile,
+                ...engineStats,
+                points: engineStats.points,
+                exact: engineStats.exact,
+                gd: engineStats.gd,
+                result: engineStats.result
+            }
+        })
+    } else {
+        // Fallback to old predictions table (no bonuses)
+        const { data: allPredictions } = await supabaseClient.from('predictions').select('*')
+        stats = profiles.map(p => {
+            const userPreds = allPredictions?.filter(pred => pred.user_id === p.id) || []
+            const points = userPreds.reduce((sum, pred) => sum + (pred.points_awarded || 0), 0)
+            const exact = userPreds.filter(pred => pred.points_awarded === 5).length
+            const gd = userPreds.filter(pred => pred.points_awarded === 3).length
+            const result = userPreds.filter(pred => pred.points_awarded === 2).length
+            return { ...p, points, exact, gd, result }
+        })
+    }
 
     stats.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points
