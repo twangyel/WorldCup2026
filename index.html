@@ -848,6 +848,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1485,13 +1486,22 @@
         <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Changes</button>
       </div>
 
-      <div id="admin-link" class="hidden border-t border-paper-border p-5">
-        <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
-          <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-        </a>
       </div>
     </div>
+  </div>
+
+  <!-- Admin Panel Link (visible only for admins) -->
+  <div id="admin-link" class="hidden">
+    <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap shadow-lifted">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg border border-white/20">⚙️</div>
+        <div>
+          <div class="font-semibold text-[15px]">Admin Panel</div>
+          <div class="text-xs text-white/60">Manage league settings</div>
+        </div>
+      </div>
+      <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+    </a>
   </div>
 
   <!-- Payment Status Card (Compact) -->
