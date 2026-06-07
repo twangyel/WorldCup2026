@@ -1684,29 +1684,6 @@ recentEl.innerHTML = finished.map(f => {
       console.log('[Realtime] Prize settings channel status:', status)
     })
 
-  // 5) System settings — private leagues toggle (realtime sync from admin panel)
-  supabaseClient.channel('system-settings')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, (payload) => {
-      const newVal = payload.new?.private_leagues_enabled
-      if (typeof newVal === 'boolean') {
-        const oldVal = privateLeaguesEnabled
-        privateLeaguesEnabled = newVal
-        console.log('[Realtime] Private leagues toggled:', oldVal, '→', newVal)
-        // If user is on profile tab, re-render leagues section immediately
-        const profileTab = document.getElementById('tab-profile')
-        if (profileTab && !profileTab.classList.contains('hidden')) {
-          loadMyLeagues()
-        }
-        // Show toast if value actually changed
-        if (oldVal !== newVal) {
-          showToast(newVal ? 'Private leagues are now enabled!' : 'Private leagues have been disabled', 'info')
-        }
-      }
-    })
-    .subscribe((status) => {
-      console.log('[Realtime] System settings channel status:', status)
-    })
-
   // Fallback: poll prize pool every 10 seconds in case realtime fails
   if (prizePollInterval) clearInterval(prizePollInterval)
   prizePollInterval = setInterval(() => {
@@ -1968,15 +1945,10 @@ async function updateProfileHeader() {
 
   const nameEl = document.getElementById('profile-header-name')
   const adminBadge = document.getElementById('profile-admin-badge')
-  const verifiedBadge = document.getElementById('profile-verified-badge')
   if (nameEl) nameEl.textContent = name
   if (adminBadge) {
     if (isAdmin()) adminBadge.classList.remove('hidden')
     else adminBadge.classList.add('hidden')
-  }
-  if (verifiedBadge) {
-    if (profile.fee_paid && !previewMode) verifiedBadge.classList.remove('hidden')
-    else verifiedBadge.classList.add('hidden')
   }
 
   const deptEl = document.getElementById('profile-header-dept')
@@ -2013,14 +1985,28 @@ async function updateProfileCards() {
 
   await updateProfileHeader()
 
-  // Verified badge on profile header
-  const verifiedBadge = document.getElementById('profile-verified-badge')
-  if (verifiedBadge) {
-    if (profile?.fee_paid && !previewMode) {
-      verifiedBadge.classList.remove('hidden')
-    } else {
-      verifiedBadge.classList.add('hidden')
-    }
+  const paidCard = document.getElementById('payment-status-card')
+  const pendingCard = document.getElementById('payment-pending-card')
+
+  if (!profile || previewMode) {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.add('hidden')
+  } else if (profile.fee_paid) {
+    paidCard?.classList.remove('hidden')
+    pendingCard?.classList.add('hidden')
+    try {
+      const { data: ps } = await (getPrizeSettings?.() || Promise.resolve({ data: null }))
+      const fee = ps?.entry_fee || 500
+      const cur = ps?.currency || 'Nu.'
+      const amountEl = document.getElementById('payment-status-amount')
+      if (amountEl) amountEl.textContent = cur + ' ' + Number(fee).toLocaleString() + ' · Verified'
+    } catch (e) {}
+  } else if (profile.payment_proof_url || profile.payment_status === 'pending') {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.remove('hidden')
+  } else {
+    paidCard?.classList.add('hidden')
+    pendingCard?.classList.add('hidden')
   }
 
   const shareCard = document.getElementById('share-rank-card')
@@ -2070,16 +2056,16 @@ async function updateProfileCards() {
 }
 
 function togglePredictionHistory() {
-  const wrapper = document.getElementById('history-content-wrap')
+  const content = document.getElementById('history-content')
   const chevron = document.getElementById('history-chevron')
-  const isOpen = wrapper.classList.contains('open')
+  const isHidden = content.classList.contains('hidden')
 
-  if (!isOpen) {
-    wrapper.classList.add('open')
+  if (isHidden) {
+    content.classList.remove('hidden')
     chevron.style.transform = 'rotate(180deg)'
     renderPredictionHistory()
   } else {
-    wrapper.classList.remove('open')
+    content.classList.add('hidden')
     chevron.style.transform = 'rotate(0deg)'
   }
 }
@@ -2752,314 +2738,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
-}
-
-// ============== PRIVATE LEAGUES ==============
-
-let myLeagues = []
-let activeLeagueId = null
-let privateLeaguesEnabled = false
-
-async function checkPrivateLeaguesEnabled() {
-    const { data } = await getSystemSettings()
-    privateLeaguesEnabled = data?.private_leagues_enabled || false
-    return privateLeaguesEnabled
-}
-
-function showCreateLeagueModal() {
-    const overlay = document.getElementById('league-modal-overlay')
-    const panel = document.getElementById('league-modal-content')
-    overlay.classList.remove('hidden')
-    requestAnimationFrame(() => panel.classList.add('shown'))
-    document.getElementById('new-league-name').focus()
-}
-
-function hideLeagueModal() {
-    const overlay = document.getElementById('league-modal-overlay')
-    const panel = document.getElementById('league-modal-content')
-    panel.classList.remove('shown')
-    setTimeout(() => overlay.classList.add('hidden'), 320)
-}
-
-document.getElementById('league-modal-overlay')?.addEventListener('click', e => {
-    if (e.target.id === 'league-modal-overlay') hideLeagueModal()
-})
-
-async function handleCreateLeagueClick() {
-    const profile = getProfile()
-
-    // Check if private leagues are enabled globally
-    const enabled = await checkPrivateLeaguesEnabled()
-    if (!enabled) {
-        showToast('Private leagues are coming soon! Stay tuned.', 'info')
-        return
-    }
-
-    // Only paid users can create
-    if (!profile?.fee_paid) {
-        showToast('Complete your entry fee to create private leagues', 'warning')
-        return
-    }
-
-    showCreateLeagueModal()
-}
-
-async function handleCreateLeague() {
-    const name = document.getElementById('new-league-name').value.trim()
-    if (!name) {
-        showToast('Enter a league name', 'warning')
-        return
-    }
-
-    const btn = document.querySelector('#league-modal-content button[onclick="handleCreateLeague()"]')
-    btn.disabled = true
-    btn.textContent = 'Creating...'
-
-    const { data, error } = await createLeague(name)
-
-    btn.disabled = false
-    btn.textContent = 'Create League'
-
-    if (error) {
-        showToast(error.message, 'error')
-        return
-    }
-
-    hideLeagueModal()
-    showToast(`League created! Code: ${data.invite_code}`, 'success')
-    await loadMyLeagues()
-    activeLeagueId = data.id
-    switchTab('leaderboard')
-}
-
-async function handleJoinLeague() {
-    const enabled = await checkPrivateLeaguesEnabled()
-    if (!enabled) {
-        showToast('Private leagues are coming soon! Stay tuned.', 'info')
-        return
-    }
-
-    const code = document.getElementById('league-join-code').value.trim()
-    if (!code) {
-        showToast('Enter an invite code', 'warning')
-        return
-    }
-
-    const { data, error } = await joinLeagueByCode(code)
-    if (error) {
-        showToast(error.message, 'error')
-        return
-    }
-
-    showToast(`Joined "${data.name}"!`, 'success')
-    document.getElementById('league-join-code').value = ''
-    await loadMyLeagues()
-    activeLeagueId = data.id
-    switchTab('leaderboard')
-}
-
-async function loadMyLeagues() {
-    const container = document.getElementById('my-leagues-list')
-    const createBtn = document.getElementById('create-league-btn')
-    const joinWrap = document.getElementById('league-join-wrap')
-
-    // Check system setting
-    const enabled = await checkPrivateLeaguesEnabled()
-
-    if (!enabled) {
-        // Show Coming Soon state
-        if (createBtn) {
-            createBtn.textContent = 'Coming Soon'
-            createBtn.classList.add('opacity-50', 'cursor-not-allowed')
-            createBtn.classList.remove('tap')
-            createBtn.onclick = () => showToast('Private leagues are coming soon!', 'info')
-        }
-        if (joinWrap) joinWrap.classList.add('hidden')
-        container.innerHTML = `
-            <div class="text-center py-6">
-                <div class="text-3xl mb-2">🔜</div>
-                <div class="text-sm font-semibold text-ink-700">Coming Soon</div>
-                <p class="text-xs text-ink-500 mt-1">Private leagues will be available soon. Stay tuned!</p>
-            </div>`
-        return
-    }
-
-    // Reset button state when enabled
-    if (createBtn) {
-        createBtn.textContent = '+ Create'
-        createBtn.classList.remove('opacity-50', 'cursor-not-allowed')
-        createBtn.classList.add('tap')
-        createBtn.onclick = handleCreateLeagueClick
-    }
-    if (joinWrap) joinWrap.classList.remove('hidden')
-
-    const { data, error } = await getMyLeagues()
-    if (error) {
-        console.error('loadMyLeagues error:', error)
-        return
-    }
-
-    myLeagues = data || []
-
-    if (!myLeagues.length) {
-        container.innerHTML = `
-            <div class="text-center py-6">
-                <div class="text-3xl mb-2 opacity-40">🏆</div>
-                <div class="text-sm font-semibold text-ink-700">No leagues yet</div>
-                <p class="text-xs text-ink-500 mt-1">Create one or join with a code</p>
-            </div>`
-        return
-    }
-
-    container.innerHTML = myLeagues.map(l => `
-        <div class="flex items-center gap-3 p-3 rounded-2xl border ${activeLeagueId === l.id ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" onclick="selectLeague('${l.id}')">
-            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${(l.name || 'L').substring(0, 2).toUpperCase()}</div>
-            <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate">${l.name}</div>
-                <div class="text-[11px] text-ink-500 font-mono tracking-wider">${l.invite_code}</div>
-            </div>
-            ${activeLeagueId === l.id ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">ACTIVE</span>' : ''}
-            <button onclick="event.stopPropagation(); shareLeagueCode('${l.id}', '${l.invite_code}', '${l.name.replace(/'/g, "\'")}')" class="text-ink-400 p-1.5 tap">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
-            </button>
-        </div>
-    `).join('')
-}
-
-function selectLeague(leagueId) {
-    activeLeagueId = activeLeagueId === leagueId ? null : leagueId
-    loadMyLeagues()
-    if (activeLeagueId) {
-        showToast('Switched to league leaderboard', 'success')
-        switchTab('leaderboard')
-    }
-}
-
-function shareLeagueCode(leagueId, code, name) {
-    const appUrl = window.location.origin
-    const message = `🏆 Join my WC 2026 Prediction League: *"${name}"*\n\nUse code: *${code}*\n👉 ${appUrl}\n\nLet's see who predicts better! ⚽`
-    const encoded = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encoded}`, '_blank')
-}
-
-// ============== LEAGUE LEADERBOARD OVERRIDE ==============
-
-const _originalLoadLeaderboard = loadLeaderboard
-loadLeaderboard = async function() {
-    if (activeLeagueId && !previewMode) {
-        await loadLeagueLeaderboardView(activeLeagueId)
-        return
-    }
-    // Restore global sub-tabs when not in league mode
-    const subOv = document.getElementById('lb-subtab-overall')
-    const subMd = document.getElementById('lb-subtab-matchday')
-    const backBtn = document.getElementById('lb-back-to-global')
-    if (subOv) subOv.classList.remove('hidden')
-    if (subMd) subMd.classList.remove('hidden')
-    if (backBtn) backBtn.classList.add('hidden')
-    if (document.getElementById('lb-subtab-meta')) {
-        document.getElementById('lb-subtab-meta').textContent = ''
-    }
-    await _originalLoadLeaderboard()
-}
-
-async function loadLeagueLeaderboardView(leagueId) {
-    const c = document.getElementById('leaderboard-list')
-    const myId = getUser()?.id
-
-    const [{ data: stats }, { data: league }] = await Promise.all([
-        getLeagueLeaderboard(leagueId),
-        supabaseClient.from('leagues').select('name, invite_code').eq('id', leagueId).single()
-    ])
-
-    // Hide global sub-tabs, show back button
-    const subOv = document.getElementById('lb-subtab-overall')
-    const subMd = document.getElementById('lb-subtab-matchday')
-    if (subOv) subOv.classList.add('hidden')
-    if (subMd) subMd.classList.add('hidden')
-
-    // Create or show back button
-    let backBtn = document.getElementById('lb-back-to-global')
-    if (!backBtn) {
-        backBtn = document.createElement('button')
-        backBtn.id = 'lb-back-to-global'
-        backBtn.className = 'lb-subtab tap active'
-        backBtn.textContent = '← Global'
-        backBtn.onclick = () => { activeLeagueId = null; loadMyLeagues(); switchTab('leaderboard') }
-        document.querySelector('.lb-subtabs')?.prepend(backBtn)
-    } else {
-        backBtn.classList.remove('hidden')
-    }
-
-    if (document.getElementById('lb-subtab-meta')) {
-        document.getElementById('lb-subtab-meta').textContent = league?.name || 'League'
-    }
-
-    // Hide CTA and prize strip in league mode
-    const cta = document.getElementById('lb-cta')
-    if (cta) { cta.classList.add('hidden'); cta.innerHTML = '' }
-    const prize = document.getElementById('lb-prize')
-    if (prize) { prize.classList.add('hidden'); prize.innerHTML = '' }
-
-    if (!stats?.length) {
-        c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-            <div class="text-4xl mb-2">👥</div>
-            <div class="font-semibold">No members yet</div>
-            <p class="text-sm text-ink-500 mt-1">Invite friends with code: ${league?.invite_code || '---'}</p>
-        </div>`
-        return
-    }
-
-    // Render league leaderboard using existing styles
-    c.innerHTML = stats.map((s, i) => {
-        const rank = i + 1
-        const uid = s.user_id || s.id
-        const isMe = uid === myId
-        const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
-        const hasPoints = (s.points || 0) > 0
-        const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
-        const rankDisplay = medal
-            ? `<div class="text-2xl relative">${medal}</div>`
-            : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
-
-        return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3">
-            ${rankDisplay}
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
-                    ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
-                </div>
-                <div class="text-xs text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
-                    <span><b class="text-ink-900">${correct}</b> correct</span>
-                    <span class="text-ink-300">·</span>
-                    <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
-                    ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}
-                </div>
-            </div>
-            <div class="text-right shrink-0">
-                <div class="text-2xl font-bold text-brand-700 leading-none">${s.points || 0}</div>
-                <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
-            </div>
-        </div>`
-    }).join('')
-}
-
-// ============== PROFILE TAB: LOAD LEAGUES ==============
-
-const _originalSwitchTab = switchTab
-switchTab = function(tab) {
-    if (tab === 'profile' && !previewMode) {
-        loadMyLeagues()
-    }
-    _originalSwitchTab(tab)
-}
-
-// ============== INIT: LOAD SYSTEM SETTINGS ==============
-
-const _originalInitApp = initApp
-initApp = async function() {
-    // Pre-check system settings
-    await checkPrivateLeaguesEnabled()
-    await _originalInitApp()
 }

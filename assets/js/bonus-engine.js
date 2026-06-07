@@ -1,5 +1,5 @@
 // ============================================================
-// BONUS CALCULATION ENGINE v1.0
+// BONUS CALCULATION ENGINE v1.1
 // Layer 1: Streak Bonus | Layer 2: Combo Bonus | Layer 3: Stage Multiplier
 // Integrates with existing calculatePoints(predHome, predAway, actualHome, actualAway)
 // ============================================================
@@ -17,6 +17,8 @@ const BONUS_CONFIG = {
       { minStreak: 10, bonus: 15, label: 'Legendary',     emoji: '👑' }
     ],
     // Cap at highest tier reached (don't stack tiers)
+    // If true, applies the highest tier bonus on EVERY match once reached
+    // If false, only applies when the tier threshold is first crossed
     stackTiers: false
   },
 
@@ -96,6 +98,14 @@ function createMatchResult({
   basePoints,  // From calculatePoints()
   timestamp = new Date().toISOString()
 }) {
+  // Input validation
+  if (typeof basePoints !== 'number' || isNaN(basePoints)) {
+    throw new Error(`Invalid basePoints: ${basePoints}. Must be a number.`);
+  }
+  if (!fixtureId || !userId) {
+    throw new Error('fixtureId and userId are required');
+  }
+
   return {
     fixture_id: fixtureId,
     user_id: userId,
@@ -127,22 +137,26 @@ function createMatchResult({
  * Resets to 0 on any 0-point match
  * 
  * @param {Array} userHistory - Array of match results, sorted by kickoff ASC
+ * @param {Object} currentMatch - The match being evaluated (optional)
  * @returns {Object} { currentStreak, tier, bonus }
  */
-function calculateStreak(userHistory) {
+function calculateStreak(userHistory, currentMatch = null) {
   if (!BONUS_CONFIG.streak.enabled) {
     return { currentStreak: 0, tier: null, bonus: 0, label: '', emoji: '' };
   }
 
+  // Build full history including current match if provided
+  const allMatches = currentMatch ? [...userHistory, currentMatch] : [...userHistory];
+
   // Sort by kickoff to ensure chronological order
-  const sorted = [...userHistory].sort((a, b) => 
+  const sorted = allMatches.sort((a, b) => 
     new Date(a.kickoff) - new Date(b.kickoff)
   );
 
-  // Count consecutive matches with final_points > 0 from the END
+  // Count consecutive matches with base_points > 0 from the END
   let currentStreak = 0;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].final_points > 0) {
+    if (sorted[i].base_points > 0) {
       currentStreak++;
     } else {
       break; // Streak broken
@@ -173,9 +187,21 @@ function calculateStreak(userHistory) {
  * Apply streak bonus to a new match result
  * The bonus is applied ONCE when the streak threshold is crossed
  * (applied to the match that completes the streak)
+ * 
+ * BUG FIXES:
+ * - Current match is now included in streak count
+ * - Bonus only awarded if current match has base_points > 0
+ * - Bonus only awarded on the match that FIRST reaches the tier threshold
  */
 function applyStreakBonus(matchResult, userHistory) {
-  const streak = calculateStreak(userHistory);
+  // FIX: Streak bonus should not apply to 0-point matches
+  if (matchResult.base_points === 0) {
+    matchResult.streak_count = 0;
+    return matchResult;
+  }
+
+  // FIX: Include current match in streak calculation
+  const streak = calculateStreak(userHistory, matchResult);
 
   matchResult.streak_count = streak.currentStreak;
   matchResult.streak_tier = streak.tier ? {
@@ -186,7 +212,7 @@ function applyStreakBonus(matchResult, userHistory) {
 
   // Only apply bonus if this match COMPLETES a streak tier
   // i.e., current streak count equals exactly a tier threshold
-  // OR if stackTiers is true, apply highest tier reached
+  // OR if stackTiers is true, apply highest tier reached on every match
   if (streak.tier) {
     const isThresholdMatch = streak.currentStreak === streak.tier.minStreak;
     const shouldApply = BONUS_CONFIG.streak.stackTiers 
@@ -269,11 +295,15 @@ function checkGDCombo(userHistory, currentMatch) {
 
 /**
  * Check for Perfect Day (all exact on same matchday)
+ * 
+ * BUG FIX: Now prevents multiple awards for the same matchday.
+ * Only awards if not already earned on this matchday.
  */
 function checkPerfectDay(userHistory, currentMatch) {
   if (!BONUS_CONFIG.combo.perfectDay.enabled) return null;
 
   const matchdayKey = currentMatch.matchday_key;
+  if (!matchdayKey) return null;
 
   // Get all matches on this matchday (including current)
   const matchdayMatches = [...userHistory, currentMatch].filter(m => 
@@ -286,16 +316,24 @@ function checkPerfectDay(userHistory, currentMatch) {
   // All must be exact scores
   const allExact = matchdayMatches.every(m => m.base_points === 5);
 
-  if (allExact) {
-    return {
-      type: 'perfect_day',
-      label: BONUS_CONFIG.combo.perfectDay.label,
-      emoji: BONUS_CONFIG.combo.perfectDay.emoji,
-      value: BONUS_CONFIG.combo.perfectDay.bonus,
-      description: `All ${matchdayMatches.length} predictions exact on ${matchdayKey}`
-    };
-  }
-  return null;
+  if (!allExact) return null;
+
+  // FIX: Check if Perfect Day was already awarded for this matchday
+  const alreadyAwarded = userHistory.some(m => 
+    m.matchday_key === matchdayKey &&
+    m.combos_earned &&
+    m.combos_earned.some(c => c.type === 'perfect_day')
+  );
+
+  if (alreadyAwarded) return null;
+
+  return {
+    type: 'perfect_day',
+    label: BONUS_CONFIG.combo.perfectDay.label,
+    emoji: BONUS_CONFIG.combo.perfectDay.emoji,
+    value: BONUS_CONFIG.combo.perfectDay.bonus,
+    description: `All ${matchdayMatches.length} predictions exact on ${matchdayKey}`
+  };
 }
 
 /**
@@ -382,13 +420,18 @@ function applyStageMultiplier(matchResult) {
  * @returns {Object} Complete match result with all bonuses
  */
 function calculateFullPoints(params, userHistory = []) {
+  // Validate userHistory is an array
+  if (!Array.isArray(userHistory)) {
+    throw new Error('userHistory must be an array');
+  }
+
   // Step 0: Create base result
   let result = createMatchResult(params);
 
   // Step 1: Apply stage multiplier to base points
   result = applyStageMultiplier(result);
 
-  // Step 2: Apply streak bonus (based on history BEFORE this match)
+  // Step 2: Apply streak bonus (includes this match in streak count)
   result = applyStreakBonus(result, userHistory);
 
   // Step 3: Apply combo bonuses (includes this match in checks)
@@ -546,11 +589,13 @@ function getStreakDisplay(userHistory) {
 
 /**
  * Get matchday key from kickoff date
- * Used for Perfect Day combo detection
+ * 
+ * BUG FIX: Uses UTC methods to avoid timezone shifts.
+ * (Bhutan is UTC+6, so a 23:00 UTC kickoff would shift to 05:00 next day locally)
  */
 function getMatchdayKey(kickoff) {
   const d = new Date(kickoff);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 // ============== INTEGRATION WITH EXISTING CODE ==============
@@ -558,79 +603,106 @@ function getMatchdayKey(kickoff) {
 /**
  * Hook this into your existing score-saving flow in admin.html
  * Replace the simple points_awarded update with this full calculation
+ * 
+ * BUG FIX: Added per-user try/catch so one failure doesn't block others.
+ * Added conflict target hint for upsert.
  */
 async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
   // 1. Get fixture details
-  const { data: fixture } = await supabaseClient
+  const { data: fixture, error: fixtureError } = await supabaseClient
     .from('fixtures')
     .select('*')
     .eq('id', fixtureId)
     .single();
 
-  if (!fixture) return;
+  if (fixtureError || !fixture) {
+    console.error('Failed to load fixture:', fixtureError);
+    return;
+  }
 
   // 2. Get all predictions for this fixture
-  const { data: predictions } = await supabaseClient
+  const { data: predictions, error: predError } = await supabaseClient
     .from('predictions')
     .select('*')
     .eq('fixture_id', fixtureId);
 
-  if (!predictions?.length) return;
+  if (predError || !predictions?.length) {
+    console.error('No predictions found:', predError);
+    return;
+  }
+
+  const matchdayKey = getMatchdayKey(fixture.kickoff);
 
   // 3. For each prediction, calculate full points with bonuses
   for (const pred of predictions) {
-    // Calculate base points using existing function
-    const basePoints = calculatePoints(
-      pred.home_prediction, 
-      pred.away_prediction,
-      actualHome, 
-      actualAway
-    );
+    try {
+      // Calculate base points using existing function
+      const basePoints = calculatePoints(
+        pred.home_prediction, 
+        pred.away_prediction,
+        actualHome, 
+        actualAway
+      );
 
-    // Get user's match history for streak/combo calculation
-    const { data: userHistory } = await supabaseClient
-      .from('prediction_results') // or your results table
-      .select('*')
-      .eq('user_id', pred.user_id)
-      .lt('kickoff', fixture.kickoff)
-      .order('kickoff', { ascending: true });
+      // Get user\'s match history for streak/combo calculation
+      const { data: userHistory, error: histError } = await supabaseClient
+        .from('prediction_results') // or your results table
+        .select('*')
+        .eq('user_id', pred.user_id)
+        .lt('kickoff', fixture.kickoff)
+        .order('kickoff', { ascending: true });
 
-    // Calculate full points with bonuses
-    const matchdayKey = getMatchdayKey(fixture.kickoff);
-    const fullResult = calculateFullPoints({
-      fixtureId: fixtureId,
-      userId: pred.user_id,
-      stage: fixture.stage,
-      kickoff: fixture.kickoff,
-      matchdayKey: matchdayKey,
-      predHome: pred.home_prediction,
-      predAway: pred.away_prediction,
-      actualHome: actualHome,
-      actualAway: actualAway,
-      basePoints: basePoints
-    }, userHistory || []);
+      if (histError) {
+        console.error(`History load failed for user ${pred.user_id}:`, histError);
+        continue;
+      }
 
-    // 4. Save to database
-    await supabaseClient
-      .from('prediction_results')
-      .upsert({
-        prediction_id: pred.id,
-        user_id: pred.user_id,
-        fixture_id: fixtureId,
-        base_points: fullResult.base_points,
-        stage_multiplier: fullResult.stage_multiplier,
-        multiplied_base: fullResult.multiplied_base,
-        streak_bonus: fullResult.streak_bonus,
-        combo_bonus: fullResult.combo_bonus,
-        total_bonus: fullResult.total_bonus,
-        final_points: fullResult.final_points,
-        streak_count: fullResult.streak_count,
-        streak_tier: fullResult.streak_tier,
-        combos_earned: fullResult.combos_earned,
-        bonus_breakdown: fullResult.bonus_breakdown,
+      // Calculate full points with bonuses
+      const fullResult = calculateFullPoints({
+        fixtureId: fixtureId,
+        userId: pred.user_id,
+        stage: fixture.stage,
         kickoff: fixture.kickoff,
-        matchday_key: matchdayKey
-      });
+        matchdayKey: matchdayKey,
+        predHome: pred.home_prediction,
+        predAway: pred.away_prediction,
+        actualHome: actualHome,
+        actualAway: actualAway,
+        basePoints: basePoints
+      }, userHistory || []);
+
+      // 4. Save to database
+      const { error: upsertError } = await supabaseClient
+        .from('prediction_results')
+        .upsert({
+          prediction_id: pred.id,
+          user_id: pred.user_id,
+          fixture_id: fixtureId,
+          home_prediction: pred.home_prediction,
+          away_prediction: pred.away_prediction,
+          base_points: fullResult.base_points,
+          stage_multiplier: fullResult.stage_multiplier,
+          multiplied_base: fullResult.multiplied_base,
+          streak_bonus: fullResult.streak_bonus,
+          combo_bonus: fullResult.combo_bonus,
+          total_bonus: fullResult.total_bonus,
+          final_points: fullResult.final_points,
+          streak_count: fullResult.streak_count,
+          streak_tier: fullResult.streak_tier,
+          combos_earned: fullResult.combos_earned,
+          bonus_breakdown: fullResult.bonus_breakdown,
+          kickoff: fixture.kickoff,
+          matchday_key: matchdayKey
+        }, { 
+          onConflict: 'prediction_id' // or your unique constraint column
+        });
+
+      if (upsertError) {
+        console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
+      }
+    } catch (err) {
+      console.error(`Failed to process prediction ${pred.id}:`, err);
+    }
   }
 }
 
