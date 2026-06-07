@@ -1390,7 +1390,32 @@ recentEl.innerHTML = finished.map(f => {
         </div>`
     }
 
-  
+    // ===== Prize strip =====
+    function renderLbPrize(myRank) {
+      const host = document.getElementById('lb-prize')
+      if (!host) return
+      const b = lbPrizeBreakdown
+      if (!b || b.gross <= 0) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      host.classList.remove('hidden')
+      const split = (myRank >= 1 && myRank <= 3) ? b.splits[myRank - 1] : null
+      const projectedHtml = split
+        ? `<div class="projected">
+             <div class="proj-amount">${fmtMoney(b.currency, split.amount)}</div>
+             <div class="proj-label">if standings hold</div>
+           </div>`
+        : `<div class="projected">
+             <div class="proj-amount">${b.splits.map(p => fmtMoney(b.currency, p.amount).replace(b.currency + ' ', '')).join(' / ')}</div>
+             <div class="proj-label">top 3 payouts</div>
+           </div>`
+      host.innerHTML = `
+        <div class="lb-prize-strip">
+          <div>
+            <div class="pool-label">Prize Pool</div>
+            <div class="pool">${fmtMoney(b.currency, b.net)}</div>
+          </div>
+          ${projectedHtml}
+        </div>`
+    }
 
     async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
