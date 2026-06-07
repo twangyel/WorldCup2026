@@ -546,7 +546,143 @@
       box-shadow: 0 10px 24px -8px rgba(11,18,33,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
     }
     .enter-league-btn:hover { filter: brightness(1.08); }
+
+    /* ========== SPLASH SCREEN ("The Tunnel") ========== */
+    .splash-screen {
+      position: fixed;
+      inset: 0;
+      background: #0A1628;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.5s;
+    }
+    .splash-screen.splash-exit {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Ambient floating particles */
+    .splash-particles {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .splash-particles span {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(212, 162, 76, 0.25);
+      border-radius: 50%;
+      animation: particleFloat 8s ease-in-out infinite;
+    }
+    .splash-particles span:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 7s; }
+    .splash-particles span:nth-child(2) { left: 25%; top: 60%; animation-delay: 1s; animation-duration: 9s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(3) { left: 45%; top: 15%; animation-delay: 2s; animation-duration: 6s; }
+    .splash-particles span:nth-child(4) { left: 65%; top: 70%; animation-delay: 0.5s; animation-duration: 8s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(5) { left: 80%; top: 30%; animation-delay: 1.5s; animation-duration: 10s; }
+    .splash-particles span:nth-child(6) { left: 15%; top: 80%; animation-delay: 3s; animation-duration: 7s; width: 2px; height: 2px; }
+    .splash-particles span:nth-child(7) { left: 55%; top: 45%; animation-delay: 2.5s; animation-duration: 9s; }
+    .splash-particles span:nth-child(8) { left: 90%; top: 55%; animation-delay: 1s; animation-duration: 8s; width: 2px; height: 2px; }
+    @keyframes particleFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
+      50% { transform: translateY(-30px) scale(1.3); opacity: 0.7; }
+    }
+
+    /* Logo container */
+    .splash-logo-wrap {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin-bottom: 32px;
+    }
+    .splash-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      position: relative;
+      z-index: 2;
+      animation: breathe 3s ease-in-out infinite;
+      filter: drop-shadow(0 4px 20px rgba(212, 162, 76, 0.15));
+    }
+    .splash-glow {
+      position: absolute;
+      inset: -20%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 162, 76, 0.18), transparent 70%);
+      animation: glowPulse 3s ease-in-out infinite;
+      z-index: 1;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Progress bar */
+    .splash-progress-wrap {
+      width: 160px;
+      margin-bottom: 24px;
+    }
+    .splash-progress-track {
+      width: 100%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .splash-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #D4A24C, #E8C878);
+      border-radius: 999px;
+      transition: width 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 0 8px rgba(212, 162, 76, 0.4);
+    }
+
+    /* Rotating tip */
+    .splash-tip {
+      color: #6B7B8F;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.5;
+      margin: 0;
+      transition: opacity 0.3s ease;
+      min-height: 40px;
+    }
+
+    /* Version text */
+    .splash-version {
+      position: absolute;
+      bottom: 32px;
+      color: rgba(255, 255, 255, 0.15);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .splash-logo, .splash-glow, .splash-particles span {
+        animation: none !important;
+      }
+      .splash-progress-bar {
+        transition: none;
+      }
+    }
   </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -577,32 +713,116 @@
     </div>
   </div>
 
-  <!-- Loading Screen -->
-<div id="loading-screen" style="
-  position: fixed;
-  inset: 0;
-  background: #f9fafb;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  transition: opacity 0.4s ease;
-">
-  <img src="/image/logo.svg" alt="WC 26" style="width: 100px; height: 100px; margin-bottom: 24px;">
-  <div style="color: #059669; font-family: system-ui, sans-serif; font-size: 18px; font-weight: 600;">
-    Loading Predictions...
+  <!-- ========== SPLASH SCREEN ("The Tunnel") ========== -->
+<div id="loading-screen" class="splash-screen">
+  <!-- Subtle ambient particles -->
+  <div class="splash-particles" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
   </div>
+
+  <!-- Logo with breathing pulse -->
+  <div class="splash-logo-wrap">
+    <img src="/image/logo.svg" alt="WC 2026" class="splash-logo">
+    <!-- Soft radial glow behind logo -->
+    <div class="splash-glow" aria-hidden="true"></div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="splash-progress-wrap">
+    <div class="splash-progress-track">
+      <div class="splash-progress-bar" id="splash-progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Rotating trivia tip -->
+  <p class="splash-tip" id="splash-tip">Loading your league…</p>
+
+  <!-- Version / build info (subtle) -->
+  <div class="splash-version">WC26 Prediction League</div>
 </div>
 
 <script>
-  // Hide loading screen when app is ready
-  window.addEventListener('load', () => {
-    const loader = document.getElementById('loading-screen');
-    loader.style.opacity = '0';
-    setTimeout(() => loader.remove(), 400);
-  });
+  // ===== SPLASH SCREEN LOGIC =====
+  (function() {
+    const TIPS = [
+      "Did you know? Brazil has 5 World Cup titles.",
+      "48 teams. 104 matches. 1 trophy.",
+      "First 3-host World Cup: USA, Canada, Mexico.",
+      "Pelé is the only player with 3 World Cup wins.",
+      "The 2026 final is July 19 at MetLife Stadium.",
+      "Miroslav Klose holds the record: 16 World Cup goals.",
+      "Mexico's Azteca Stadium will host its 3rd World Cup.",
+      "Lionel Messi has played in 26 World Cup matches — the most ever.",
+      "The fastest World Cup goal: 13 seconds by Hakan Şükür (2002).",
+      "Only Brazil has played in every World Cup since 1930.",
+      "The 2022 final drew 1.5 billion viewers worldwide.",
+      "Roger Milla scored at age 42 — the oldest World Cup goalscorer."
+    ];
+
+    let tipIndex = 0;
+    let tipInterval = null;
+    let progress = 0;
+    let progressInterval = null;
+
+    function startSplash() {
+      const tipEl = document.getElementById('splash-tip');
+      const barEl = document.getElementById('splash-progress-bar');
+      if (!tipEl || !barEl) return;
+
+      // Random starting tip
+      tipIndex = Math.floor(Math.random() * TIPS.length);
+      tipEl.textContent = TIPS[tipIndex];
+
+      // Cycle tips every 2.5s
+      tipInterval = setInterval(() => {
+        tipEl.style.opacity = '0';
+        setTimeout(() => {
+          tipIndex = (tipIndex + 1) % TIPS.length;
+          tipEl.textContent = TIPS[tipIndex];
+          tipEl.style.opacity = '1';
+        }, 300);
+      }, 2500);
+
+      // Simulate progress (fills over ~2s, then holds)
+      progressInterval = setInterval(() => {
+        progress += Math.random() * 15 + 5;
+        if (progress >= 90) {
+          progress = 90;
+          clearInterval(progressInterval);
+        }
+        barEl.style.width = progress + '%';
+      }, 200);
+    }
+
+    function finishSplash() {
+      const barEl = document.getElementById('splash-progress-bar');
+      const screen = document.getElementById('loading-screen');
+      if (barEl) barEl.style.width = '100%';
+      if (tipInterval) clearInterval(tipInterval);
+      if (progressInterval) clearInterval(progressInterval);
+
+      setTimeout(() => {
+        if (screen) {
+          screen.classList.add('splash-exit');
+          setTimeout(() => screen.remove(), 500);
+        }
+      }, 400);
+    }
+
+    // Start immediately
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startSplash);
+    } else {
+      startSplash();
+    }
+
+    // Expose finish function for the app init
+    window.finishSplash = finishSplash;
+  })();
 </script>
+
+
   <!-- TOAST -->
   <div id="toast-container" class="fixed bottom-24 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none items-center"></div>
 
@@ -3703,7 +3923,7 @@ if (typeof getPrizePool !== 'function') {
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden')
-    await showApp();
+    await showApp(); if (typeof window.finishSplash === 'function') window.finishSplash();
   } else {
     if (typeof showAuth === 'function') showAuth();
     else if (typeof loadAuthStats === 'function') loadAuthStats();

@@ -5,9 +5,8 @@ const urlsToCache = [
   '/admin.html',
   '/assets/js/auth.js',
   '/manifest.json',
-  '/image/logo.svg'  // <-- add this
+  '/image/logo.svg'
 ]
-// ... rest of your sw.js stays the same
 
 self.addEventListener('install', event => {
   event.waitUntil(
