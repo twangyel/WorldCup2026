@@ -167,6 +167,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1045,6 +1046,14 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       }
       renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
+
+    // Hook loadSystemSettings into loadAll
+    const _originalLoadAll = loadAll
+    loadAll = async function() {
+      await _originalLoadAll()
+      await loadSystemSettings()
+    }
+
 
     async function loadNotifications() {
   try {
@@ -2125,7 +2134,36 @@ async function executeSaveScore(id) {
     init()
   
 
-    // ============== SETTINGS ==============
+        // ============== SETTINGS ==============
+    // FORCE OVERRIDE: Direct table access — no RPC needed
+    // These MUST be defined before loadSystemSettings() is called
+    window.getSystemSettings = async function() {
+      try {
+        const { data, error } = await supabaseClient
+          .from('system_settings')
+          .select('*')
+          .limit(1)
+        if (error) throw error
+        return { data: data?.[0] || { private_leagues_enabled: false }, error: null }
+      } catch (e) {
+        return { data: { private_leagues_enabled: false }, error: e }
+      }
+    }
+
+    window.setSystemSettings = async function(payload) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('system_settings')
+          .update({ private_leagues_enabled: payload.private_leagues_enabled })
+          .eq('id', 1)
+          .select()
+        if (error) throw error
+        return { data: data?.[0] || null, error: null }
+      } catch (e) {
+        return { data: null, error: e }
+      }
+    }
+
     let systemSettings = { private_leagues_enabled: false }
 
     async function loadSystemSettings() {
@@ -2163,11 +2201,6 @@ async function executeSaveScore(id) {
     async function togglePrivateLeagues() {
       const newValue = !systemSettings.private_leagues_enabled
 
-      if (typeof setSystemSettings !== 'function') {
-        showToast('setSystemSettings helper missing', 'error')
-        return
-      }
-
       const { error } = await setSystemSettings({ private_leagues_enabled: newValue })
       if (error) {
         const msg = error.message || ''
@@ -2203,38 +2236,3 @@ async function executeSaveScore(id) {
         console.error('loadLeagueStats error:', e)
       }
     }
-
-    // Fallback getSystemSettings/setSystemSettings if not in auth.js
-    if (typeof getSystemSettings !== 'function') {
-      window.getSystemSettings = async function() {
-        try {
-          const { data, error } = await supabaseClient
-            .rpc('get_system_settings')
-          return { data: data || { private_leagues_enabled: false }, error }
-        } catch (e) {
-          return { data: { private_leagues_enabled: false }, error: e }
-        }
-      }
-    }
-    if (typeof setSystemSettings !== 'function') {
-      window.setSystemSettings = async function(payload) {
-        try {
-          const { data, error } = await supabaseClient
-            .rpc('toggle_private_leagues', { p_enabled: payload.private_leagues_enabled })
-          return { data, error }
-        } catch (e) {
-          return { data: null, error: e }
-        }
-      }
-    }
-
-    // Hook loadSystemSettings into loadAll
-    const _originalLoadAll = loadAll
-    loadAll = async function() {
-      await _originalLoadAll()
-      await loadSystemSettings()
-    }
-
-</script>
-</body>
-</html>
