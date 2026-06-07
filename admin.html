@@ -2149,20 +2149,21 @@ async function executeSaveScore(id) {
         return { data: { private_leagues_enabled: false }, error: e }
       }
     }
-
-    window.setSystemSettings = async function(payload) {
-      try {
-        const { data, error } = await supabaseClient
-          .from('system_settings')
-          .update({ private_leagues_enabled: payload.private_leagues_enabled })
-          .eq('id', 1)
-          .select()
-        if (error) throw error
-        return { data: data?.[0] || null, error: null }
-      } catch (e) {
-        return { data: null, error: e }
-      }
-    }
+window.setSystemSettings = async function(payload) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .upsert(
+        { id: 1, private_leagues_enabled: payload.private_leagues_enabled },
+        { onConflict: 'id' }
+      )
+      .select()
+    if (error) throw error
+    return { data: data?.[0] || null, error: null }
+  } catch (e) {
+    return { data: null, error: e }
+  }
+}
 
     let systemSettings = { private_leagues_enabled: false }
 
