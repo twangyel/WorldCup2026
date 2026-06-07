@@ -5,7 +5,7 @@ const urlsToCache = [
   '/admin.html',
   '/assets/js/auth.js',
   '/manifest.json',
-  '/image/logo.svg'
+  '/image/pwa.svg'
 ]
 
 self.addEventListener('install', event => {
@@ -52,8 +52,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/image/logo.svg',
-      badge: '/image/logo.svg',
+      icon: '/image/pwa.svg',
+      badge: '/image/pwa.svg',
       tag: data.tag,
       requireInteraction: true,
       data: { url: data.url || '/admin.html' }
