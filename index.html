@@ -3292,12 +3292,15 @@ function msToCountdown(ms) {
       const tEl = document.getElementById('auth-stat-teams')
       if (!mEl || !tEl) return
       try {
-        // One query gets us both numbers: the row count (matches) and the
-        // team names (which we de-dupe locally).
+        // Pull team names so we can both count matches and derive teams.
         const { data, count, error } = await supabaseClient
           .from('fixtures')
           .select('home_team, away_team', { count: 'exact' })
-        if (error) throw error
+
+        if (error) {
+          console.warn('[loadAuthStats] fixtures query error:', error)
+          throw error
+        }
 
         const matchCount = (typeof count === 'number') ? count : (data?.length || 0)
         mEl.textContent = matchCount
@@ -3308,9 +3311,22 @@ function msToCountdown(ms) {
           if (f.away_team && f.away_team !== 'TBD') teamSet.add(f.away_team)
         })
         tEl.textContent = teamSet.size
+
+        console.log('[loadAuthStats] matches:', matchCount, 'teams:', teamSet.size)
       } catch (e) {
-        // Graceful fallback to official WC 2026 numbers
-        console.warn('loadAuthStats failed, using fallback:', e)
+        // Last-ditch: try a head-only count so we at least show matches.
+        try {
+          const { count } = await supabaseClient
+            .from('fixtures')
+            .select('*', { count: 'exact', head: true })
+          if (typeof count === 'number') {
+            mEl.textContent = count
+            tEl.textContent = 48
+            return
+          }
+        } catch (e2) { /* fall through */ }
+        // Final fallback to official WC 2026 numbers.
+        console.warn('[loadAuthStats] using static fallback:', e)
         mEl.textContent = 64
         tEl.textContent = 48
       }
@@ -3481,39 +3497,48 @@ if (typeof getPrizePool !== 'function') {
     (async function() {
   await init();
 
-  // getUser() can return null immediately after init() because Supabase
-  // restores its session asynchronously from localStorage. If we have no
-  // user yet but a session DOES exist in storage, poll briefly while
-  // auth.js finishes wiring up its in-memory state. This was the cause
-  // of the "logged out after returning from admin.html" bug — the
-  // session was fine, the UI just gave up too early.
-  let user = (typeof getUser === 'function') ? getUser() : null;
+  // After init() resolves, getUser() can still be null because auth.js
+  // (custom WhatsApp+password auth) may restore its in-memory user state
+  // asynchronously — sometimes via a microtask, sometimes from a fetch
+  // against the profiles table. We don't know the exact mechanism, so
+  // we poll for up to ~1.5s. This is what fixes the "logged out after
+  // returning from admin" bug: the session token is still in localStorage,
+  // we just have to wait a beat for auth.js to read it.
+  async function waitForUser(maxMs = 1500, stepMs = 50) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      const u = (typeof getUser === 'function') ? getUser() : null;
+      if (u) return u;
+      await new Promise(r => setTimeout(r, stepMs));
+    }
+    return (typeof getUser === 'function') ? getUser() : null;
+  }
 
-  if (!user && window.supabaseClient?.auth) {
+  // Heuristic: if localStorage contains anything that looks like a saved
+  // session, it's worth waiting the full window. If not, we can show the
+  // login screen sooner.
+  function looksLikeSavedSession() {
     try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) {
-        for (let i = 0; i < 30 && !user; i++) {
-          await new Promise(r => setTimeout(r, 50));
-          user = (typeof getUser === 'function') ? getUser() : null;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i) || '';
+        if (/auth|session|user|token|sb-/i.test(k)) {
+          const v = localStorage.getItem(k);
+          if (v && v.length > 2) return true;
         }
       }
-    } catch (e) {
-      console.warn('Session restore check failed:', e);
-    }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
+  let user = (typeof getUser === 'function') ? getUser() : null;
+  if (!user && looksLikeSavedSession()) {
+    user = await waitForUser(1500);
   }
 
   if (user) {
-    // User already has a session — hide the auth screen up front so
-    // showApp() reveals the home directly under the loading overlay
-    // (no crossfade from a screen the user never saw).
     document.getElementById('auth-screen').classList.add('hidden')
     await showApp();
   } else {
-    // No session — show login screen explicitly. This also loads the
-    // Matches/Teams stats, which otherwise stay as em-dashes because
-    // the auth screen is visible by default but loadAuthStats() only
-    // runs from inside showAuth().
     if (typeof showAuth === 'function') showAuth();
     else if (typeof loadAuthStats === 'function') loadAuthStats();
   }
