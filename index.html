@@ -849,7 +849,6 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -990,26 +989,6 @@
     </div>
   </div>
 
-    <!-- Create League Modal -->
-  <div id="league-modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
-    <div id="league-modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
-      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
-      <div class="text-4xl text-center mb-3">🏆</div>
-      <h3 class="text-xl font-bold text-center mb-2">Create Private League</h3>
-      <p class="text-sm text-ink-500 text-center mb-6">Invite friends and compete in your own mini-leaderboard.</p>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">League Name</label>
-          <input type="text" id="new-league-name" placeholder="e.g. Office Squad" 
-            class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
-        </div>
-        <button onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
-        <button onclick="hideLeagueModal()" class="w-full bg-paper border border-paper-border text-ink-700 font-semibold py-4 rounded-2xl tap">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Rules & Regulations Sheet -->
 <div id="rules-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
   <div id="rules-panel" class="sheet-panel bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-lifted max-h-[90vh] flex flex-col">
@@ -1143,6 +1122,26 @@
       <button onclick="hideRulesSheet()" class="w-full bg-ink-900 text-white font-semibold py-3.5 rounded-2xl tap">Got it — Let's Play</button>
     </div>
   </div>
+
+  <!-- Create League Modal -->
+  <div id="league-modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">
+    <div id="league-modal-content" class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+      <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+      <div class="text-4xl text-center mb-3">🏆</div>
+      <h3 class="text-xl font-bold text-center mb-2">Create Private League</h3>
+      <p class="text-sm text-ink-500 text-center mb-6">Invite friends and compete in your own mini-leaderboard.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">League Name</label>
+          <input type="text" id="new-league-name" placeholder="e.g. Office Squad" 
+            class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+        </div>
+        <button onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
+        <button onclick="hideLeagueModal()" class="w-full bg-paper border border-paper-border text-ink-700 font-semibold py-4 rounded-2xl tap">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
   <!-- AUTH SCREEN -->
@@ -1459,9 +1458,6 @@
         </div>
       </div>
 
-      <a id="admin-link" href="admin.html" class="hidden w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 transition tap border border-white/10" title="Admin Panel">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      </a>
       <button onclick="toggleEditProfile()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 transition tap border border-white/10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </button>
@@ -1485,25 +1481,27 @@
     </div>
   </div>
 
-    <!-- My Leagues Card -->
-  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+
+  <!-- My Leagues Card -->
+  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5" id="leagues-card">
     <div class="flex items-center justify-between mb-4">
       <h3 class="font-bold tracking-tight">My Leagues</h3>
-      <button onclick="showCreateLeagueModal()" class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">+ Create</button>
+      <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">+ Create</button>
     </div>
-    
+
     <!-- Join by code -->
-    <div class="flex gap-2 mb-4">
+    <div class="flex gap-2 mb-4" id="league-join-wrap">
       <input type="text" id="league-join-code" placeholder="Enter invite code" 
         class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-paper text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition">
       <button onclick="handleJoinLeague()" class="bg-ink-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm">Join</button>
     </div>
-    
+
     <!-- League list -->
     <div id="my-leagues-list" class="space-y-2">
       <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
     </div>
   </div>
+
 
   <!-- Collapsible Edit Form -->
   <div id="profile-edit-panel" class="hidden">
@@ -1530,8 +1528,15 @@
         <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Changes</button>
       </div>
 
+      <div id="admin-link" class="hidden border-t border-paper-border p-5">
+        <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
+          <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </a>
       </div>
     </div>
+  </div>
+
   <!-- Payment Status Card (Compact) -->
   <div id="payment-status-card" class="hidden">
     <div class="relative overflow-hidden rounded-2xl border border-emerald-500/20 p-4" 

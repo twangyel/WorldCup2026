@@ -165,6 +165,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -239,6 +240,10 @@
         <button onclick="adminTab('prize')" data-atab="prize" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">💰 Prize</span>
         </button>
+        <button onclick="adminTab('settings')" data-atab="settings" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
+          <span class="seg-content">⚙️ Settings</span>
+        </button>
+
       </div>
 
       <!-- USERS -->
@@ -518,6 +523,57 @@
 
         <button onclick="savePrizeSettings()" class="btn-primary tap">Save All Settings</button>
       </div>
+
+
+      <!-- SETTINGS -->
+      <div id="atab-settings" class="atab hidden space-y-4">
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-1">System Settings</h2>
+          <p class="text-xs text-ink-500 mb-5">Control global features for all players.</p>
+
+          <!-- Private Leagues Toggle -->
+          <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border">
+            <div class="min-w-0 mr-3">
+              <div class="font-semibold text-sm">Private Leagues</div>
+              <div class="text-xs text-ink-500 mt-0.5">Allow users to create and join private leagues</div>
+              <div class="text-[11px] text-ink-400 mt-1">When disabled, all users see "Coming Soon"</div>
+            </div>
+            <div id="private-leagues-switch" class="switch" onclick="togglePrivateLeagues()"></div>
+          </div>
+
+          <div class="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+            <div class="flex items-start gap-2">
+              <span class="text-blue-600 text-lg">ℹ️</span>
+              <div>
+                <div class="text-xs font-bold text-blue-800 uppercase tracking-wider">How it works</div>
+                <div class="text-xs text-blue-700 mt-1 leading-relaxed">
+                  When enabled, paid users can create private leagues and invite friends via WhatsApp. 
+                  Each league has its own mini-leaderboard. Unpaid users see "Coming Soon" and cannot create or join leagues.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="font-bold text-lg tracking-tight mb-1">Current Status</h2>
+          <div class="space-y-3 mt-3">
+            <div class="flex items-center justify-between py-2 border-b border-paper-border">
+              <span class="text-sm text-ink-500">Private Leagues</span>
+              <span id="settings-pl-status" class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">Loading...</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-paper-border">
+              <span class="text-sm text-ink-500">Total Leagues Created</span>
+              <span id="settings-league-count" class="text-sm font-bold text-ink-900">—</span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+              <span class="text-sm text-ink-500">Total League Members</span>
+              <span id="settings-member-count" class="text-sm font-bold text-ink-900">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -2066,6 +2122,119 @@ async function executeSaveScore(id) {
     }
 
     init()
-  </script>
+  
+
+    // ============== SETTINGS ==============
+    let systemSettings = { private_leagues_enabled: false }
+
+    async function loadSystemSettings() {
+      try {
+        const { data, error } = await getSystemSettings()
+        if (error) throw error
+        systemSettings = { ...systemSettings, ...data }
+        renderSettings()
+      } catch (e) {
+        console.error('loadSystemSettings error:', e)
+      }
+    }
+
+    function renderSettings() {
+      const sw = document.getElementById('private-leagues-switch')
+      const status = document.getElementById('settings-pl-status')
+
+      if (sw) {
+        sw.classList.toggle('on', systemSettings.private_leagues_enabled)
+      }
+
+      if (status) {
+        if (systemSettings.private_leagues_enabled) {
+          status.textContent = 'ENABLED'
+          status.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700'
+        } else {
+          status.textContent = 'DISABLED'
+          status.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500'
+        }
+      }
+
+      loadLeagueStats()
+    }
+
+    async function togglePrivateLeagues() {
+      const newValue = !systemSettings.private_leagues_enabled
+
+      if (typeof setSystemSettings !== 'function') {
+        showToast('setSystemSettings helper missing', 'error')
+        return
+      }
+
+      const { error } = await setSystemSettings({ private_leagues_enabled: newValue })
+      if (error) {
+        showToast(error.message, 'error')
+        return
+      }
+
+      systemSettings.private_leagues_enabled = newValue
+      renderSettings()
+      showToast(newValue ? 'Private leagues enabled!' : 'Private leagues disabled', 'success')
+    }
+
+    async function loadLeagueStats() {
+      try {
+        const { data: leagues, error: lErr } = await supabaseClient
+          .from('leagues')
+          .select('id', { count: 'exact' })
+
+        const { data: members, error: mErr } = await supabaseClient
+          .from('league_memberships')
+          .select('id', { count: 'exact' })
+
+        const leagueCountEl = document.getElementById('settings-league-count')
+        const memberCountEl = document.getElementById('settings-member-count')
+
+        if (leagueCountEl) leagueCountEl.textContent = lErr ? '—' : (leagues?.length || 0)
+        if (memberCountEl) memberCountEl.textContent = mErr ? '—' : (members?.length || 0)
+      } catch (e) {
+        console.error('loadLeagueStats error:', e)
+      }
+    }
+
+    // Fallback getSystemSettings/setSystemSettings if not in auth.js
+    if (typeof getSystemSettings !== 'function') {
+      window.getSystemSettings = async function() {
+        try {
+          const { data, error } = await supabaseClient
+            .from('system_settings')
+            .select('*')
+            .eq('id', 1)
+            .single()
+          return { data, error }
+        } catch (e) {
+          return { data: { private_leagues_enabled: false }, error: e }
+        }
+      }
+    }
+    if (typeof setSystemSettings !== 'function') {
+      window.setSystemSettings = async function(payload) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('system_settings')
+            .upsert({ id: 1, ...payload }, { onConflict: 'id' })
+            .select()
+            .single()
+          return { data, error }
+        } catch (e) {
+          return { data: null, error: e }
+        }
+      }
+    }
+
+    // Hook loadSystemSettings into loadAll
+    const _originalLoadAll = loadAll
+    loadAll = async function() {
+      await _originalLoadAll()
+      await loadSystemSettings()
+    }
+
+</script>
 </body>
 </html>

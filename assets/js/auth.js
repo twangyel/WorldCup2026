@@ -389,12 +389,50 @@ async function setPrizeSettings(payload) {
 // PRIVATE LEAGUES
 // =====================
 
+async function getSystemSettings() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('system_settings')
+            .select('*')
+            .eq('id', 1)
+            .single()
+        if (error) throw error
+        return { data: data || { private_leagues_enabled: false }, error: null }
+    } catch (e) {
+        return { data: { private_leagues_enabled: false }, error: e }
+    }
+}
+
+async function setSystemSettings(payload) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('system_settings')
+            .upsert({ id: 1, ...payload }, { onConflict: 'id' })
+            .select()
+            .single()
+        return { data, error }
+    } catch (e) {
+        return { data: null, error: e }
+    }
+}
+
 async function createLeague(name) {
     const user = getUser()
     if (!user) return { data: null, error: new Error('Not authenticated') }
-    
+
+    // Check if private leagues are enabled globally
+    const { data: sys } = await getSystemSettings()
+    if (!sys?.private_leagues_enabled) {
+        return { data: null, error: new Error('Private leagues are currently disabled') }
+    }
+
+    // Only paid users can create leagues
+    if (!currentProfile?.fee_paid) {
+        return { data: null, error: new Error('Complete your entry fee to create private leagues') }
+    }
+
     const code = 'WC26-' + Math.random().toString(36).substring(2, 6).toUpperCase()
-    
+
     const { data, error } = await supabaseClient
         .from('leagues')
         .insert({
@@ -405,56 +443,61 @@ async function createLeague(name) {
         })
         .select()
         .single()
-    
+
     if (!error && data) {
-        // Auto-join creator
         await supabaseClient
             .from('league_memberships')
             .insert({ league_id: data.id, user_id: user.id })
     }
-    
+
     return { data, error }
 }
 
 async function joinLeagueByCode(code) {
     const user = getUser()
     if (!user) return { data: null, error: new Error('Not authenticated') }
-    
+
+    // Check if private leagues are enabled globally
+    const { data: sys } = await getSystemSettings()
+    if (!sys?.private_leagues_enabled) {
+        return { data: null, error: new Error('Private leagues are currently disabled') }
+    }
+
     const cleanCode = code.trim().toUpperCase()
-    
+
     const { data: league, error: findErr } = await supabaseClient
         .from('leagues')
         .select('id, name')
         .eq('invite_code', cleanCode)
         .single()
-    
+
     if (findErr || !league) {
         return { data: null, error: new Error('Invalid invite code') }
     }
-    
+
     const { error } = await supabaseClient
         .from('league_memberships')
         .insert({ league_id: league.id, user_id: user.id })
-    
+
     return { data: league, error }
 }
 
 async function getMyLeagues() {
     const user = getUser()
     if (!user) return { data: [], error: new Error('Not authenticated') }
-    
+
     const { data, error } = await supabaseClient
         .from('league_memberships')
         .select('league_id, leagues(id, name, invite_code, created_by, created_at)')
         .eq('user_id', user.id)
-    
+
     if (error) return { data: [], error }
-    
+
     const leagues = (data || []).map(m => ({
         ...m.leagues,
         membership_id: m.league_id
     }))
-    
+
     return { data: leagues, error: null }
 }
 
@@ -463,45 +506,41 @@ async function getLeagueMembers(leagueId) {
         .from('league_memberships')
         .select('user_id, profiles(id, name, department, fee_paid)')
         .eq('league_id', leagueId)
-    
+
     if (error) return { data: [], error }
-    
+
     const members = (data || []).map(m => m.profiles).filter(Boolean)
     return { data: members, error: null }
 }
 
 async function getLeagueLeaderboard(leagueId) {
-    // Get all members
     const { data: members, error: mErr } = await getLeagueMembers(leagueId)
     if (mErr) return { data: [], error: mErr }
-    
+
     const memberIds = members.map(m => m.id)
-    
-    // Re-use global leaderboard logic
     const { data: allStats } = await getLeaderboard()
-    
-    // Filter to league members only + re-rank
+
     const filtered = (allStats || []).filter(s => 
         memberIds.includes(s.user_id) || memberIds.includes(s.id)
     )
-    
+
     filtered.forEach((s, i) => {
         s.league_rank = i + 1
         s.total_in_league = filtered.length
     })
-    
+
     return { data: filtered, error: null }
 }
 
 async function leaveLeague(leagueId) {
     const user = getUser()
     if (!user) return { error: new Error('Not authenticated') }
-    
+
     const { error } = await supabaseClient
         .from('league_memberships')
         .delete()
         .eq('league_id', leagueId)
         .eq('user_id', user.id)
-    
+
     return { error }
 }
