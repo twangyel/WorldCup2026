@@ -75,10 +75,33 @@
     .sheet-panel.shown { transform: translateY(0); }
 
     /* Bottom nav active pill */
-    .nav-btn { color: #8A9590; transition: color 150ms ease; }
-    .nav-btn.active { color: #0B1221; }
-    .nav-btn.active .nav-dot { opacity: 1; transform: scale(1); }
-    .nav-dot { opacity: 0; transform: scale(0); transition: all 200ms ease; }
+    .nav-btn { 
+      color: #8A9590; 
+      transition: all 200ms ease; 
+      font-weight: 600;
+    }
+    .nav-btn.active { 
+      color: #0B1221; 
+      font-weight: 800;
+      transform: translateY(-2px);
+    }
+    .nav-btn.active svg { 
+      stroke-width: 2.5;
+      filter: drop-shadow(0 2px 4px rgba(11,18,33,0.15));
+    }
+    .nav-btn.active .nav-dot { 
+      opacity: 1; 
+      transform: scale(1.2);
+      background: #D4A24C;
+      box-shadow: 0 0 8px rgba(212,162,76,0.5);
+    }
+    .nav-dot { 
+      opacity: 0; 
+      transform: scale(0); 
+      transition: all 200ms ease; 
+      width: 6px; 
+      height: 6px;
+    }
 
     /* Skeleton */
     .skel { background: linear-gradient(90deg, #EEEDE7 0%, #F4F3EE 50%, #EEEDE7 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 12px; }
@@ -741,6 +764,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1198,8 +1222,8 @@
             <p class="text-xs text-ink-500" id="user-name">Loading…</p>
           </div>
         </div>
-        <button onclick="confirmLogout()" class="w-10 h-10 rounded-xl bg-paper-card border border-paper-border flex items-center justify-center text-ink-500 tap">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        <button onclick="confirmLogout()" class="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 tap hover:bg-red-100 transition-colors shadow-sm">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
         </button>
       </div>
     </header>
@@ -1536,26 +1560,26 @@
   </div>
 </div>
 <!-- Bottom Nav -->
-    <nav id="app-nav" class="fixed bottom-0 inset-x-0 z-30 bg-white/90 border-t border-paper-border safe-bottom" style="backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);">
+    <nav id="app-nav" class="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-paper-border safe-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
       <div class="max-w-lg mx-auto grid grid-cols-4 px-2 py-2">
         <button onclick="switchTab('home')" data-tab="home" class="nav-btn active flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-          <span class="text-[10px] font-semibold tracking-wide">Home</span>
+          <span class="text-[11px] font-bold tracking-wide">Home</span>
           <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
         <button onclick="switchTab('predictions')" data-tab="predictions" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-          <span class="text-[10px] font-semibold tracking-wide">Predict</span>
+          <span class="text-[11px] font-bold tracking-wide">Predict</span>
           <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
         <button onclick="switchTab('leaderboard')" data-tab="leaderboard" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          <span class="text-[10px] font-semibold tracking-wide">Ranks</span>
+          <span class="text-[11px] font-bold tracking-wide">Ranks</span>
           <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
         <button onclick="switchTab('profile')" data-tab="profile" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-          <span class="text-[10px] font-semibold tracking-wide">Me</span>
+          <span class="text-[11px] font-bold tracking-wide">Me</span>
           <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
       </div>
