@@ -168,6 +168,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1446,7 +1447,7 @@ Good luck! ⚽🔥`
 
       // Build email from WhatsApp (required for Supabase auth)
       const cleanWa = whatsapp.replace(/\D/g, '')
-     const email = whatsappToEmail(`+975${cleanWa}`);  // Uses auth.js helper → @wa.predict.local
+      const email = `${cleanWa}@wc-predictions.local`
 
       setAuthButtonLoadingForAddUser(true)
 

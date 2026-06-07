@@ -14,7 +14,7 @@ let currentProfile = null
 // We store auth identity in Supabase as a synthesized email derived from the
 // user's WhatsApp number. The real WhatsApp number lives in profiles.whatsapp
 // so it can be used for sending template messages.
-const WA_EMAIL_DOMAIN = 'wc-predictions.local';
+const WA_EMAIL_DOMAIN = 'wa.predict.local'
 const DEFAULT_COUNTRY_CODE = '975' // Bhutan
 
 // Strip everything except digits. If the result is short (local number without
@@ -83,9 +83,8 @@ async function signInOrSignUp(name, whatsapp, password) {
     }
     const email = whatsappToEmail(whatsapp)
 
-    // Try sign in FIRST — no fallback to sign-up
-    const { data: signInData, error: signInError } = 
-        await supabaseClient.auth.signInWithPassword({ email, password })
+    // 1. Try to sign in
+    const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password })
 
     if (signInData?.session) {
         currentUser = signInData.user
@@ -93,28 +92,8 @@ async function signInOrSignUp(name, whatsapp, password) {
         return { data: signInData, error: null }
     }
 
-    // Sign-in failed — check if user exists
+    // 2. If sign-in failed, try sign up
     if (signInError) {
-        const { exists } = await checkEmailExists(email)
-        
-        if (exists) {
-            return { 
-                data: null, 
-                error: { message: 'Incorrect password. Contact your admin if you forgot it.' } 
-            }
-        }
-        
-        // Only proceed to sign-up if explicitly in sign-up mode (name provided)
-        if (!name || !name.trim()) {
-            return { 
-                data: null, 
-                error: { 
-                    message: 'Account not found. Ask your admin to create your account first.',
-                    code: 'USER_NOT_FOUND' 
-                } 
-            }
-        }
-        
         return signUpUser(name, whatsapp, password)
     }
 
