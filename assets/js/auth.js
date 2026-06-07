@@ -391,26 +391,32 @@ async function setPrizeSettings(payload) {
 
 async function getSystemSettings() {
     try {
+        // Use RPC to bypass RLS issues
         const { data, error } = await supabaseClient
-            .from('system_settings')
-            .select('*')
-            .eq('id', 1)
-            .single()
+            .rpc('get_system_settings')
         if (error) throw error
         return { data: data || { private_leagues_enabled: false }, error: null }
     } catch (e) {
+        // Fallback to direct query
+        try {
+            const { data, error } = await supabaseClient
+                .from('system_settings')
+                .select('*')
+                .eq('id', 1)
+                .single()
+            if (!error && data) return { data, error: null }
+        } catch (e2) {}
         return { data: { private_leagues_enabled: false }, error: e }
     }
 }
 
 async function setSystemSettings(payload) {
     try {
+        // Use RPC to bypass RLS — function checks admin status internally
         const { data, error } = await supabaseClient
-            .from('system_settings')
-            .upsert({ id: 1, ...payload }, { onConflict: 'id' })
-            .select()
-            .single()
-        return { data, error }
+            .rpc('toggle_private_leagues', { p_enabled: payload.private_leagues_enabled })
+        if (error) throw error
+        return { data, error: null }
     } catch (e) {
         return { data: null, error: e }
     }

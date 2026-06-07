@@ -166,6 +166,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -2169,7 +2170,12 @@ async function executeSaveScore(id) {
 
       const { error } = await setSystemSettings({ private_leagues_enabled: newValue })
       if (error) {
-        showToast(error.message, 'error')
+        const msg = error.message || ''
+        if (msg.includes('Admin access required') || msg.includes('admin')) {
+          showToast('Admin access required. Check your profile has is_admin=true or role=admin.', 'error')
+        } else {
+          showToast(error.message || 'Failed to update setting', 'error')
+        }
         return
       }
 
@@ -2203,11 +2209,8 @@ async function executeSaveScore(id) {
       window.getSystemSettings = async function() {
         try {
           const { data, error } = await supabaseClient
-            .from('system_settings')
-            .select('*')
-            .eq('id', 1)
-            .single()
-          return { data, error }
+            .rpc('get_system_settings')
+          return { data: data || { private_leagues_enabled: false }, error }
         } catch (e) {
           return { data: { private_leagues_enabled: false }, error: e }
         }
@@ -2217,10 +2220,7 @@ async function executeSaveScore(id) {
       window.setSystemSettings = async function(payload) {
         try {
           const { data, error } = await supabaseClient
-            .from('system_settings')
-            .upsert({ id: 1, ...payload }, { onConflict: 'id' })
-            .select()
-            .single()
+            .rpc('toggle_private_leagues', { p_enabled: payload.private_leagues_enabled })
           return { data, error }
         } catch (e) {
           return { data: null, error: e }
