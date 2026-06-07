@@ -333,6 +333,134 @@ async function getPrizePool() {
     return { data: { amount, currency, paid_count: count }, error: null }
 }
 
+// Add to auth.js (or as a script block in index.html before index.js)
+window.getSystemSettings = async function() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .select('*')
+      .limit(1)
+    if (error) throw error
+    return { data: data?.[0] || { private_leagues_enabled: false }, error: null }
+  } catch (e) {
+    return { data: { private_leagues_enabled: false }, error: e }
+  }
+}
+
+// =====================
+// PRIVATE LEAGUES
+// =====================
+async function createLeague(name) {
+    if (!currentUser) return { data: null, error: new Error('Not authenticated') }
+
+    // Generate a random 6-character invite code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+    const { data, error } = await supabaseClient
+        .from('leagues')
+        .insert({
+            name: name,
+            created_by: currentUser.id,
+            invite_code: code
+        })
+        .select()
+        .single()
+
+    if (error) return { data: null, error }
+
+    // Auto-add creator as first member
+    await supabaseClient
+        .from('league_memberships')
+        .insert({
+            league_id: data.id,
+            user_id: currentUser.id
+        })
+
+    return { data, error: null }
+}
+
+async function joinLeagueByCode(code) {
+    if (!currentUser) return { data: null, error: new Error('Not authenticated') }
+
+    const cleanCode = code.trim().toUpperCase()
+
+    // Find league by invite code
+    const { data: league, error: leagueError } = await supabaseClient
+        .from('leagues')
+        .select('*')
+        .eq('invite_code', cleanCode)
+        .single()
+
+    if (leagueError || !league) {
+        return { data: null, error: new Error('Invalid invite code. Please check and try again.') }
+    }
+
+    // Check if already a member
+    const { data: existing } = await supabaseClient
+        .from('league_memberships')
+        .select('*')
+        .eq('league_id', league.id)
+        .eq('user_id', currentUser.id)
+        .single()
+
+    if (existing) {
+        return { data: null, error: new Error('You are already a member of this league.') }
+    }
+
+    // Add membership
+    const { data, error } = await supabaseClient
+        .from('league_memberships')
+        .insert({
+            league_id: league.id,
+            user_id: currentUser.id
+        })
+        .select()
+        .single()
+
+    if (error) return { data: null, error }
+
+    return { data: { ...data, league }, error: null }
+}
+
+async function getMyLeagues() {
+    if (!currentUser) return { data: [], error: new Error('Not authenticated') }
+
+    const { data, error } = await supabaseClient
+        .from('league_memberships')
+        .select('league_id, leagues(*)')
+        .eq('user_id', currentUser.id)
+
+    if (error) return { data: [], error }
+
+    // Extract league data from the joined query
+    const leagues = (data || []).map(m => m.leagues).filter(Boolean)
+    return { data: leagues, error: null }
+}
+
+async function getLeagueMembers(leagueId) {
+    const { data, error } = await supabaseClient
+        .from('league_memberships')
+        .select('user_id, profiles(*)')
+        .eq('league_id', leagueId)
+
+    if (error) return { data: [], error }
+
+    const members = (data || []).map(m => m.profiles).filter(Boolean)
+    return { data: members, error: null }
+}
+
+async function leaveLeague(leagueId) {
+    if (!currentUser) return { error: new Error('Not authenticated') }
+
+    const { error } = await supabaseClient
+        .from('league_memberships')
+        .delete()
+        .eq('league_id', leagueId)
+        .eq('user_id', currentUser.id)
+
+    return { error }
+}
+
 // =====================
 // ADMIN
 // =====================
