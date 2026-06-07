@@ -976,6 +976,17 @@ function flagHtml(name, size = 24) {
         }).subscribe()
     }
 
+    supabaseClient.channel('admin-system-settings')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, (payload) => {
+    systemSettings = { ...systemSettings, ...payload.new }
+    renderSettings()
+    // Optional: show a subtle toast only if another tab/admin made the change
+    if (document.hidden) {
+      showToast('Private leagues setting updated', 'info')
+    }
+  })
+  .subscribe()
+
 
     // ============== POINTS CALCULATION ==============
 function calculatePoints(predHome, predAway, actualHome, actualAway) {

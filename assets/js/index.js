@@ -1684,6 +1684,29 @@ recentEl.innerHTML = finished.map(f => {
       console.log('[Realtime] Prize settings channel status:', status)
     })
 
+  // 5) System settings — private leagues toggle (realtime sync from admin panel)
+  supabaseClient.channel('system-settings')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, (payload) => {
+      const newVal = payload.new?.private_leagues_enabled
+      if (typeof newVal === 'boolean') {
+        const oldVal = privateLeaguesEnabled
+        privateLeaguesEnabled = newVal
+        console.log('[Realtime] Private leagues toggled:', oldVal, '→', newVal)
+        // If user is on profile tab, re-render leagues section immediately
+        const profileTab = document.getElementById('tab-profile')
+        if (profileTab && !profileTab.classList.contains('hidden')) {
+          loadMyLeagues()
+        }
+        // Show toast if value actually changed
+        if (oldVal !== newVal) {
+          showToast(newVal ? 'Private leagues are now enabled!' : 'Private leagues have been disabled', 'info')
+        }
+      }
+    })
+    .subscribe((status) => {
+      console.log('[Realtime] System settings channel status:', status)
+    })
+
   // Fallback: poll prize pool every 10 seconds in case realtime fails
   if (prizePollInterval) clearInterval(prizePollInterval)
   prizePollInterval = setInterval(() => {
