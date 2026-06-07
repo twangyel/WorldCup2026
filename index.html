@@ -134,14 +134,22 @@
       pointer-events: none;
       visibility: visible !important;
     }
-    /* Button spinner during auth */
-    .auth-btn-loading { pointer-events: none; opacity: 0.85; }
-    .auth-btn-loading > svg, .auth-btn-loading > span { display: none; }
+    /* Button spinner during auth.
+       IMPORTANT: only hide elements explicitly marked .auth-hide-on-loading,
+       NOT every <span> — the spinner itself is a <span>. */
+    .auth-btn-loading { pointer-events: none; }
+    .auth-btn-loading .auth-hide-on-loading { display: none !important; }
     .auth-spinner {
-      width: 22px; height: 22px; border-radius: 50%;
+      width: 20px; height: 20px; border-radius: 50%;
       border: 2.5px solid rgba(255,255,255,0.35);
       border-top-color: #fff;
       animation: authSpin 720ms linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .auth-loading-label {
+      font-weight: 600; font-size: 15px; color: #fff;
+      letter-spacing: 0.01em;
     }
     @keyframes authSpin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) {
@@ -851,8 +859,8 @@
           <!-- Enter League button -->
           <button type="submit" id="auth-submit-btn"
             class="enter-league-btn w-full text-white font-semibold py-4 rounded-2xl tap text-[16px] mt-2 flex items-center justify-center gap-3">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2a10 10 0 0 0-10 10"/><path d="M12 12 7.5 7.5"/><path d="M12 12 16.5 7.5"/><path d="M12 12 7.5 16.5"/><path d="M12 12 16.5 16.5"/><path d="M7.5 7.5 5 5"/><path d="M16.5 7.5 19 5"/><path d="M7.5 16.5 5 19"/><path d="M16.5 16.5 19 19"/></svg>
-            <span>Enter League</span>
+            <svg class="auth-hide-on-loading w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2a10 10 0 0 0-10 10"/><path d="M12 12 7.5 7.5"/><path d="M12 12 16.5 7.5"/><path d="M12 12 7.5 16.5"/><path d="M12 12 16.5 16.5"/><path d="M7.5 7.5 5 5"/><path d="M16.5 7.5 19 5"/><path d="M7.5 16.5 5 19"/><path d="M16.5 16.5 19 19"/></svg>
+            <span class="auth-hide-on-loading">Enter League</span>
           </button>
         </form>
 
@@ -1586,24 +1594,41 @@ function switchToLoginUI() {
 }
 
 // ============== SMOOTH SCREEN TRANSITIONS ==============
-// Adds a spinner to the auth button while we preload data, so users
-// get clear feedback that something is happening.
-function setAuthButtonLoading(loading) {
+// Adds a spinner + progressive status label to the auth button while
+// we preload data, so the user sees clear progress instead of a
+// "frozen" button.
+let _authLoadingTimers = []
+function setAuthButtonLoading(loading, initialLabel) {
   const btn = document.getElementById('auth-submit-btn')
   if (!btn) return
+  // Always clear any pending label timers from a previous load
+  _authLoadingTimers.forEach(t => clearTimeout(t))
+  _authLoadingTimers = []
+
   if (loading) {
     btn.disabled = true
     btn.classList.add('auth-btn-loading')
-    if (!btn.querySelector('.auth-spinner')) {
-      const s = document.createElement('span')
-      s.className = 'auth-spinner'
-      btn.appendChild(s)
-    }
+    // Build spinner + label fresh (remove any leftover)
+    btn.querySelectorAll('.auth-spinner, .auth-loading-label').forEach(n => n.remove())
+    const spinner = document.createElement('span')
+    spinner.className = 'auth-spinner'
+    const label = document.createElement('span')
+    label.className = 'auth-loading-label'
+    label.textContent = initialLabel || 'Signing in…'
+    btn.appendChild(spinner)
+    btn.appendChild(label)
+    // Progressive status — gives the user a sense that work is happening
+    // even on slow connections.
+    _authLoadingTimers.push(setTimeout(() => {
+      if (label.isConnected) label.textContent = 'Loading your league…'
+    }, 600))
+    _authLoadingTimers.push(setTimeout(() => {
+      if (label.isConnected) label.textContent = 'Almost there…'
+    }, 1800))
   } else {
     btn.disabled = false
     btn.classList.remove('auth-btn-loading')
-    const s = btn.querySelector('.auth-spinner')
-    if (s) s.remove()
+    btn.querySelectorAll('.auth-spinner, .auth-loading-label').forEach(n => n.remove())
   }
 }
 
@@ -1724,9 +1749,19 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         icon: '👋', title: 'Log out?', message: 'You\'ll need to sign in again next time.',
         actions: [
           { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
-          { text: 'Log out', onclick: 'hideModal(); signOut()', class: 'bg-red-600 text-white' }
+          { text: 'Log out', onclick: 'beginLogout()', class: 'bg-red-600 text-white' }
         ]
       })
+    }
+
+    // Starts the logout fade IMMEDIATELY on tap, in parallel with the
+    // modal close animation. This is what makes logout feel snappy
+    // instead of "tap → modal slides down → THEN something happens."
+    function beginLogout() {
+      hideModal()
+      // Kick the fade on the next frame so the modal close animation
+      // doesn't interrupt the app-shell transition.
+      requestAnimationFrame(() => { if (typeof signOut === 'function') signOut() })
     }
 
     async function handleSaveProfile() {
@@ -3323,11 +3358,14 @@ window.signOut = async function smoothSignOut() {
     const authScreen = document.getElementById('auth-screen')
     // Fade the shell out before we tear down the session, so the user
     // sees a clean exit instead of a flash to the login screen.
+    // 240ms feels snappier than 380ms for an exit.
     if (shell && !shell.classList.contains('hidden')) {
+      shell.style.transition = 'opacity 240ms cubic-bezier(0.32, 0.72, 0, 1)'
       shell.classList.add('screen-fading-out')
-      await new Promise(r => setTimeout(r, 380))
+      await new Promise(r => setTimeout(r, 240))
       shell.classList.add('hidden')
       shell.classList.remove('screen-fading-out')
+      shell.style.transition = ''
     }
     // Pre-mount the auth screen invisibly so it fades in cleanly after
     // the session is cleared.
