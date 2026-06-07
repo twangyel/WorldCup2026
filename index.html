@@ -560,6 +560,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -3401,14 +3402,83 @@ function msToCountdown(ms) {
         const matchCount = (typeof count === 'number') ? count : (data?.length || 0)
         mEl.textContent = matchCount
 
+        // Normalize team names to prevent duplicates like "USA" vs "United States"
+        // and filter out all placeholder/TBD variants
+        const normalizeTeam = (name) => {
+          if (!name || typeof name !== 'string') return null
+          const n = name.toLowerCase().trim()
+          // Reject placeholders and empty strings
+          if (
+            n === '' ||
+            n === 'tbd' ||
+            n === 'tbc' ||
+            n === 'to be determined' ||
+            n === 'to be confirmed' ||
+            n === '???' ||
+            n === 'unknown' ||
+            n === 'n/a' ||
+            n === '-' ||
+            n.startsWith('tbd') ||
+            n.startsWith('team ') ||
+            /\?$/.test(n) // ends with ?
+          ) return null
+          // Normalize common aliases
+          const aliases = {
+            'united states': 'usa',
+            'united states of america': 'usa',
+            'us': 'usa',
+            'america': 'usa',
+            'korea republic': 'south korea',
+            'republic of korea': 'south korea',
+            'korea': 'south korea',
+            'russian federation': 'russia',
+            'england': 'england',
+            'great britain': 'england',
+            'scotland': 'scotland',
+            'wales': 'wales',
+            'northern ireland': 'northern ireland',
+            'czech republic': 'czechia',
+            'czechia': 'czechia',
+            'trinidad and tobago': 'trinidad & tobago',
+            'bosnia and herzegovina': 'bosnia',
+            'north macedonia': 'macedonia',
+            'curaçao': 'curacao',
+            "côte d'ivoire": 'ivory coast',
+            'dr congo': 'congo dr',
+            'democratic republic of congo': 'congo dr',
+            'congo dr': 'congo dr',
+            'republic of the congo': 'congo',
+            'congo': 'congo',
+            'south africa': 'south africa',
+            'costa rica': 'costa rica',
+            'saudi arabia': 'saudi arabia',
+            'new zealand': 'new zealand',
+            'united arab emirates': 'uae',
+            'emirates': 'uae',
+            'uae': 'uae'
+          }
+          return aliases[n] || n
+        }
+
         const teamSet = new Set()
         ;(data || []).forEach(f => {
-          if (f.home_team && f.home_team !== 'TBD') teamSet.add(f.home_team)
-          if (f.away_team && f.away_team !== 'TBD') teamSet.add(f.away_team)
+          const home = normalizeTeam(f.home_team)
+          const away = normalizeTeam(f.away_team)
+          if (home) teamSet.add(home)
+          if (away) teamSet.add(away)
         })
-        tEl.textContent = teamSet.size
 
-        console.log('[loadAuthStats] matches:', matchCount, 'teams:', teamSet.size)
+        const teamCount = teamSet.size
+        // Sanity check: WC 2026 has 48 teams maximum.
+        // If we exceed that, the database has polluted/duplicate data.
+        if (teamCount > 48) {
+          console.warn(`[loadAuthStats] Found ${teamCount} teams after normalization — database has duplicate/polluted data. Capping display at 48.`)
+          tEl.textContent = 48
+        } else {
+          tEl.textContent = teamCount
+        }
+
+        console.log('[loadAuthStats] matches:', matchCount, 'teams:', teamCount, 'capped:', teamCount > 48)
       } catch (e) {
         // Last-ditch: try a head-only count so we at least show matches.
         try {

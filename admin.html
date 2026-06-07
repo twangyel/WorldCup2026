@@ -164,6 +164,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1575,16 +1576,78 @@ async function importWC2026() { await bulkImport(WC2026, 'WC 2026') }
     async function importCSV() {
       const raw = document.getElementById('csv-input').value.trim()
       if (!raw) return showToast('Paste some rows first', 'warning')
-      const rows = raw.split('\n').map(line => {
-        const parts = line.split(',').map(s => s.trim())
-        if (parts.length < 4) return null
-        return { home_team: parts[0], away_team: parts[1], kickoff: new Date(parts[2]).toISOString(), stage: parts[3] }
-      }).filter(Boolean)
-      if (!rows.length) return showToast('No valid rows parsed', 'error')
-      await bulkImport(rows, 'CSV')
-      document.getElementById('csv-input').value = ''
-    }
 
+      // Proper CSV parser: handles quoted fields and commas inside team names
+      // e.g. "Bosnia and Herzegovina", "Trinidad and Tobago", 2026-06-15T18:00:00Z, "Group A"
+      function parseCSVLine(line) {
+        const result = []
+        let current = ''
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          const next = line[i + 1]
+          if (char === '"') {
+            if (inQuotes && next === '"') {
+              current += '"'
+              i++ // skip escaped quote
+            } else {
+              inQuotes = !inQuotes
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim())
+            current = ''
+          } else {
+            current += char
+          }
+        }
+        result.push(current.trim())
+        return result
+      }
+
+      const lines = raw.split(/\r?\n/).filter(l => l.trim())
+      const rows = lines.map(line => {
+        const parts = parseCSVLine(line)
+        if (parts.length < 4) {
+          console.warn('[importCSV] Skipping malformed line:', line)
+          return null
+        }
+        const home = parts[0].replace(/^"|"$/g, '').trim()
+        const away = parts[1].replace(/^"|"$/g, '').trim()
+        const kickoffStr = parts[2].replace(/^"|"$/g, '').trim()
+        const stage = parts[3].replace(/^"|"$/g, '').trim()
+// Validate kickoff date
+const kickoffDate = new Date(kickoffStr);
+
+if (isNaN(kickoffDate.getTime())) {
+  console.warn(
+    '[importCSV] Invalid date:',
+    kickoffStr,
+    'in line:',
+    line
+  );
+  return null;
+}
+
+return {
+  home_team: home,
+  away_team: away,
+  kickoff: kickoffDate.toISOString(),
+  stage: stage
+};
+}).filter(Boolean);
+
+if (!rows.length) {
+  return showToast(
+    'No valid rows parsed. Format: Team1, Team2, 2026-06-15T18:00:00Z, Group A',
+    'error'
+  );
+}
+
+showToast(`Parsed ${rows.length} fixture(s). Importing...`, 'info');
+
+await bulkImport(rows, 'CSV');
+document.getElementById('csv-input').value = '';
+    }
     async function bulkImport(rows, label) {
       let added = 0, skipped = 0, failed = 0
       for (const r of rows) {
