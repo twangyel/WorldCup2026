@@ -799,33 +799,59 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     // ============== PAYMENT GATE ==============
     let pendingPaymentFile = null
 
-    function showPaymentGate() {
-       previewMode = false;
-  // CRITICAL FIX: ensure the shell is fully visible (not opacity:0 from screen-preloading)
-  const shell = document.getElementById('app-shell')
-  if (shell) {
-    shell.classList.remove('screen-preloading')
-    shell.classList.remove('screen-fading-in')
-    shell.style.opacity = ''
-    shell.style.visibility = ''
-    shell.style.position = ''
-  }
+  function showPaymentGate() {
+  console.log('[gate] enter')
+  try {
+    previewMode = false;
+    const shell = document.getElementById('app-shell')
+    if (shell) {
+      shell.classList.remove('screen-preloading')
+      shell.classList.remove('screen-fading-in')
+      shell.style.opacity = ''
+      shell.style.visibility = ''
+      shell.style.position = ''
+    }
+    console.log('[gate] shell reset done')
 
-  document.getElementById('app-main').classList.add('hidden')
-  document.getElementById('app-nav').classList.add('hidden')
-  const gate = document.getElementById('payment-gate')
-  gate.classList.remove('hidden')
-  gate.classList.add('flex')
-  loadGateFee()
-  const profile = getProfile()
-  if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
-    document.getElementById('payment-form-content').classList.add('hidden')
-    document.getElementById('pending-state').classList.remove('hidden')
-  } else {
-    document.getElementById('payment-form-content').classList.remove('hidden')
-    document.getElementById('pending-state').classList.add('hidden')
+    const main = document.getElementById('app-main')
+    const nav  = document.getElementById('app-nav')
+    const gate = document.getElementById('payment-gate')
+    console.log('[gate] elements:', { main: !!main, nav: !!nav, gate: !!gate })
+    console.log('[gate] elements:', { main: !!main, nav: !!nav, gate: !!gate })
+
+    if (main) main.classList.add('hidden')
+    if (nav)  nav.classList.add('hidden')
+    if (!gate) { console.error('[gate] #payment-gate NOT FOUND'); return }
+
+    gate.classList.remove('hidden')
+    console.log('[gate] gate unhidden, classes:', gate.className)
+
+    loadGateFee()
+    const profile = getProfile()
+    const pf = document.getElementById('payment-form-content')
+    const ps = document.getElementById('pending-state')
+    if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
+      pf && pf.classList.add('hidden')
+      ps && ps.classList.remove('hidden')
+    } else {
+      pf && pf.classList.remove('hidden')
+      ps && ps.classList.add('hidden')
+    }
+    setupPaymentRealtime()
+    console.log('[gate] done. gate classes:', gate.className, 'display:', getComputedStyle(gate).display)
+
+    // One frame later, check if anyone re-hid us
+    requestAnimationFrame(() => {
+      const g = document.getElementById('payment-gate')
+      console.log('[gate] +1 frame. classes:', g.className, 'display:', getComputedStyle(g).display)
+    })
+    setTimeout(() => {
+      const g = document.getElementById('payment-gate')
+      console.log('[gate] +500ms. classes:', g.className, 'display:', getComputedStyle(g).display)
+    }, 500)
+  } catch (e) {
+    console.error('[gate] ERROR:', e)
   }
-  setupPaymentRealtime()
 }
 
         function setupPaymentRealtime() {

@@ -1401,6 +1401,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -2058,81 +2059,99 @@
 
 <!-- Collapsible Edit Form -->
   <div id="profile-edit-panel" class="hidden">
-    <div class="bg-white rounded-3xl shadow-card border border-paper-border overflow-hidden">
-      <div class="p-5 space-y-4">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="font-bold text-sm tracking-tight">Edit Profile</h3>
-          <button onclick="toggleEditProfile()" class="text-ink-400 hover:text-ink-700 p-1 tap">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    <div class="relative overflow-hidden rounded-3xl border border-white/15 p-5"
+         style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.92) 0%, rgba(11, 18, 33, 0.88) 100%);
+                backdrop-filter: blur(20px) saturate(150%);
+                -webkit-backdrop-filter: blur(20px) saturate(150%);
+                box-shadow: 0 8px 32px rgba(11, 18, 33, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);">
+
+      <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full opacity-20"
+           style="background: radial-gradient(circle, rgba(212, 162, 76, 0.4), transparent 70%);"></div>
+
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl backdrop-blur-sm border border-white/10">✏️</div>
+            <h3 class="font-bold text-sm tracking-tight text-white/90">Edit Profile</h3>
+          </div>
+          <button onclick="toggleEditProfile()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition tap border border-white/10">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
+
         <!-- Profile Picture Upload -->
-        <div class="flex flex-col items-center mb-4">
+        <div class="flex flex-col items-center mb-5">
           <div class="relative">
             <div id="profile-avatar-edit" class="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-500 via-amber-500 to-orange-500 flex items-center justify-center text-3xl font-bold text-white shadow-lg ring-2 ring-white/30 overflow-hidden">
               <span id="profile-avatar-initials">TW</span>
               <img id="profile-avatar-img" class="hidden w-full h-full object-cover" />
             </div>
-            <label for="profile-avatar-upload" class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-ink-900 text-white flex items-center justify-center cursor-pointer tap shadow-md border-2 border-white">
+            <label for="profile-avatar-upload" class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gold text-white flex items-center justify-center cursor-pointer tap shadow-md border-2 border-white/80 hover:scale-110 transition-transform">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </label>
             <input type="file" id="profile-avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarUpload(this)">
           </div>
-          <p class="text-[11px] text-ink-400 mt-2">Tap camera to change photo</p>
+          <p class="text-[11px] text-white/40 mt-2">Tap camera to change photo</p>
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Name</label>
-          <input type="text" id="profile-name" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
+        <div class="space-y-3">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-1.5">Name</label>
+            <input type="text" id="profile-name" class="w-full px-4 py-3 rounded-2xl border border-white/10 bg-white/5 text-white placeholder-white/30 focus:border-gold/50 focus:bg-white/10 focus:ring-4 focus:ring-gold/10 outline-none transition text-[15px]">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-1.5">Department</label>
+            <input type="text" id="profile-dept" class="w-full px-4 py-3 rounded-2xl border border-white/10 bg-white/5 text-white placeholder-white/30 focus:border-gold/50 focus:bg-white/10 focus:ring-4 focus:ring-gold/10 outline-none transition text-[15px]" placeholder="e.g. Engineering">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-1.5">Phone</label>
+            <input type="tel" id="profile-phone" class="w-full px-4 py-3 rounded-2xl border border-white/10 bg-white/5 text-white placeholder-white/30 focus:border-gold/50 focus:bg-white/10 focus:ring-4 focus:ring-gold/10 outline-none transition text-[15px]">
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Department</label>
-          <input type="text" id="profile-dept" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]" placeholder="e.g. Engineering">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Phone</label>
-          <input type="tel" id="profile-phone" class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
-        </div>
-        <button onclick="handleSaveProfile()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px]">Save Changes</button>
+
+        <button onclick="handleSaveProfile()" class="w-full mt-4 bg-gradient-to-r from-gold to-amber-500 text-white font-semibold py-3.5 rounded-2xl tap text-[15px] shadow-lg shadow-gold/20 hover:shadow-gold/30 transition-shadow">Save Changes</button>
       </div>
 
-      <div id="admin-link" class="hidden border-t border-paper-border p-5">
-        <a href="admin.html" class="flex items-center justify-between bg-ink-900 text-white px-5 py-4 rounded-2xl tap">
+      <div id="admin-link" class="hidden mt-4 pt-4 border-t border-white/10">
+        <a href="admin.html" class="flex items-center justify-between bg-white/10 hover:bg-white/15 text-white px-5 py-4 rounded-2xl tap border border-white/10 transition-colors">
           <span class="font-semibold text-[15px]">⚙️ Admin Panel</span>
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+          <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </a>
       </div>
     </div>
-  </div>
+  </div><!-- My Leagues Card -->
+  <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5" id="leagues-card"
+       style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
+              backdrop-filter: blur(24px) saturate(160%);
+              -webkit-backdrop-filter: blur(24px) saturate(160%);
+              box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);">
 
-  
-<!-- My Leagues Card -->
-  <div class="rounded-3xl border border-white/30 p-5" id="leagues-card"
-     style="background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(250,250,247,0.75) 50%, rgba(255,255,255,0.82) 100%);
-            backdrop-filter: blur(20px) saturate(140%);
-            -webkit-backdrop-filter: blur(20px) saturate(140%);
-            box-shadow: 0 4px 24px rgba(10,15,13,0.06), inset 0 1px 0 rgba(255,255,255,0.6);">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-bold tracking-tight">My Leagues</h3>
-      <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50/80 px-3 py-1.5 rounded-full tap backdrop-blur-sm">+ Create</button>
+    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"></div>
+    <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-15"
+         style="background: radial-gradient(circle, rgba(212, 162, 76, 0.3), transparent 70%);"></div>
+
+    <div class="relative">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl border border-brand-500/20">🏆</div>
+          <h3 class="font-bold tracking-tight text-ink-900">My Leagues</h3>
+        </div>
+        <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50/80 px-3 py-1.5 rounded-full tap backdrop-blur-sm border border-brand-500/20 hover:bg-brand-100 transition-colors">+ Create</button>
+      </div>
+
+      <!-- Join by code -->
+      <div class="flex gap-2 mb-4" id="league-join-wrap">
+        <input type="text" id="league-join-code" placeholder="Enter invite code" 
+          class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-white/60 text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition backdrop-blur-sm">
+        <button onclick="handleJoinLeague()" class="bg-gradient-to-r from-ink-900 to-brand-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm shadow-lg shadow-ink-900/20 hover:shadow-ink-900/30 transition-shadow">Join</button>
+      </div>
+
+      <!-- League list -->
+      <div id="my-leagues-list" class="space-y-2">
+        <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
+      </div>
     </div>
-
-    <!-- Join by code -->
-    <div class="flex gap-2 mb-4" id="league-join-wrap">
-      <input type="text" id="league-join-code" placeholder="Enter invite code" 
-        class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-paper text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition">
-      <button onclick="handleJoinLeague()" class="bg-ink-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm">Join</button>
-    </div>
-
-    <!-- League list -->
-    <div id="my-leagues-list" class="space-y-2">
-      <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
-    </div>
-  </div>
-
-
-  
-<!-- Share Rank Card (Glassmorphism) -->
+  </div><!-- Share Rank Card (Glassmorphism) -->
   <div id="share-rank-card" class="hidden">
     <div class="relative overflow-hidden rounded-3xl border border-white/15 p-5" 
          style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.9) 0%, rgba(11, 18, 33, 0.85) 100%); 
@@ -2213,25 +2232,32 @@
     </div>
   </div>
 <!-- Badges & streaks -->
-  <div class="rounded-3xl border border-white/30 p-5"
-       style="background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(250,250,247,0.75) 50%, rgba(255,255,255,0.82) 100%);
-              backdrop-filter: blur(20px) saturate(140%);
-              -webkit-backdrop-filter: blur(20px) saturate(140%);
-              box-shadow: 0 4px 24px rgba(10,15,13,0.06), inset 0 1px 0 rgba(255,255,255,0.6);">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-bold tracking-tight">Achievements</h3>
-      <span id="profile-streak" class="hidden"></span>
-    </div>
-    <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
-      <div class="skel h-24 rounded-2xl"></div>
-      <div class="skel h-24 rounded-2xl"></div>
-      <div class="skel h-24 rounded-2xl"></div>
-    </div>
-    <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
-  </div>
+  <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5"
+       style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
+              backdrop-filter: blur(24px) saturate(160%);
+              -webkit-backdrop-filter: blur(24px) saturate(160%);
+              box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);">
 
-  
-<!-- Scoring rules -->
+    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"></div>
+    <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-15"
+         style="background: radial-gradient(circle, rgba(212, 162, 76, 0.3), transparent 70%);"></div>
+
+    <div class="relative">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl border border-amber-500/20">🎯</div>
+          <h3 class="font-bold tracking-tight text-ink-900">Achievements</h3>
+        </div>
+        <span id="profile-streak" class="hidden"></span>
+      </div>
+      <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
+        <div class="skel h-24 rounded-2xl"></div>
+        <div class="skel h-24 rounded-2xl"></div>
+        <div class="skel h-24 rounded-2xl"></div>
+      </div>
+      <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
+    </div>
+  </div><!-- Scoring rules -->
   <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
     <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
     <div class="space-y-3">
