@@ -811,6 +811,7 @@ function showPaymentGate() {
             const cached = (typeof getProfile === 'function') ? getProfile() : null
             if (cached) cached.private_leagues_access = false
             showToast('Private league access has been revoked', 'info')
+            if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('revoked')
             if (typeof loadMyLeagues === 'function') loadMyLeagues()
           }
         })
@@ -1967,24 +1968,58 @@ async function loadLeaderboard() {
   supabaseClient.channel('system-settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, (payload) => {
       const newVal = payload.new?.private_leagues_enabled
-      if (typeof newVal === 'boolean') {
-        const oldVal = privateLeaguesEnabled
-        privateLeaguesEnabled = newVal
-        console.log('[Realtime] Private leagues toggled:', oldVal, '→', newVal)
-        // If user is on profile tab, re-render leagues section immediately
-        const profileTab = document.getElementById('tab-profile')
-        if (profileTab && !profileTab.classList.contains('hidden')) {
-          loadMyLeagues()
-        }
-        // Show toast if value actually changed
-        if (oldVal !== newVal) {
-          showToast(newVal ? 'Private leagues are now enabled!' : 'Private leagues have been disabled', 'info')
-        }
+      if (typeof newVal !== 'boolean') return
+
+      const oldVal = privateLeaguesEnabled
+      privateLeaguesEnabled = newVal
+      console.log('[Realtime] Private leagues toggled:', oldVal, '→', newVal)
+
+      // Always re-render leagues UI if user is on profile tab
+      const profileTab = document.getElementById('tab-profile')
+      if (profileTab && !profileTab.classList.contains('hidden')) {
+        loadMyLeagues()
+      }
+
+      // If toggled OFF, kick everyone out of league views immediately
+      if (newVal === false) {
+        if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('disabled')
+      }
+
+      // Show toast — fire whenever local cache disagreed with the new value
+      // (Supabase doesn't always send accurate payload.old; we trust our own cache)
+      if (oldVal !== newVal) {
+        showToast(newVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
       }
     })
     .subscribe((status) => {
       console.log('[Realtime] System settings channel status:', status)
     })
+
+  // Fallback poll for the global toggle — covers cases where realtime is
+  // disabled on the system_settings table or the websocket drops
+  if (window._privateLeaguesPollInterval) clearInterval(window._privateLeaguesPollInterval)
+  window._privateLeaguesPollInterval = setInterval(async () => {
+    if (document.visibilityState !== 'visible') return
+    try {
+      const { data } = await getSystemSettings()
+      const dbVal = !!(data?.private_leagues_enabled)
+      if (dbVal !== privateLeaguesEnabled) {
+        const oldVal = privateLeaguesEnabled
+        privateLeaguesEnabled = dbVal
+        console.log('[Poll] Private leagues drift detected:', oldVal, '→', dbVal)
+        showToast(dbVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
+        if (dbVal === false && typeof enforceLeagueAccessLockout === 'function') {
+          enforceLeagueAccessLockout('disabled')
+        }
+        const profileTab = document.getElementById('tab-profile')
+        if (profileTab && !profileTab.classList.contains('hidden')) {
+          loadMyLeagues()
+        }
+      }
+    } catch (e) {
+      // silent
+    }
+  }, 15000)
 
   // Fallback: poll prize pool every 10 seconds in case realtime fails
   if (prizePollInterval) clearInterval(prizePollInterval)
@@ -3251,6 +3286,37 @@ function hasLeagueAccess(profile) {
         || (typeof isAdmin === 'function' && isAdmin())
 }
 
+// Forcibly evict the user from any league view they're currently in.
+// Called when (a) global toggle goes OFF, or (b) admin revokes per-user access.
+function enforceLeagueAccessLockout(reason) {
+    // Reset in-memory state
+    activeLeagueId = null
+    myLeagues = []
+
+    // If they're currently viewing the league leaderboard, hide the back button
+    // and force a switch to the global leaderboard view
+    const backBtn = document.getElementById('lb-back-to-global')
+    if (backBtn) backBtn.classList.add('hidden')
+
+    const subOv = document.getElementById('lb-subtab-overall')
+    const subMd = document.getElementById('lb-subtab-matchday')
+    if (subOv) subOv.classList.remove('hidden')
+    if (subMd) subMd.classList.remove('hidden')
+
+    const subMeta = document.getElementById('lb-subtab-meta')
+    if (subMeta) subMeta.textContent = ''
+
+    // Refresh whichever view they happen to be on
+    const leaderboardTab = document.getElementById('tab-leaderboard')
+    const profileTab = document.getElementById('tab-profile')
+    if (leaderboardTab && !leaderboardTab.classList.contains('hidden')) {
+        if (typeof loadLeaderboard === 'function') loadLeaderboard()
+    }
+    if (profileTab && !profileTab.classList.contains('hidden')) {
+        if (typeof loadMyLeagues === 'function') loadMyLeagues()
+    }
+}
+
 function askAdminForLeagueAccess() {
     const profile = getProfile()
     const name = profile?.full_name || profile?.name || 'A player'
@@ -3585,6 +3651,23 @@ loadLeaderboard = async function() {
 }
 
 async function loadLeagueLeaderboardView(leagueId) {
+    // Re-verify access — covers the case where admin revoked access or disabled
+    // private leagues while the user was already inside a league view.
+    const profile = getProfile()
+    if (!privateLeaguesEnabled || !hasLeagueAccess(profile)) {
+        activeLeagueId = null
+        myLeagues = []
+        showToast('Your access to private leagues is no longer available', 'warning')
+        const backBtn = document.getElementById('lb-back-to-global')
+        if (backBtn) backBtn.classList.add('hidden')
+        const subOv = document.getElementById('lb-subtab-overall')
+        const subMd = document.getElementById('lb-subtab-matchday')
+        if (subOv) subOv.classList.remove('hidden')
+        if (subMd) subMd.classList.remove('hidden')
+        if (typeof _originalLoadLeaderboard === 'function') await _originalLoadLeaderboard()
+        return
+    }
+
     const c = document.getElementById('leaderboard-list')
     const myId = getUser()?.id
 
