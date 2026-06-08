@@ -487,7 +487,7 @@ async function handleWhatsappBlur() {
   if (exists === null && supabaseClient) {
     try {
       const normalized = '975' + clean  // DEFAULT_COUNTRY_CODE + digits
-      const adminEmail = `${clean}@wc-predictions.local`
+      const adminEmail = `${clean}@wa.predict.local`
       const { data: found, error: fbErr } = await supabaseClient
         .from('profiles')
         .select('id')
