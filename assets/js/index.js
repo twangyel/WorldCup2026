@@ -472,7 +472,8 @@ function setAuthMode(mode) {
 
     authMode = 'signup'
   }
-}// Keep old function names for compatibility
+}
+
 function switchToLoginUI() { setAuthMode('login') }
 function switchToSignupUI(msg) { 
   setAuthMode('signup') 
@@ -484,32 +485,6 @@ function switchToSignupUI(msg) {
 // Wire up blur detection
 
 // Restore remembered WhatsApp number (if user previously checked "Remember me")
-
-
-// Helper: show the signup UI (name + confirm password fields)
-function switchToSignupUI(subtitleMsg) {
-  const whatsapp = document.getElementById('whatsapp').value.trim()
-  if (!isEligibleForSignup(whatsapp)) {
-    showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
-    return
-  }
-  authMode = 'signup'
-  const confirmWrap = document.getElementById('confirm-password-wrap')
-  const confirmInput = document.getElementById('confirm-password')
-  const nameWrap = document.getElementById('name-wrap')
-  const nameInput = document.getElementById('name')
-  confirmWrap.classList.remove('hidden')
-  confirmInput.required = true
-  nameWrap.classList.remove('hidden')
-  nameInput.required = true
-  document.getElementById('auth-submit-btn').querySelector('span').textContent = 'Create Account'
-  const subtitle = document.getElementById('auth-subtitle')
-  if (subtitleMsg && subtitle) subtitle.textContent = subtitleMsg
-  nameInput.focus()
-}
-
-
-
 
 // Toggle between login and signup modes (replaces the old button toggle)
 function toggleAuthMode() {
@@ -2604,7 +2579,7 @@ showToast('Opening WhatsApp...', 'success')
 
     // ============== PREVIEW MODE (Feature 4) ==============
     async function enterPreviewMode() {
-      previewMode = false;
+      previewMode = true;
       document.getElementById('auth-screen').classList.add('hidden')
       document.getElementById('app-shell').classList.remove('hidden')
       document.getElementById('preview-banner').classList.remove('hidden')
@@ -3364,6 +3339,23 @@ function shareLeagueCode(leagueId, code, name) {
     const encoded = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encoded}`, '_blank')
 }
+
+
+async function getLeagueMembers(leagueId) {
+    const { data, error } = await supabaseClient
+        .from('league_memberships')
+        .select('user_id, profiles:user_id (id, full_name, name, department, avatar_url)')
+        .eq('league_id', leagueId);
+    if (error) return { data: null, error };
+    const members = (data || []).map(row => ({
+        id: row.user_id,
+        name: row.profiles?.full_name || row.profiles?.name || 'Anonymous',
+        department: row.profiles?.department || '',
+        avatar_url: row.profiles?.avatar_url || null
+    }));
+    return { data: members, error: null };
+}
+
 
 // ============== LEAGUE LEADERBOARD ==============
 
