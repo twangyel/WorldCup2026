@@ -2896,11 +2896,14 @@ async function showApp() {
     // Give the browser one frame to paint the now-populated shell before
     // we start the crossfade — this is what makes the transition feel
     // instant on the other side.
-    if (authVisible) {
-      shell.classList.remove('screen-preloading')
-      await nextFrame()
-      await crossfadeScreens(authScreen, shell)
-    }
+   if (authVisible) {
+  authScreen.classList.add('hidden')   // ← hide FIRST, not after a 400ms timeout
+  window.scrollTo(0, 0)
+  shell.classList.remove('screen-preloading')
+  shell.classList.add('screen-fading-in')
+  await nextFrame()
+  shell.classList.remove('screen-fading-in')   // fades shell in via the 380ms CSS transition
+}
   } catch (err) {
     console.error('showApp error:', err)
     // Recover gracefully: make sure something is visible.

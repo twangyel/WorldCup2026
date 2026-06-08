@@ -405,6 +405,12 @@
       font-size: 11px !important;
     }
 
+    /* Blend photographic flags into flat UI */
+    .fixture-team-flag,
+    .team-flag-lg, .team-flag-sm, .team-flag-xs {
+      filter: saturate(0.92) contrast(1.08);
+    }
+
 
     /* ===== Empty States ===== */
     .empty-state-warm {
@@ -447,11 +453,7 @@
   box-shadow: 0 1px 3px rgba(10, 15, 13, 0.06), 0 4px 12px rgba(10, 15, 13, 0.04);
 }
 
-/* Match leaderboard row width: extend out by 20px each side to negate parent px-5 */
-#home-next-match {
-  margin-left: -20px !important;
-  margin-right: -20px !important;
-}
+/* Cards now align to parent padding for consistent width */
 
 /* ===== Fixtures (Predictions tab) ===== */
 .glass-fixture {
@@ -498,8 +500,8 @@
 }
 .fixture-vs-text {
   font-size: 13px;
-  font-weight: 600;
-  color: #B5BDC5;
+  font-weight: 700;
+  color: #6B7B8A;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -1398,6 +1400,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1904,7 +1907,10 @@
                 <span class="text-5xl font-bold tracking-tight" id="home-rank">—</span>
                 <span class="text-sm opacity-70" id="home-rank-total"></span>
               </div>
-              <div class="text-xs mt-1.5 opacity-80 font-medium" id="home-rank-medal">Loading…</div>
+              <div class="flex items-center gap-1.5 mt-2">
+              <span id="home-rank-medal-icon" class="flex items-center justify-center w-5 h-5 rounded-full text-[10px] leading-none shadow-sm border border-white/20" style="background: linear-gradient(135deg, #CD7F32, #B87333);">🥉</span>
+              <span class="text-xs opacity-80 font-medium" id="home-rank-medal">Loading…</span>
+            </div>
             </div>
             <div class="text-right">
               <div class="text-[11px] uppercase tracking-wider opacity-70 font-semibold mb-1.5">Points</div>
