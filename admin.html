@@ -1170,13 +1170,121 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       }).join('')
     }
 
-    async function toggleFee(userId, paid) {
+        async function toggleFee(userId, paid) {
       if (typeof setFeePaid !== 'function') { showToast('setFeePaid helper missing', 'error'); return }
+      const u = allUsers.find(x => x.id === userId)
+
+      // When marking as paid: update DB first, then show WhatsApp verification sheet
+      if (paid && u) {
+        const { error } = await setFeePaid(userId, true)
+        if (error) return showToast(error.message, 'error')
+        u.fee_paid = true
+        renderUsers(); renderPrize()
+        showToast('Marked as paid', 'success')
+        showPaymentVerifiedWa(u)
+        return
+      }
+
+      // Unpaid flow stays exactly the same
       const { error } = await setFeePaid(userId, paid)
       if (error) return showToast(error.message, 'error')
-      const u = allUsers.find(x => x.id === userId); if (u) u.fee_paid = paid
+      if (u) u.fee_paid = paid
       renderUsers(); renderPrize()
       showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
+    }
+
+        function buildPaymentVerifiedMessage(name, whatsapp) {
+      const appUrl = typeof window !== 'undefined' ? (window.location.origin + '/index.html') : 'https://your-app-url.com'
+      const cleanWa = (whatsapp || '').replace(/\D/g, '')
+      return `Hi ${name || 'there'}! 👋
+
+Great news! 🎉 Your payment for the *WC 2026 Prediction League* has been *verified* by the admin. ✅
+
+You now have full access to the game! 🏆
+
+*Your login details:*
+📱 WhatsApp: +975 ${cleanWa}
+🔑 Use your registered password
+
+👉 *Login and start predicting:*
+${appUrl}
+
+Good luck! ⚽🔥`
+    }
+
+    function showPaymentVerifiedWa(user) {
+      const name = user.name || 'there'
+      const wa = user.phone || user.whatsapp || user.email?.replace('@wa.predict.local', '') || ''
+      const cleanWa = wa.replace(/\D/g, '')
+      const msg = buildPaymentVerifiedMessage(name, wa)
+
+      const overlay = document.createElement('div')
+      overlay.id = 'wa-verify-overlay'
+      overlay.className = 'fixed inset-0 sheet-backdrop z-50 flex items-end sm:items-center justify-center'
+      overlay.innerHTML = `
+        <div class="sheet-panel bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-lifted p-6">
+          <div class="w-10 h-1 bg-paper-border rounded-full mx-auto mb-5 sm:hidden"></div>
+          <div class="text-4xl text-center mb-3">💬</div>
+          <h3 class="text-xl font-bold text-center mb-2">Payment Verified!</h3>
+          <p class="text-sm text-ink-500 text-center mb-4">Notify ${name} via WhatsApp</p>
+
+          <div class="bg-paper rounded-2xl p-4 border border-paper-border space-y-3 mb-5">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-lg">📱</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-ink-500">WhatsApp Preview</span>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-paper-border text-sm whitespace-pre-wrap leading-relaxed" id="wa-verify-msg" style="font-family: system-ui, sans-serif;"></div>
+            <div class="flex gap-2">
+              <button id="wa-verify-copy" class="flex-1 btn-ghost text-xs py-2.5">📋 Copy</button>
+              <a id="wa-verify-send" href="#" target="_blank" class="flex-1 btn-primary text-center text-xs py-2.5 flex items-center justify-center gap-1.5 no-underline" style="width:auto;">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.13 1.58 5.943L0 24l6.335-1.652a11.897 11.897 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Open WhatsApp
+              </a>
+            </div>
+          </div>
+
+          <button id="wa-verify-done" class="btn-dark tap w-full">Done</button>
+        </div>
+      `
+
+      document.body.appendChild(overlay)
+
+      // Safely inject message text
+      overlay.querySelector('#wa-verify-msg').textContent = msg
+      overlay.querySelector('#wa-verify-send').href = `https://wa.me/975${cleanWa}?text=${encodeURIComponent(msg)}`
+
+      // Copy handler
+      overlay.querySelector('#wa-verify-copy').addEventListener('click', () => {
+        const text = overlay.querySelector('#wa-verify-msg').textContent
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('Message copied to clipboard', 'success')
+        }).catch(() => {
+          const ta = document.createElement('textarea')
+          ta.value = text
+          ta.style.position = 'fixed'; ta.style.opacity = '0'
+          document.body.appendChild(ta)
+          ta.select()
+          document.execCommand('copy')
+          document.body.removeChild(ta)
+          showToast('Message copied to clipboard', 'success')
+        })
+      })
+
+      // Done handler — just closes the sheet
+      overlay.querySelector('#wa-verify-done').addEventListener('click', () => {
+        overlay.querySelector('.sheet-panel').classList.remove('shown')
+        setTimeout(() => overlay.remove(), 320)
+      })
+
+      // Close on backdrop tap
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) {
+          overlay.querySelector('.sheet-panel').classList.remove('shown')
+          setTimeout(() => overlay.remove(), 320)
+        }
+      })
+
+      requestAnimationFrame(() => overlay.querySelector('.sheet-panel').classList.add('shown'))
     }
 
     // ===== Bulk paid actions =====
