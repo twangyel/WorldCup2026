@@ -1372,6 +1372,7 @@
     }
 </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1553,60 +1554,171 @@
       </div>
 
       <!-- Point System -->
-     <!-- Point System -->
-<div>
-  <div class="flex items-center gap-2 mb-2">
-    <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">2</div>
-    <h4 class="font-bold text-sm">Point System</h4>
-  </div>
-  
-  <!-- MAX POINTS BANNER -->
-  <div class="ml-10 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-    <span class="text-amber-700 text-lg leading-none mt-0.5">⚠️</span>
-    <div>
-      <div class="text-xs font-bold text-amber-800 uppercase tracking-wider">Important</div>
-      <div class="text-xs text-amber-700 mt-0.5 leading-relaxed">
-        You can earn a <b>maximum of 5 points per match</b>. Even if multiple conditions apply, only the <b>highest single tier</b> is awarded — they do not stack.
-      </div>
-    </div>
-  </div>
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">2</div>
+          <h4 class="font-bold text-sm">Point System</h4>
+        </div>
 
-  <div class="pl-10 space-y-2">
-    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-      <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
-      <div>
-        <div class="text-sm font-semibold">Exact Score</div>
-        <div class="text-xs text-ink-500">You predicted the exact final scoreline</div>
+        <!-- MAX POINTS BANNER -->
+        <div class="ml-10 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+          <span class="text-amber-700 text-lg leading-none mt-0.5">⚠️</span>
+          <div>
+            <div class="text-xs font-bold text-amber-800 uppercase tracking-wider">Important</div>
+            <div class="text-xs text-amber-700 mt-0.5 leading-relaxed">
+              You can earn a <b>maximum of 5 base points per match</b>. Even if multiple conditions apply, only the <b>highest single tier</b> is awarded — they do not stack.
+            </div>
+          </div>
+        </div>
+
+        <div class="pl-10 space-y-2">
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
+            <div>
+              <div class="text-sm font-semibold">Exact Score</div>
+              <div class="text-xs text-ink-500">You predicted the exact final scoreline</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
+            <div>
+              <div class="text-sm font-semibold">Correct Goal Difference</div>
+              <div class="text-xs text-ink-500">Right margin, wrong score (e.g. you said 2–0, result was 3–1)</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
+            <div>
+              <div class="text-sm font-semibold">Correct Outcome</div>
+              <div class="text-xs text-ink-500">Right winner or correct draw, wrong margin</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-sm font-bold shrink-0">0</div>
+            <div>
+              <div class="text-sm font-semibold">Wrong Outcome</div>
+              <div class="text-xs text-ink-500">Wrong winner or wrong draw call</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
+
+      <!-- Bonus Points -->
       <div>
-        <div class="text-sm font-semibold">Correct Goal Difference</div>
-        <div class="text-xs text-ink-500">Right margin, wrong score (e.g. you said 2–0, result was 3–1)</div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center text-sm font-bold">3</div>
+          <h4 class="font-bold text-sm">Bonus Points</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2">
+          Earn extra points on top of your base score. Bonuses are applied <b>after</b> the stage multiplier.
+        </p>
+
+        <!-- Streak Bonus -->
+        <div class="ml-10 mb-3">
+          <div class="text-xs font-bold text-ink-700 uppercase tracking-wider mb-2">🔥 Streak Bonus</div>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-sm font-bold shrink-0">+2</div>
+              <div>
+                <div class="text-sm font-semibold">Hot Streak 🔥</div>
+                <div class="text-xs text-ink-500">3 consecutive matches with any points</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-sm font-bold shrink-0">+5</div>
+              <div>
+                <div class="text-sm font-semibold">On Fire 🔥🔥</div>
+                <div class="text-xs text-ink-500">5 consecutive matches with any points</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold shrink-0">+10</div>
+              <div>
+                <div class="text-sm font-semibold">Unstoppable 🔥🔥🔥</div>
+                <div class="text-xs text-ink-500">7 consecutive matches with any points</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center text-sm font-bold shrink-0">+15</div>
+              <div>
+                <div class="text-sm font-semibold">Legendary 👑</div>
+                <div class="text-xs text-ink-500">10 consecutive matches with any points</div>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-ink-400 mt-2 pl-1">Streak resets to 0 if you get 0 points on any match. Bonus is awarded once when each threshold is crossed.</p>
+        </div>
+
+        <!-- Combo Bonus -->
+        <div class="ml-10 mb-3">
+          <div class="text-xs font-bold text-ink-700 uppercase tracking-wider mb-2">⚡ Combo Bonus</div>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold shrink-0">+3</div>
+              <div>
+                <div class="text-sm font-semibold">Exact Combo ⚡</div>
+                <div class="text-xs text-ink-500">2 exact scores in a row</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold shrink-0">+2</div>
+              <div>
+                <div class="text-sm font-semibold">GD Combo 🎯</div>
+                <div class="text-xs text-ink-500">2 correct goal differences in a row</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center text-sm font-bold shrink-0">+5</div>
+              <div>
+                <div class="text-sm font-semibold">Perfect Day ✨</div>
+                <div class="text-xs text-ink-500">All predictions on a single matchday are exact scores</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stage Multiplier -->
+        <div class="ml-10">
+          <div class="text-xs font-bold text-ink-700 uppercase tracking-wider mb-2">🏆 Stage Multiplier</div>
+          <p class="text-xs text-ink-500 mb-2">Applied to <b>base points only</b> before bonuses are added.</p>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-gray-50 text-gray-600 flex items-center justify-center text-sm font-bold shrink-0">1×</div>
+              <div>
+                <div class="text-sm font-semibold">Group Stage</div>
+                <div class="text-xs text-ink-500">All group matches</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm font-bold shrink-0">1.5×</div>
+              <div>
+                <div class="text-sm font-semibold">Round of 32 / Round of 16 / Quarter Final / 3rd Place</div>
+                <div class="text-xs text-ink-500">Knockout rounds (early + late)</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold shrink-0">2×</div>
+              <div>
+                <div class="text-sm font-semibold">Semi Final</div>
+                <div class="text-xs text-ink-500">Semi-final matches</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+              <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">2.5×</div>
+              <div>
+                <div class="text-sm font-semibold">Final</div>
+                <div class="text-xs text-ink-500">The championship match</div>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-ink-400 mt-2 pl-1">Example: Exact score (5 pts) in the Final = 5 × 2.5 = <b>12.5 base pts</b>, then bonuses are added on top.</p>
+        </div>
       </div>
-    </div>
-    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
-      <div>
-        <div class="text-sm font-semibold">Correct Outcome</div>
-        <div class="text-xs text-ink-500">Right winner or correct draw, wrong margin</div>
-      </div>
-    </div>
-    <div class="flex items-center gap-3 bg-paper rounded-xl p-3 border border-paper-border">
-      <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-sm font-bold shrink-0">0</div>
-      <div>
-        <div class="text-sm font-semibold">Wrong Outcome</div>
-        <div class="text-xs text-ink-500">Wrong winner or wrong draw call</div>
-      </div>
-    </div>
-  </div>
-</div>
 
       <!-- Prize Pool -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">3</div>
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">4</div>
           <h4 class="font-bold text-sm">Prize Distribution</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2">
@@ -1637,10 +1749,21 @@
         </div>
       </div>
 
+      <!-- Private Leagues -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold">5</div>
+          <h4 class="font-bold text-sm">Private Leagues</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10">
+          Create or join private leagues with friends and colleagues. Each league has its own mini-leaderboard. You must be a paid player to create or join a private league. Share your league's invite code to invite others.
+        </p>
+      </div>
+
       <!-- Deadlines -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">4</div>
+          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">6</div>
           <h4 class="font-bold text-sm">Prediction Deadlines</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -1651,14 +1774,13 @@
       <!-- Fair Play -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">5</div>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">7</div>
           <h4 class="font-bold text-sm">Fair Play</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
           One account per person. Admins reserve the right to remove duplicate or fraudulent accounts. All decisions are final.
         </p>
-      </div>
-    </div>
+      </div>    </div>
 
     <div class="p-4 border-t border-paper-border shrink-0">
       <button onclick="hideRulesSheet()" class="w-full bg-ink-900 text-white font-semibold py-3.5 rounded-2xl tap">Got it — Let's Play</button>
