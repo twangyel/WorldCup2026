@@ -800,6 +800,14 @@ function showPaymentGate() {
             showToast('Payment verified! Welcome aboard.', 'success')
             showNormalApp().then(() => switchTab('home'))
           }
+          if (payload.new?.private_leagues_access === true && payload.old?.private_leagues_access !== true) {
+            showToast('🎉 Private league access granted by admin!', 'success')
+            if (typeof loadMyLeagues === 'function') loadMyLeagues()
+          }
+          if (payload.new?.private_leagues_access === false && payload.old?.private_leagues_access === true) {
+            showToast('Private league access has been revoked', 'info')
+            if (typeof loadMyLeagues === 'function') loadMyLeagues()
+          }
         })
         .subscribe()
     }
@@ -2849,7 +2857,7 @@ function subscribeToOwnDeletion() {
   if (!user?.id) return;
   if (_deletionChannel) return; // already subscribed
 
-  _deletionChannel = supabase
+  _deletionChannel = supabaseClient
     .channel(`profile-self-${user.id}`)
     .on(
       'postgres_changes',
@@ -2861,7 +2869,7 @@ function subscribeToOwnDeletion() {
       },
       async () => {
         try {
-          localStorage.removeItem('wc-user');            // adjust to your actual key
+          localStorage.removeItem('wc-user');
           localStorage.removeItem('remembered-whatsapp');
         } catch (_) {}
 
@@ -2876,7 +2884,7 @@ function subscribeToOwnDeletion() {
 
         setTimeout(() => location.reload(), 4000);
 
-        try { await supabase.removeChannel(_deletionChannel); } catch (_) {}
+        try { await supabaseClient.removeChannel(_deletionChannel); } catch (_) {}
         _deletionChannel = null;
       }
     )
@@ -3230,6 +3238,22 @@ document.getElementById('league-modal-overlay')?.addEventListener('click', e => 
     if (e.target.id === 'league-modal-overlay') hideLeagueModal()
 })
 
+// ============== ACCESS HELPERS ==============
+function hasLeagueAccess(profile) {
+    if (!profile) return false
+    return profile.fee_paid === true
+        || profile.private_leagues_access === true
+        || (typeof isAdmin === 'function' && isAdmin())
+}
+
+function askAdminForLeagueAccess() {
+    const profile = getProfile()
+    const name = profile?.full_name || profile?.name || 'A player'
+    const message = `Hi! This is ${name}. Can I get early access to private leagues in the WC 2026 Predictions app? 🙏`
+    const adminNumber = '975XXXXXXXX' // <-- replace with admin WhatsApp number (digits only, with country code, no + sign)
+    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank')
+}
+
 async function handleCreateLeagueClick() {
     const profile = getProfile()
 
@@ -3240,9 +3264,9 @@ async function handleCreateLeagueClick() {
         return
     }
 
-    // Only paid users can create
-    if (!profile?.fee_paid) {
-        showToast('Complete your entry fee to create private leagues', 'warning')
+    // Access gate: paid OR admin-granted OR admin
+    if (!hasLeagueAccess(profile)) {
+        showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning')
         return
     }
 
@@ -3278,10 +3302,10 @@ async function handleCreateLeague() {
 }
 
 async function handleJoinLeague() {
-    // Payment gate: unpaid users cannot join leagues
+    // Access gate: paid OR admin-granted users can join
     const profile = getProfile()
-    if (!profile?.fee_paid) {
-        showToast('Complete your entry fee to join private leagues', 'warning')
+    if (!hasLeagueAccess(profile)) {
+        showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning')
         return
     }
     const enabled = await checkPrivateLeaguesEnabled()
@@ -3343,22 +3367,25 @@ async function loadMyLeagues() {
         createBtn.onclick = handleCreateLeagueClick
     }
 
-    // Payment gate: unpaid users cannot create or join leagues
+    // Access gate: paid OR admin-granted users can create/join
     const profile = getProfile()
-    if (!profile?.fee_paid) {
+    if (!hasLeagueAccess(profile)) {
         if (createBtn) {
-            createBtn.textContent = 'Pay to Create'
+            createBtn.textContent = '🔒 Locked'
             createBtn.classList.add('opacity-50', 'cursor-not-allowed')
             createBtn.classList.remove('tap')
-            createBtn.onclick = () => showToast('Complete your entry fee first', 'warning')
+            createBtn.onclick = () => showToast('Pay your entry fee or ask the admin for access', 'warning')
         }
         if (joinWrap) {
             joinWrap.innerHTML = `
                 <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
                     <div class="text-2xl mb-2">🔒</div>
-                    <div class="text-sm font-bold text-amber-800">Payment Required</div>
-                    <p class="text-xs text-amber-700 mt-1">Pay Nu. 500 entry fee to join private leagues</p>
-                    <button onclick="switchTab('home')" class="mt-2 bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl tap">Go to Payment</button>
+                    <div class="text-sm font-bold text-amber-800">Invite-Only Access</div>
+                    <p class="text-xs text-amber-700 mt-1">Pay Nu. 500 entry fee, or request early access from the admin.</p>
+                    <div class="flex gap-2 mt-2 justify-center">
+                        <button onclick="switchTab('home')" class="bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl tap">Pay Entry Fee</button>
+                        <button onclick="askAdminForLeagueAccess()" class="bg-white border border-amber-300 text-amber-800 text-xs font-bold px-3 py-2 rounded-xl tap">Ask Admin</button>
+                    </div>
                 </div>
             `
         }
@@ -3366,7 +3393,7 @@ async function loadMyLeagues() {
             <div class="text-center py-4">
                 <div class="text-3xl mb-2 opacity-40">🏆</div>
                 <div class="text-sm font-semibold text-ink-700">Private Leagues</div>
-                <p class="text-xs text-ink-500 mt-1">Available after payment verification</p>
+                <p class="text-xs text-ink-500 mt-1">Locked — paid members or admin-granted users only</p>
             </div>`
         return
     }

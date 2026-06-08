@@ -1162,6 +1162,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
             <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
           </div>
           <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
+          <button onclick="toggleLeagueAccess('${u.id}', ${!(u.private_leagues_access === true)})" class="text-[11px] font-bold px-2.5 py-1.5 rounded-full tap shrink-0 ${u.private_leagues_access ? 'bg-purple-500 text-white' : 'bg-paper text-ink-500 border border-paper-border'}" title="${u.private_leagues_access ? 'Revoke private league access' : 'Grant private league access'}">${u.private_leagues_access ? '🔓 LEAGUE' : '🔒'}</button>
           <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
           </button>
@@ -1193,6 +1194,25 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       if (u) u.fee_paid = paid
       renderUsers(); renderPrize()
       showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
+    }
+
+    async function toggleLeagueAccess(userId, grant) {
+      const u = allUsers.find(x => x.id === userId)
+      if (!u) return
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ private_leagues_access: grant })
+        .eq('id', userId)
+
+      if (error) {
+        showToast(error.message || 'Update failed', 'error')
+        return
+      }
+
+      u.private_leagues_access = grant
+      renderUsers()
+      showToast(grant ? `Granted league access to ${u.name || 'user'}` : `Revoked league access`, 'success')
     }
 
         function buildPaymentVerifiedMessage(name, whatsapp) {
