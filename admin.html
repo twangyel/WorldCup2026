@@ -172,6 +172,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1258,8 +1259,8 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
         // remove the profile + predictions so the user disappears from the app.
         let authDeleted = false
         try {
-          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('hyper-service', {
-            body: { user_id: id }
+          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('delete-auth-user', {
+            body: { user_id: id, action: 'delete' }
           })
           if (fnError) {
             console.warn('[ADMIN] Auth delete skipped (edge function failed):', fnError.message || fnError)
@@ -2242,6 +2243,70 @@ window.setSystemSettings = async function(payload) {
         console.error('loadLeagueStats error:', e)
       }
     }
-    </script>
+    
+    // ===== PASSWORD RESET =====
+    function generateTempPassword() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+      let pwd = ''
+      for (let i = 0; i < 10; i++) {
+        pwd += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return pwd
+    }
+
+    function resetUserPassword(userId, name) {
+      const tempPassword = generateTempPassword()
+      const safeName = (name || 'this user').replace(/'/g, "\'")
+
+      showModal({
+        icon: '🔑',
+        title: 'Reset Password?',
+        message: `Reset password for ${safeName}?
+
+A temporary password will be generated. Send it to the user via WhatsApp.`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Reset', onclick: `hideModal(); executeResetPassword('${userId}', '${tempPassword}', '${safeName}')`, class: 'bg-amber-600 text-white' }
+        ]
+      })
+    }
+
+    async function executeResetPassword(userId, tempPassword, name) {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('delete-auth-user', {
+          body: { 
+            user_id: userId, 
+            action: 'reset_password',
+            new_password: tempPassword 
+          }
+        })
+
+        if (error || !data?.success) {
+          showToast(error?.message || data?.error || 'Reset failed', 'error')
+          return
+        }
+
+        const pwd = data.temp_password || tempPassword
+        showModal({
+          icon: '✅',
+          title: 'Password Reset!',
+          message: `Temporary password for ${name}:
+
+${pwd}
+
+Copy this and send to the user via WhatsApp. They should change it after logging in.`,
+          actions: [
+            { text: 'Copy & Close', onclick: `navigator.clipboard.writeText('${pwd}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' }
+          ]
+        })
+
+        showToast('Password reset successfully', 'success')
+      } catch (e) {
+        console.error('Reset error:', e)
+        showToast('Reset failed: ' + e.message, 'error')
+      }
+    }
+
+</script>
 </body>
 </html>
