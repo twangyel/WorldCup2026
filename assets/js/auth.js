@@ -272,10 +272,15 @@ async function savePrediction(fixtureId, home, away) {
 }
 
 async function getLeaderboard() {
-    // Fetch profiles and results separately (prediction_results.user_id references auth.users, not profiles)
+    // Only fetch profiles where fee_paid = true (plus admin can see all, handled by RLS or app layer)
     const [{ data: profiles }, { data: allResults }] = await Promise.all([
-        supabaseClient.from('profiles').select('*'),
-        supabaseClient.from('prediction_results').select('*')
+        supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('fee_paid', true),  // ← ONLY PAID USERS
+        supabaseClient
+            .from('prediction_results')
+            .select('*')
     ])
 
     if (!profiles) return { data: [], error: new Error('No profiles') }
@@ -283,11 +288,12 @@ async function getLeaderboard() {
     let stats
 
     if (allResults && allResults.length > 0) {
-        // Use bonus engine aggregation
         const userIds = [...new Set(allResults.map(r => r.user_id))]
         stats = userIds.map(uid => {
             const userResults = allResults.filter(r => r.user_id === uid)
             const profile = profiles.find(p => p.id === uid) || {}
+            // Skip if no paid profile found (safety check)
+            if (!profile.id) return null
             const engineStats = BonusEngine.aggregateUserStats(uid, userResults)
             return {
                 ...profile,
@@ -297,9 +303,8 @@ async function getLeaderboard() {
                 gd: engineStats.gd,
                 result: engineStats.result
             }
-        })
+        }).filter(Boolean)  // ← Remove nulls (unpaid users with results but no profile)
     } else {
-        // Fallback to old predictions table (no bonuses)
         const { data: allPredictions } = await supabaseClient.from('predictions').select('*')
         stats = profiles.map(p => {
             const userPreds = allPredictions?.filter(pred => pred.user_id === p.id) || []
