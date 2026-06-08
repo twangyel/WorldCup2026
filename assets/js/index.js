@@ -1,5 +1,4 @@
-
-    // ============== FLAGS ==============
+// ============== FLAGS ==============
         const FLAG_MAP = {
       // ===== AFC (9) =====
       'argentina': { code: 'ar', emoji: '🇦🇷' }, 'brazil': { code: 'br', emoji: '🇧🇷' },
@@ -132,8 +131,8 @@ function flagHtml(name, size = 24) {
     if (f.isTbd) {
         return `
             <div
-                class="${flagClass} flag-fallback inline-flex items-center justify-center"
-                style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+                class="${flagClass} flag-fallback shrink-0"
+                style="display:inline-flex;font-size:${Math.max(10, size * 0.35)}px;"
                 title="To be determined"
             >
                 ?
@@ -142,18 +141,18 @@ function flagHtml(name, size = 24) {
     }
 
     if (f.img) {
+        // Request a higher-resolution image from flagcdn for crisp rectangular display
+        const hiResImg = f.img.replace('/w40/', '/w80/');
         return `
             <img
-                src="${f.img}"
+                src="${hiResImg}"
                 alt="${name}"
-                width="${size}"
-                height="${size}"
-                class="${flagClass} inline-block object-cover shrink-0"
+                class="${flagClass} shrink-0"
                 onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"
             >
             <span
-                class="hidden ${flagClass} flag-fallback inline-flex items-center justify-center"
-                style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+                class="${flagClass} flag-fallback shrink-0"
+                style="display:none;font-size:${Math.max(10, size * 0.35)}px;"
                 title="${name || 'Unknown'}"
             >
                 ${f.emoji}
