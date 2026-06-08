@@ -875,6 +875,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1547,10 +1548,14 @@
 
   
 <!-- My Leagues Card -->
-  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5" id="leagues-card">
+  <div class="rounded-3xl border border-white/30 p-5" id="leagues-card"
+     style="background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(250,250,247,0.75) 50%, rgba(255,255,255,0.82) 100%);
+            backdrop-filter: blur(20px) saturate(140%);
+            -webkit-backdrop-filter: blur(20px) saturate(140%);
+            box-shadow: 0 4px 24px rgba(10,15,13,0.06), inset 0 1px 0 rgba(255,255,255,0.6);">
     <div class="flex items-center justify-between mb-4">
       <h3 class="font-bold tracking-tight">My Leagues</h3>
-      <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">+ Create</button>
+      <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50/80 px-3 py-1.5 rounded-full tap backdrop-blur-sm">+ Create</button>
     </div>
 
     <!-- Join by code -->
@@ -1649,7 +1654,11 @@
     </div>
   </div>
 <!-- Badges & streaks -->
-  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+  <div class="rounded-3xl border border-white/30 p-5"
+       style="background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(250,250,247,0.75) 50%, rgba(255,255,255,0.82) 100%);
+              backdrop-filter: blur(20px) saturate(140%);
+              -webkit-backdrop-filter: blur(20px) saturate(140%);
+              box-shadow: 0 4px 24px rgba(10,15,13,0.06), inset 0 1px 0 rgba(255,255,255,0.6);">
     <div class="flex items-center justify-between mb-4">
       <h3 class="font-bold tracking-tight">Achievements</h3>
       <span id="profile-streak" class="hidden"></span>
