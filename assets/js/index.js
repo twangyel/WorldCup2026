@@ -444,8 +444,6 @@ function isEligibleForSignup(num) {
 // ========== MANUAL AUTH MODE TOGGLE ==========
 
 function setAuthMode(mode) {
-  const loginBtn = document.getElementById('mode-login-btn')
-  const signupBtn = document.getElementById('mode-signup-btn')
   const nameWrap = document.getElementById('name-wrap')
   const confirmWrap = document.getElementById('confirm-password-wrap')
   const nameInput = document.getElementById('name')
@@ -454,35 +452,27 @@ function setAuthMode(mode) {
   const subtitle = document.getElementById('auth-subtitle')
 
   if (mode === 'login') {
-    loginBtn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 bg-ink-900 text-white shadow-sm'
-    signupBtn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 text-ink-500 hover:text-ink-900'
-    
     nameWrap.classList.add('hidden')
     confirmWrap.classList.add('hidden')
     nameInput.required = false
     confirmInput.required = false
-    
-    submitBtn.querySelector('span').textContent = 'Sign In'
-    if (subtitle) subtitle.textContent = 'Welcome back! Enter your password.'
-    
+
+    submitBtn.querySelector('span').textContent = 'Enter League'
+    if (subtitle) subtitle.textContent = 'Enter your WhatsApp number and password to play.'
+
     authMode = 'login'
   } else {
-    signupBtn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 bg-ink-900 text-white shadow-sm'
-    loginBtn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 text-ink-500 hover:text-ink-900'
-    
     nameWrap.classList.remove('hidden')
     confirmWrap.classList.remove('hidden')
     nameInput.required = true
     confirmInput.required = true
-    
+
     submitBtn.querySelector('span').textContent = 'Create Account'
-    if (subtitle) subtitle.textContent = 'New here? Create your account below.'
-    
+    if (subtitle) subtitle.textContent = 'Fill in your details to join the league.'
+
     authMode = 'signup'
   }
-}
-
-// Keep old function names for compatibility
+}// Keep old function names for compatibility
 function switchToLoginUI() { setAuthMode('login') }
 function switchToSignupUI(msg) { 
   setAuthMode('signup') 
@@ -518,6 +508,46 @@ function switchToSignupUI(subtitleMsg) {
   nameInput.focus()
 }
 
+
+
+
+// Toggle between login and signup modes (replaces the old button toggle)
+function toggleAuthMode() {
+  if (authMode === 'login') {
+    const whatsapp = document.getElementById('whatsapp').value.trim()
+    if (whatsapp && !isEligibleForSignup(whatsapp)) {
+      showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+      return
+    }
+    setAuthMode('signup')
+    document.getElementById('auth-mode-toggle-link').textContent = '← Already have an account? Sign in'
+    // Focus on name field if empty
+    const nameInput = document.getElementById('name')
+    if (nameInput && !nameInput.value) {
+      setTimeout(() => nameInput.focus(), 100)
+    }
+  } else {
+    setAuthMode('login')
+    document.getElementById('auth-mode-toggle-link').textContent = 'New here? Create account →'
+  }
+}
+
+// Auto-detect mode on WhatsApp blur: check if number looks like it could be new
+async function handleWhatsappBlur() {
+  const whatsapp = document.getElementById('whatsapp').value.trim()
+  if (!whatsapp || !isValidLocalWhatsapp(whatsapp)) return
+
+  // If already in signup mode, don't switch back
+  if (authMode === 'signup') return
+
+  // Check if user exists by trying a lightweight query
+  // We use the auth RPC or just check if the number format suggests signup
+  // For now, we keep it simple: valid format stays in login mode until user toggles
+  // The toggle link is the primary way to switch
+}
+
+// Wire up blur detection
+document.getElementById('whatsapp')?.addEventListener('blur', handleWhatsappBlur)
 
 
 // ============== SMOOTH SCREEN TRANSITIONS ==============
@@ -644,6 +674,8 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       const msg = (error.message || '').toLowerCase()
       if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
         showToast('Wrong password. Try again.', 'error')
+      } else if (msg.includes('user not found') || msg.includes('not found')) {
+        showToast('No account found. Tap "New here?" to create one.', 'info')
       } else {
         showToast(error.message, 'error')
       }
@@ -2821,8 +2853,16 @@ function exitPreviewMode() {
     }
 
     function handleForgotPassword() {
-      showToast('Please message the admin on WhatsApp to reset your password.', 'info')
-    }
+  const whatsapp = document.getElementById('whatsapp').value.trim()
+  const clean = whatsapp.replace(/\D/g, '')
+  const message = 'Hi, I need help resetting my password for the WC Predictions League.' +
+    (clean ? ' My registered number is: ' + clean : ' My registered WhatsApp number is: [your number]') +
+    '\n\nCould you please assist me with a password reset?'
+
+  const encoded = encodeURIComponent(message)
+  window.open('https://wa.me/?text=' + encoded, '_blank')
+  showToast('Opening WhatsApp to message admin...', 'info')
+}
 async function showApp() {
   try {
     document.getElementById('auth-screen').classList.add('hidden')
