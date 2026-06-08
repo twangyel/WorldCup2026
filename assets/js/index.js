@@ -200,6 +200,7 @@ function flagHtml(name, size = 24) {
       requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
       setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
     }
+    
 
     // ============== MODAL ==============
     function showModal({ icon, title, message, actions }) {
@@ -618,6 +619,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     let pendingPaymentFile = null
 
     function showPaymentGate() {
+       previewMode = false;
   // CRITICAL FIX: ensure the shell is fully visible (not opacity:0 from screen-preloading)
   const shell = document.getElementById('app-shell')
   if (shell) {
@@ -664,6 +666,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
 
     async function showNormalApp() {
+      previewMode = false;
       // Make sure the shell is mounted in the DOM (even if invisible) so
       // images/layout can render while we fetch data.
       const shell = document.getElementById('app-shell')
@@ -1231,7 +1234,7 @@ async function loadHome() {
   if (!upcoming.length) {
     cdEl.textContent = ''
     cdEl.removeAttribute('data-cd-home')
-   nextEl.innerHTML = `<div class="glass-light rounded-3xl p-8 text-center">
+   nextEl.innerHTML = `<div class="glass-light rounded-3xl p-6 text-center">
       <div class="text-4xl mb-2">⏳</div><div class="text-sm font-semibold text-ink-700">No upcoming matches</div><p class="text-xs text-ink-500 mt-1">Check back soon</p>
     </div>`
   } else {
@@ -1244,8 +1247,8 @@ async function loadHome() {
 
    nextEl.innerHTML = `
   <div class="glass-light rounded-3xl overflow-hidden">
-        <div class="p-5">
-          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-4">${f.stage}</div>
+        <div class="p-4">
+          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-3">${f.stage}</div>
           <div class="flex items-center justify-between mb-4">
          <div class="flex-1 text-center flex flex-col items-center gap-1">
   ${flagHtml(f.home_team, 40)}
@@ -1261,7 +1264,7 @@ async function loadHome() {
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
-        <div class="px-5 py-4 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
+        <div class="px-4 py-3 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-0.5">Your Pick</div>
@@ -1277,14 +1280,14 @@ async function loadHome() {
 
   const recentEl = document.getElementById('home-recent')
   if (!finished.length) {
-    recentEl.innerHTML = `<div class="glass-light rounded-2xl border border-white/30 p-8 text-center"><div class="text-2xl mb-2 opacity-60">⏳</div><div class="text-sm font-semibold text-ink-700">No results yet</div><p class="text-xs text-ink-500 mt-1">Match results will appear here</p></div>`
+    recentEl.innerHTML = `<div class="glass-light rounded-2xl border border-white/30 p-6 text-center"><div class="text-2xl mb-2 opacity-60">⏳</div><div class="text-sm font-semibold text-ink-700">No results yet</div><p class="text-xs text-ink-500 mt-1">Match results will appear here</p></div>`
   } else {
    // AFTER (glass-light)
 recentEl.innerHTML = finished.map(f => {
   const pred = getPrediction(f.id)
   const pts = pred?.points_awarded || 0
   return `
-  <div class="glass-light rounded-2xl p-4 flex items-center gap-3">
+  <div class="glass-light rounded-2xl p-3 flex items-center gap-3">
     <div class="flex items-center gap-2 shrink-0">
       ${flagHtml(f.home_team, 28)}
       <span class="font-bold text-sm">${f.home_score}</span>
@@ -2672,6 +2675,7 @@ showToast('Opening WhatsApp...', 'success')
       showToast('Please message the admin on WhatsApp to reset your password.', 'info')
     }
 async function showApp() {
+   previewMode = false;
   const authScreen = document.getElementById('auth-screen')
   const shell = document.getElementById('app-shell')
   const authVisible = authScreen && !authScreen.classList.contains('hidden')
@@ -2879,6 +2883,128 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
+}
+
+// ============== SYSTEM SETTINGS (Private leagues toggle) ==============
+async function getSystemSettings() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .select('private_leagues_enabled')
+      .eq('id', 1)
+      .single();
+    if (error) throw error;
+    return { data: data || { private_leagues_enabled: false }, error: null };
+  } catch (err) {
+    console.warn('getSystemSettings failed, defaulting to false:', err);
+    return { data: { private_leagues_enabled: false }, error: err };
+  }
+}
+
+// ============== PRIVATE LEAGUE FUNCTIONS ==============
+async function createLeague(name) {
+  const user = getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Generate a unique 6-character invite code
+  let inviteCode;
+  let attempts = 0;
+  do {
+    inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { data: existing } = await supabaseClient
+      .from('leagues')
+      .select('id')
+      .eq('invite_code', inviteCode)
+      .single();
+    if (!existing) break;
+    attempts++;
+  } while (attempts < 10);
+
+  if (attempts >= 10) throw new Error('Failed to generate unique code');
+
+  const { data, error } = await supabaseClient
+    .from('leagues')
+    .insert({
+      name: name,
+      invite_code: inviteCode,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { data, error: null };
+}
+
+async function joinLeagueByCode(inviteCode) {
+  const user = getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Find the league
+  const { data: league, error: leagueError } = await supabaseClient
+    .from('leagues')
+    .select('*')
+    .eq('invite_code', inviteCode.toUpperCase())
+    .single();
+
+  if (leagueError || !league) throw new Error('Invalid invite code');
+
+  // Check if already a member
+  const { data: existing, error: existingError } = await supabaseClient
+    .from('league_memberships')
+    .select('id')
+    .eq('league_id', league.id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existing) throw new Error('You are already a member of this league');
+
+  // Add membership
+  const { data, error } = await supabaseClient
+    .from('league_memberships')
+    .insert({ league_id: league.id, user_id: user.id })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { data: league, error: null };
+}
+
+async function getMyLeagues() {
+  const user = getUser();
+  if (!user) return { data: [], error: null };
+
+  const { data, error } = await supabaseClient
+    .from('league_memberships')
+    .select(`
+      league_id,
+      leagues:league_id (
+        id,
+        name,
+        invite_code,
+        created_by
+      )
+    `)
+    .eq('user_id', user.id);
+
+  if (error) return { data: [], error };
+  // Flatten the result
+  const leagues = data.map(row => row.leagues).filter(Boolean);
+  return { data: leagues, error: null };
+}
+
+async function leaveLeague(leagueId) {
+  const user = getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabaseClient
+    .from('league_memberships')
+    .delete()
+    .eq('league_id', leagueId)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+  return { error: null };
 }
 
 // ============== PRIVATE LEAGUES ==============
