@@ -222,16 +222,39 @@ async function uploadAvatar() {
   if (!user) return { url: null, error: new Error('Not authenticated') };
 
   try {
-    const fileExt = pendingAvatarFile.name.split('.').pop();
+    const fileExt = pendingAvatarFile.name.split('.').pop().toLowerCase();
     const fileName = `avatars/${user.id}/${Date.now()}.${fileExt}`;
 
+    // Check if bucket exists, if not try to create or use fallback
     const { error: uploadError } = await supabaseClient
       .storage
       .from('profile-photos')
-      .upload(fileName, pendingAvatarFile, { cacheControl: '3600', upsert: true });
+      .upload(fileName, pendingAvatarFile, { 
+        cacheControl: '3600', 
+        upsert: true,
+        contentType: pendingAvatarFile.type
+      });
 
     if (uploadError) {
       console.error('Avatar upload error:', uploadError);
+      // Try fallback: upload to public bucket if profile-photos doesn't exist
+      if (uploadError.message && uploadError.message.includes('bucket')) {
+        const { error: fallbackError } = await supabaseClient
+          .storage
+          .from('public')
+          .upload(fileName, pendingAvatarFile, { 
+            cacheControl: '3600', 
+            upsert: true 
+          });
+        if (fallbackError) {
+          return { url: null, error: fallbackError };
+        }
+        const { data: fallbackUrl } = supabaseClient
+          .storage
+          .from('public')
+          .getPublicUrl(fileName);
+        return { url: fallbackUrl?.publicUrl, error: null };
+      }
       return { url: null, error: uploadError };
     }
 
@@ -240,9 +263,9 @@ async function uploadAvatar() {
       .from('profile-photos')
       .getPublicUrl(fileName);
 
-    pendingAvatarFile = null;
     return { url: urlData?.publicUrl, error: null };
   } catch (e) {
+    console.error('Avatar upload exception:', e);
     return { url: null, error: e };
   }
 }
@@ -742,23 +765,35 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         phone: document.getElementById('profile-phone').value
       }
 
+      let avatarUrl = null;
+
       // Upload avatar if pending
       if (pendingAvatarFile) {
         const { url, error: avatarError } = await uploadAvatar();
         if (avatarError) {
-          showToast('Photo upload failed, but profile saved', 'warning');
+          showToast('Photo upload failed: ' + (avatarError.message || 'Unknown error'), 'error');
+          console.error('Avatar upload failed:', avatarError);
+          pendingAvatarFile = null;
         } else if (url) {
+          avatarUrl = url;
           updates.avatar_url = url;
+          pendingAvatarFile = null;
+          showToast('Photo uploaded!', 'success');
         }
       }
 
       const { error } = await updateProfile(updates)
-      if (error) showToast('Could not save', 'error')
+      if (error) {
+        showToast('Could not save: ' + (error.message || 'Unknown error'), 'error');
+        console.error('Profile save error:', error);
+      }
       else { 
         showToast('Profile saved', 'success'); 
         document.getElementById('user-name').textContent = updates.name || 'Player';
         // Refresh avatar display with new data
-        updateAvatarDisplay(updates.avatar_url, updates.name);
+        updateAvatarDisplay(avatarUrl || getProfile()?.avatar_url, updates.name);
+        // Refresh profile cards to show new avatar everywhere
+        await updateProfileCards();
       }
     }
 
@@ -1123,26 +1158,25 @@ function msToCountdown(ms) {
         ${badge}
       </div>
 
-      <div class="flex items-center gap-3 mb-4">
+      <div class="flex items-center gap-3 mb-3">
         <div class="flex-1 text-center min-w-0">
-          <div class="fixture-team">
-            ${flagHtml(f.home_team, 44)}
-            <div class="fixture-team-name line-clamp-2">${f.home_team}</div>
+          <div class="flex flex-col items-center gap-1 w-full">
+            ${flagHtml(f.home_team, 40)}
+            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.home_team}</div>
           </div>
+          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
         </div>
-        <div class="flex flex-col items-center gap-1 shrink-0">
-          <div class="fixture-vs-divider">VS</div>
-          <div class="flex items-center gap-1.5">
-            ${locked
-              ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-lg">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
-              : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-lg">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
-          </div>
+        <div class="flex items-center gap-2 shrink-0">
+          ${locked
+            ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
+            : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
         </div>
         <div class="flex-1 text-center min-w-0">
-          <div class="fixture-team">
-            ${flagHtml(f.away_team, 44)}
-            <div class="fixture-team-name line-clamp-2">${f.away_team}</div>
+          <div class="flex flex-col items-center gap-1 w-full">
+            ${flagHtml(f.away_team, 40)}
+            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.away_team}</div>
           </div>
+          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
         </div>
       </div>
 
@@ -1397,18 +1431,16 @@ async function loadHome() {
   <div class="glass-light rounded-3xl overflow-hidden">
         <div class="p-3">
           <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-2">${f.stage}</div>
-          <div class="flex items-center justify-between mb-3 px-1">
-            <div class="flex-1 text-center flex flex-col items-center gap-2">
-              ${flagHtml(f.home_team, 44)}
-              <div class="font-bold text-sm line-clamp-2 leading-tight w-full">${f.home_team}</div>
-            </div>
-            <div class="px-3 flex flex-col items-center gap-1">
-              <div class="fixture-vs-divider" style="width:36px;height:36px;font-size:11px;">VS</div>
-            </div>
-            <div class="flex-1 text-center flex flex-col items-center gap-2">
-              ${flagHtml(f.away_team, 44)}
-              <div class="font-bold text-sm line-clamp-2 leading-tight w-full">${f.away_team}</div>
-            </div>
+          <div class="flex items-center justify-between mb-2">
+         <div class="flex-1 text-center flex flex-col items-center gap-1">
+  ${flagHtml(f.home_team, 40)}
+  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.home_team}</div>
+</div>
+            <div class="px-2 text-ink-300 font-bold text-sm">VS</div>
+          <div class="flex-1 text-center flex flex-col items-center gap-1">
+  ${flagHtml(f.away_team, 40)}
+  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.away_team}</div>
+</div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium pb-0.5">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}

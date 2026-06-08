@@ -451,54 +451,12 @@
   border: 1px solid #EEEDE7;
   box-shadow: 0 1px 3px rgba(10, 15, 13, 0.06), 0 4px 12px rgba(10, 15, 13, 0.04);
   transition: box-shadow 200ms ease, transform 150ms ease;
-  position: relative;
-  overflow: hidden;
-}
-.glass-fixture::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #D4A24C, #E8C878, #D4A24C);
-  opacity: 0;
-  transition: opacity 200ms ease;
 }
 .glass-fixture:hover {
-  box-shadow: 0 8px 24px rgba(10, 15, 13, 0.1), 0 2px 6px rgba(10, 15, 13, 0.06);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(10, 15, 13, 0.08), 0 1px 3px rgba(10, 15, 13, 0.06);
+  transform: translateY(-1px);
 }
-.glass-fixture:hover::before {
-  opacity: 1;
-}
-/* Team name + flag pairing */
-.fixture-team {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.fixture-team-name {
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1.2;
-  text-align: center;
-  color: #0A0F0D;
-}
-.fixture-vs-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #F4F3EE, #EEEDE7);
-  font-weight: 800;
-  font-size: 10px;
-  color: #8A959F;
-  letter-spacing: 0.05em;
-}
+
 
     .prize-dash-light .prize-dash-row.muted { color: #5C6B75; }
     .prize-dash-light .prize-dash-row.deduct { color: #B91C1C; }
@@ -1190,11 +1148,17 @@
       width: 100% !important;
     }
 
-    /* Compact sub-tabs */
+    /* Compact sub-tabs - full width matching leaderboard rows */
     .lb-subtabs-compact {
       padding: 3px !important;
       border-radius: 10px !important;
       margin: 0 16px 8px !important;
+      width: calc(100% - 32px) !important;
+      display: flex !important;
+    }
+    .lb-subtabs-compact .lb-subtab {
+      flex: 1 !important;
+      text-align: center !important;
     }
     .lb-subtabs-compact .lb-subtab {
       padding: 6px 12px !important;
