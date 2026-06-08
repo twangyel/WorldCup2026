@@ -2277,7 +2277,7 @@ A temporary password will be generated. Send it to the user via WhatsApp.`,
 
    async function executeResetPassword(userId, tempPassword, name) {
   try {
-    const { data, error } = await supabaseClient.functions.invoke('reset-password', {
+    const { data, error } = await supabaseClient.functions.invoke('dynamic-responder', {
       body: { 
         user_id: userId, 
         new_password: tempPassword 
