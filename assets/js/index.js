@@ -617,23 +617,33 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     // ============== PAYMENT GATE ==============
     let pendingPaymentFile = null
 
-        function showPaymentGate() {
-      document.getElementById('app-main').classList.add('hidden')
-      document.getElementById('app-nav').classList.add('hidden')
-      const gate = document.getElementById('payment-gate')
-      gate.classList.remove('hidden')
-      gate.classList.add('flex')
-      loadGateFee()
-      const profile = getProfile()
-      if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
-        document.getElementById('payment-form-content').classList.add('hidden')
-        document.getElementById('pending-state').classList.remove('hidden')
-      } else {
-        document.getElementById('payment-form-content').classList.remove('hidden')
-        document.getElementById('pending-state').classList.add('hidden')
-      }
-      setupPaymentRealtime()
-    }
+     function showPaymentGate() {
+  // CRITICAL FIX: ensure the shell is fully visible (not opacity:0 from screen-preloading)
+  const shell = document.getElementById('app-shell')
+  if (shell) {
+    shell.classList.remove('screen-preloading')
+    shell.classList.remove('screen-fading-in')
+    shell.style.opacity = ''
+    shell.style.visibility = ''
+    shell.style.position = ''
+  }
+
+  document.getElementById('app-main').classList.add('hidden')
+  document.getElementById('app-nav').classList.add('hidden')
+  const gate = document.getElementById('payment-gate')
+  gate.classList.remove('hidden')
+  gate.classList.add('flex')
+  loadGateFee()
+  const profile = getProfile()
+  if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
+    document.getElementById('payment-form-content').classList.add('hidden')
+    document.getElementById('pending-state').classList.remove('hidden')
+  } else {
+    document.getElementById('payment-form-content').classList.remove('hidden')
+    document.getElementById('pending-state').classList.add('hidden')
+  }
+  setupPaymentRealtime()
+}
 
         function setupPaymentRealtime() {
       const user = getUser()
