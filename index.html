@@ -1777,6 +1777,17 @@
             <p class="text-[11px] text-ink-500 mt-1.5 ml-1">Must be 8 digits starting with 16, 17, or 77. Country code +975 added automatically.</p>
           </div>
 
+
+              <!-- Name field – shown only when creating an account -->
+          <div id="name-wrap" class="hidden">
+            <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Name</label>
+            <div class="auth-input-wrap">
+              <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              <input type="text" id="name" class="auth-input" placeholder="Your full name" autocomplete="name">
+            </div>
+          </div>
+
+
           <!-- Password -->
           <div>
             <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Password</label>
@@ -1790,15 +1801,7 @@
             </div>
           </div>
 
-          <!-- Name field – shown only when creating an account -->
-          <div id="name-wrap" class="hidden">
-            <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Name</label>
-            <div class="auth-input-wrap">
-              <svg class="auth-input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-              <input type="text" id="name" class="auth-input" placeholder="Your full name" autocomplete="name">
-            </div>
-          </div>
-
+      
           <!-- Confirm password – shown only for new users -->
           <div id="confirm-password-wrap" class="hidden">
             <label class="block text-xs font-bold uppercase tracking-wider text-ink-700 mb-2">Confirm Password</label>
