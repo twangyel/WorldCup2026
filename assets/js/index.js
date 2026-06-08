@@ -649,76 +649,49 @@ async function crossfadeScreens(fromEl, toEl) {
 // Form submission
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault()
-  
+  const name = document.getElementById('name').value.trim()
   const whatsapp = document.getElementById('whatsapp').value.trim()
   const password = document.getElementById('password').value
   const remember = document.getElementById('remember-me').checked
-  const name = document.getElementById('name').value.trim()
-  const confirmPassword = document.getElementById('confirm-password').value
 
-  // Validate WhatsApp format
+  // Validate WhatsApp format: must be exactly 8 digits
   const clean = whatsapp.replace(/\D/g, '')
   if (!/^\d{8}$/.test(clean)) {
     showToast('Enter a valid 8-digit WhatsApp number', 'error')
     return
   }
 
-  setAuthButtonLoading(true, 'Checking...')
+  setAuthButtonLoading(true)
 
-  // FORCE CHECK: Always query database on submit
-  let exists = false
-  try {
-    // Try multiple ways to find the user
-    const { data: found } = await supabaseClient
-      .from('profiles')
-      .select('id, email, phone, fee_paid')
-      .or(`phone.eq.+975${clean},phone.eq.975${clean},email.eq.${clean}@wa.predict.local,email.eq.${clean}@wc-predictions.local`)
-      .limit(1)
-    
-    exists = found && found.length > 0
-    console.log('[Auth] User exists check:', exists, found)
-  } catch (err) {
-    console.error('[Auth] Existence check failed:', err)
-    // If check fails, assume login (safer than forcing signup)
-    exists = true
-  }
+  // ALWAYS check if the user exists in the DB — don't trust the visible form state.
+  // The blur handler may have raced, or the user may have clicked submit before
+  // blur finished. The database is the single source of truth.
+  const { exists, error: checkErr } = await checkWhatsappExists(whatsapp)
 
-  // Determine mode based on database result, NOT UI state
-  if (exists) {
-    // ========== LOGIN PATH ==========
-    console.log('[Auth] Logging in...')
-    switchToLoginUI() // Ensure UI is correct
-    
-    const { error } = await signInUser(whatsapp, password)
-    if (error) {
-      showToast(error.message, 'error')
-      setAuthButtonLoading(false)
-      return
-    }
-  } else {
-    // ========== SIGNUP PATH ==========
-    console.log('[Auth] Signing up...')
-    
-    // Check eligibility
-    if (!/^(16|17|77)/.test(clean)) {
+  // If we can't reach the DB, fall back to the visible form state as a best-effort guess
+  const confirmWrap = document.getElementById('confirm-password-wrap')
+  const confirmVisible = !confirmWrap.classList.contains('hidden')
+  const isSignupMode = checkErr ? confirmVisible : !exists
+
+  if (isSignupMode) {
+    // ===== SIGNUP PATH =====
+    if (!isEligibleForSignup(whatsapp)) {
       showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+      switchToLoginUI()
       setAuthButtonLoading(false)
       return
     }
-    
     if (!name) {
       showToast('Please enter your name', 'error')
-      switchToSignupUI('New here? Create your account below.')
       setAuthButtonLoading(false)
       return
     }
-    
+    const confirmPassword = document.getElementById('confirm-password').value
     if (password !== confirmPassword) {
       showToast('Passwords do not match', 'error')
       setAuthButtonLoading(false)
       return
     }
-    
     if (password.length < 6) {
       showToast('Password must be at least 6 characters', 'error')
       setAuthButtonLoading(false)
@@ -730,6 +703,23 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       if (error.message.includes('already registered') || error.message.includes('already exists')) {
         showToast('Account already exists. Please sign in.', 'info')
         switchToLoginUI()
+        setAuthButtonLoading(false)
+        return
+      }
+      showToast(error.message, 'error')
+      setAuthButtonLoading(false)
+      return
+    }
+  } else {
+    // ===== LOGIN PATH =====
+    // Force UI to login mode in case blur handler left us in a weird state
+    switchToLoginUI()
+
+    const { error } = await signInUser(whatsapp, password)
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+        showToast('Wrong password. Please try again.', 'error')
         setAuthButtonLoading(false)
         return
       }
