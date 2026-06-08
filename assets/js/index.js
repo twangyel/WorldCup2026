@@ -2471,22 +2471,30 @@ showToast('Opening WhatsApp...', 'success')
     }
 
     function exitPreviewMode() {
-      previewMode = false
-      // Restore hidden elements
-      const logoutBtn = document.querySelector('[onclick="confirmLogout()"]')
-      if (logoutBtn) logoutBtn.style.display = ''
-      const profileNav = document.querySelector('[data-tab="profile"]')
-      if (profileNav) profileNav.style.display = ''
-      const hero = document.querySelector('#tab-home .hero-card')
-      if (hero) hero.style.display = ''
-      // Restore leaderboard sub-tabs row that preview hid
-      const subOv = document.getElementById('lb-subtab-overall')
-      if (subOv) subOv.closest('.flex.items-center.justify-between')?.classList.remove('hidden')
-      document.getElementById('preview-banner').classList.add('hidden')
-      document.getElementById('app-shell').classList.add('hidden')
-      stopCountdownTicker()
-      showAuth()
-    }
+  previewMode = false;
+  
+  // Restore all hidden elements
+  const logoutBtn = document.querySelector('[onclick="confirmLogout()"]');
+  if (logoutBtn) logoutBtn.style.display = '';
+  
+  const profileNav = document.querySelector('[data-tab="profile"]');
+  if (profileNav) profileNav.style.display = '';
+  
+  const hero = document.querySelector('#tab-home .hero-card');
+  if (hero) hero.style.display = '';
+  
+  const subOv = document.getElementById('lb-subtab-overall');
+  if (subOv) subOv.closest('.flex.items-center.justify-between')?.classList.remove('hidden');
+  
+  // Hide preview-specific elements
+  document.getElementById('preview-banner').classList.add('hidden');
+  
+  // Hide app shell and show auth
+  document.getElementById('app-shell').classList.add('hidden');
+  document.getElementById('payment-gate').classList.add('hidden'); // Ensure payment gate is hidden
+  stopCountdownTicker();
+  showAuth();
+}
 
     function renderPreviewLeaderboard() {
       const c = document.getElementById('leaderboard-list')
