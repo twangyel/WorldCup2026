@@ -173,6 +173,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1159,7 +1160,10 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
             <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
           </div>
           <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
-          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 p-1.5 tap">
+          <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
+          </button>
+          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-red-500 p-1.5 tap" title="Remove user">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>`
