@@ -1420,74 +1420,73 @@ Good luck! ⚽🔥`
       const el = document.getElementById(id)
       if (el) el.addEventListener('input', updateWaPreview)
     })
+document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
 
-    document.getElementById('add-user-form').addEventListener('submit', async (e) => {
-      e.preventDefault()
+    const name = document.getElementById('new-user-name').value.trim()
+    const whatsapp = document.getElementById('new-user-whatsapp').value.trim()
+    const dept = document.getElementById('new-user-dept').value.trim()
+    const password = document.getElementById('new-user-password').value
 
-      const name = document.getElementById('new-user-name').value.trim()
-      const whatsapp = document.getElementById('new-user-whatsapp').value.trim()
-      const dept = document.getElementById('new-user-dept').value.trim()
-      const password = document.getElementById('new-user-password').value
-
-      // Validate WhatsApp
-      if (!isValidAdminWhatsapp(whatsapp)) {
+    // Validate WhatsApp
+    if (!isValidAdminWhatsapp(whatsapp)) {
         showToast('Enter a valid 8-digit WhatsApp number starting with 16, 17, or 77', 'error')
         return
-      }
-      if (password.length < 6) {
+    }
+    if (password.length < 6) {
         showToast('Password must be at least 6 characters', 'error')
         return
-      }
+    }
 
-      // Build email from WhatsApp (required for Supabase auth)
-      const cleanWa = whatsapp.replace(/\D/g, '')
-      const email = `${cleanWa}@wa.predict.local`
+    // Use auth.js helpers to ensure exact same email format
+    const wa = normalizeWhatsapp(whatsapp)  // From auth.js — adds '975' prefix
+    const email = whatsappToEmail(whatsapp)  // From auth.js — wa@wa.predict.local
 
-      setAuthButtonLoadingForAddUser(true)
+    setAuthButtonLoadingForAddUser(true)
 
-      try {
+    try {
         // Step 1: Create auth user via Supabase signUp
         const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-          email: email,
-          password: password,
-          options: {
-            data: { name: name, phone: `+975${cleanWa}` }
-          }
+            email: email,
+            password: password,
+            options: {
+                data: { name: name, whatsapp: wa }  // Use 'whatsapp' key to match auth.js
+            }
         })
 
         if (authError) {
-          if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
-            showToast('A user with this WhatsApp number already exists', 'error')
-          } else {
-            showToast(authError.message, 'error')
-          }
-          setAuthButtonLoadingForAddUser(false)
-          return
+            if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+                showToast('A user with this WhatsApp number already exists', 'error')
+            } else {
+                showToast(authError.message, 'error')
+            }
+            setAuthButtonLoadingForAddUser(false)
+            return
         }
 
         const userId = authData?.user?.id
         if (!userId) {
-          showToast('Account created but user ID missing — check Supabase', 'error')
-          setAuthButtonLoadingForAddUser(false)
-          return
+            showToast('Account created but user ID missing — check Supabase', 'error')
+            setAuthButtonLoadingForAddUser(false)
+            return
         }
 
-        // Step 2: Upsert profile row (in case the trigger didn't fire or we need extra fields)
+        // Step 2: Upsert profile row — match auth.js field names exactly
         const { error: profileError } = await supabaseClient
-          .from('profiles')
-          .upsert({
-            id: userId,
-            name: name,
-            email: email,
-            department: dept || null,
-            phone: `+975${cleanWa}`,
-            fee_paid: false,
-            is_admin: false
-          }, { onConflict: 'id' })
+            .from('profiles')
+            .upsert({
+                id: userId,
+                name: name,
+                email: email,
+                department: dept || null,
+                whatsapp: wa,        // Use 'whatsapp' (not 'phone') to match auth.js
+                phone: wa,           // Also set phone for compatibility
+                fee_paid: false,
+                role: 'user'         // Use 'role' (not 'is_admin') to match auth.js schema
+            }, { onConflict: 'id' })
 
         if (profileError) {
-          console.warn('Profile upsert warning:', profileError)
-          // Non-fatal — the DB trigger may have already created it
+            console.warn('Profile upsert warning:', profileError)
         }
 
         // Step 3: Add to local list and refresh
@@ -1496,7 +1495,7 @@ Good luck! ⚽🔥`
           name: name,
           email: email,
           department: dept || '',
-          phone: `+975${cleanWa}`,
+          phone: `+975${wa}`,
           fee_paid: false,
           is_admin: false
         }
