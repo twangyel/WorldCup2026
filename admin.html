@@ -173,6 +173,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1159,7 +1160,10 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
             <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
           </div>
           <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
-          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 p-1.5 tap">
+          <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
+          </button>
+          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-red-500 p-1.5 tap" title="Remove user">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>`
@@ -2271,41 +2275,64 @@ A temporary password will be generated. Send it to the user via WhatsApp.`,
       })
     }
 
-    async function executeResetPassword(userId, tempPassword, name) {
-      try {
-        const { data, error } = await supabaseClient.functions.invoke('delete-auth-user', {
-          body: { 
-            user_id: userId, 
-            action: 'reset_password',
-            new_password: tempPassword 
-          }
-        })
+   async function executeResetPassword(userId, tempPassword, name) {
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('reset-password', {
+      body: { 
+        user_id: userId, 
+        new_password: tempPassword 
+      }
+    })
 
-        if (error || !data?.success) {
-          showToast(error?.message || data?.error || 'Reset failed', 'error')
-          return
-        }
+    // Network / CORS / deployment failure
+    if (error && !data) {
+      console.error('Edge Function unreachable:', error)
+      showModal({
+        icon: '⚠️',
+        title: 'Edge Function Error',
+        message: `Could not reach the "reset-password" function. This usually means:
+1. The function isn't deployed yet, or
+2. The SUPABASE_SERVICE_ROLE_KEY secret is missing.
 
-        const pwd = data.temp_password || tempPassword
-        showModal({
-          icon: '✅',
-          title: 'Password Reset!',
-          message: `Temporary password for ${name}:
+Temporary password for ${name || 'user'}:
+${tempPassword}
+
+You can copy it now and send it manually. To fix this permanently, deploy the Edge Function (see instructions).`,
+        actions: [
+          { text: 'Copy Password', onclick: `navigator.clipboard.writeText('${tempPassword}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' },
+          { text: 'Close', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
+        ]
+      })
+      return
+    }
+
+    // Function returned an error payload
+    if (data?.error || !data?.success) {
+      showToast(data?.error || 'Reset failed on server', 'error')
+      return
+    }
+
+    // Success
+    const pwd = data.temp_password || tempPassword
+    showModal({
+      icon: '✅',
+      title: 'Password Reset!',
+      message: `Temporary password for ${name}:
 
 ${pwd}
 
 Copy this and send to the user via WhatsApp. They should change it after logging in.`,
-          actions: [
-            { text: 'Copy & Close', onclick: `navigator.clipboard.writeText('${pwd}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' }
-          ]
-        })
+      actions: [
+        { text: 'Copy & Close', onclick: `navigator.clipboard.writeText('${pwd}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' }
+      ]
+    })
 
-        showToast('Password reset successfully', 'success')
-      } catch (e) {
-        console.error('Reset error:', e)
-        showToast('Reset failed: ' + e.message, 'error')
-      }
-    }
+    showToast('Password reset successfully', 'success')
+  } catch (e) {
+    console.error('Reset exception:', e)
+    showToast('Reset failed: ' + (e.message || 'Network error'), 'error')
+  }
+}
 
 </script>
 </body>
