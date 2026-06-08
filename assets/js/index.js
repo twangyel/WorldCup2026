@@ -1124,71 +1124,70 @@ function msToCountdown(ms) {
     const hasScore = f.home_score !== null && f.away_score !== null
     const isNext = f.id === nextMatchId
     const timeLocked = isLocked(f.kickoff)
-    // In preview mode every card is locked (read-only)
     const locked = previewMode || !isNext || timeLocked
     const hP = pred ? pred.home_prediction : ''
     const aP = pred ? pred.away_prediction : ''
     const pts = pred?.points_awarded || 0
 
-    let badge
-    if (hasScore) badge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
-    else if (locked && !previewMode) badge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
-    else if (previewMode && !hasScore) badge = `<span class="text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">PREVIEW</span>`
-    else badge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">OPEN</span>`
+    // Status badge
+    let statusClass, statusText
+    if (hasScore) { statusClass = 'fixture-status-ft'; statusText = `FT ${f.home_score}–${f.away_score}`; }
+    else if (locked && !previewMode) { statusClass = 'fixture-status-locked'; statusText = '🔒 Locked'; }
+    else if (previewMode && !hasScore) { statusClass = 'fixture-status-preview'; statusText = 'Preview'; }
+    else { statusClass = 'fixture-status-open'; statusText = 'Open'; }
 
     const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
 
-    // Mini countdown next to time, for the OPEN match
-    const ms = new Date(f.kickoff) - now
-    const showMiniCd = isNext && !timeLocked && !previewMode && ms <= 24 * 3600 * 1000
-    const miniCd = showMiniCd
-      ? `<span class="card-countdown ${ms <= 10*6e4 ? 'urgent' : ''}" data-cd-card="${f.id}">${msToCountdown(ms)}</span>`
-      : ''
+    // Date/time formatting
+    const ko = new Date(f.kickoff)
+    const dateStr = ko.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
+    const timeStr = ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
-    // Feature 1: "Locked in 2h ago" stamp
-    const stamp = pred?.submitted_at
-      ? `<div class="submitted-stamp mt-2 justify-center flex">Locked in ${relativeTimeAgo(pred.submitted_at)}</div>`
-      : ''
+    // Score boxes (readonly or input)
+    const scoreSection = locked
+      ? `<div class="fixture-score-row">
+          <div class="fixture-score-box">${hP !== '' ? hP : '–'}</div>
+          <span class="fixture-score-divider">:</span>
+          <div class="fixture-score-box">${aP !== '' ? aP : '–'}</div>
+        </div>`
+      : `<div class="fixture-score-row">
+          <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)">
+          <span class="fixture-score-divider">:</span>
+          <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">
+        </div>`
+
+    // Save button
+    const saveBtn = !locked
+      ? `<button onclick="handleSavePrediction('${f.id}')" class="fixture-save-btn tap">${pred ? 'Update Prediction' : 'Save Prediction'}</button>`
+      : previewMode && !hasScore
+        ? `<button onclick="exitPreviewMode()" class="fixture-save-btn tap" style="background:linear-gradient(135deg,#1E3A5F,#0B1221);">🔓 Sign in to predict</button>`
+        : ''
 
     return `
-    <div class="glass-fixture rounded-3xl p-5 relative" data-fixture="${f.id}">
+    <div class="glass-fixture relative" data-fixture="${f.id}">
       ${ptsBadge}
-      <div class="flex items-center justify-between mb-4">
-        <span class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em]">${f.stage}</span>
-        ${badge}
+
+      <div class="fixture-stage-label">
+        <span>${f.stage}</span>
+        <span class="fixture-status-badge ${statusClass}">${statusText}</span>
       </div>
 
-      <div class="flex items-center gap-3 mb-3">
-        <div class="flex-1 text-center min-w-0">
-          <div class="flex flex-col items-center gap-1 w-full">
-            ${flagHtml(f.home_team, 40)}
-            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.home_team}</div>
-          </div>
-          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
+      <div class="fixture-match-row">
+        <div class="fixture-team-block">
+          ${flagHtml(f.home_team, 48)}
+          <div class="fixture-team-name">${f.home_team}</div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          ${locked
-            ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
-            : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
-        </div>
-        <div class="flex-1 text-center min-w-0">
-          <div class="flex flex-col items-center gap-1 w-full">
-            ${flagHtml(f.away_team, 40)}
-            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.away_team}</div>
-          </div>
-          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
+        <div class="fixture-vs-text">vs</div>
+        <div class="fixture-team-block">
+          ${flagHtml(f.away_team, 48)}
+          <div class="fixture-team-name">${f.away_team}</div>
         </div>
       </div>
 
-      <div class="text-center text-[11px] text-ink-400 font-medium mb-3 flex items-center justify-center gap-2 flex-wrap">
-        <span>${new Date(f.kickoff).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-        ${miniCd}
-      </div>
+      <div class="fixture-datetime">${dateStr} · ${timeStr}</div>
 
-      ${stamp}
-
-      ${!locked ? `<button onclick="handleSavePrediction('${f.id}')" class="w-full bg-ink-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap mt-2">${pred ? 'Update Prediction' : 'Save Prediction'}</button>` : ''}
-      ${previewMode && !hasScore ? `<button onclick="exitPreviewMode()" class="w-full bg-brand-900 text-white text-sm font-semibold py-3.5 rounded-2xl tap mt-2">🔓 Sign in to predict</button>` : ''}
+      ${scoreSection}
+      ${saveBtn}
     </div>`
   }).join('')
 }
@@ -1431,16 +1430,16 @@ async function loadHome() {
   <div class="glass-light rounded-3xl overflow-hidden">
         <div class="p-3">
           <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-2">${f.stage}</div>
-          <div class="flex items-center justify-between mb-2">
-         <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.home_team, 40)}
-  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.home_team}</div>
-</div>
-            <div class="px-2 text-ink-300 font-bold text-sm">VS</div>
-          <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.away_team, 40)}
-  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.away_team}</div>
-</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
+              ${flagHtml(f.home_team, 48)}
+              <div style="font-weight:700;font-size:15px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.home_team}</div>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:#B5BDC5;letter-spacing:0.05em;text-transform:uppercase;flex-shrink:0;padding:0 4px;">vs</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
+              ${flagHtml(f.away_team, 48)}
+              <div style="font-weight:700;font-size:15px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.away_team}</div>
+            </div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium pb-0.5">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}

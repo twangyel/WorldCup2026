@@ -457,6 +457,124 @@
   transform: translateY(-1px);
 }
 
+/* ===== Fixture Layout (Screenshot Style) ===== */
+.fixture-match-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 20px 8px;
+}
+.fixture-team-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.fixture-team-flag {
+  width: 48px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  border: 1px solid rgba(238, 237, 231, 0.8);
+}
+.fixture-team-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #0A0F0D;
+  text-align: center;
+  line-height: 1.2;
+}
+.fixture-vs-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #B5BDC5;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.fixture-stage-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8A959F;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 16px 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fixture-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.fixture-status-open { background: #F0FDF4; color: #15803D; }
+.fixture-status-locked { background: #FEF2F2; color: #DC2626; }
+.fixture-status-preview { background: #EFF6FF; color: #2563EB; }
+.fixture-status-ft { background: #0A0F0D; color: #fff; }
+.fixture-datetime {
+  text-align: center;
+  font-size: 13px;
+  color: #5C6B75;
+  font-weight: 500;
+  padding: 8px 20px 4px;
+}
+.fixture-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px 16px;
+}
+.fixture-score-box {
+  width: 56px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  background: #FAFAF7;
+  border: 1.5px solid #EEEDE7;
+  color: #1F2A26;
+}
+.fixture-score-box.active {
+  background: #fff;
+  border-color: #D4A24C;
+  box-shadow: 0 0 0 4px rgba(212,162,76,0.12);
+}
+.fixture-score-divider {
+  font-size: 18px;
+  font-weight: 700;
+  color: #B5BDC5;
+}
+.fixture-save-btn {
+  margin: 0 20px 16px;
+  width: calc(100% - 40px);
+  background: #0A0F0D;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.fixture-save-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
 
     .prize-dash-light .prize-dash-row.muted { color: #5C6B75; }
     .prize-dash-light .prize-dash-row.deduct { color: #B91C1C; }
