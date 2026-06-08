@@ -799,33 +799,32 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     // ============== PAYMENT GATE ==============
     let pendingPaymentFile = null
 
-  function showPaymentGate() {
+function showPaymentGate() {
   console.log('[gate] enter')
   try {
     previewMode = false;
+    
+    // Hide the entire app shell
     const shell = document.getElementById('app-shell')
     if (shell) {
+      shell.classList.add('hidden')
       shell.classList.remove('screen-preloading')
       shell.classList.remove('screen-fading-in')
       shell.style.opacity = ''
       shell.style.visibility = ''
       shell.style.position = ''
     }
-    console.log('[gate] shell reset done')
-
-    const main = document.getElementById('app-main')
-    const nav  = document.getElementById('app-nav')
+    
     const gate = document.getElementById('payment-gate')
-    console.log('[gate] elements:', { main: !!main, nav: !!nav, gate: !!gate })
-    console.log('[gate] elements:', { main: !!main, nav: !!nav, gate: !!gate })
-
-    if (main) main.classList.add('hidden')
-    if (nav)  nav.classList.add('hidden')
     if (!gate) { console.error('[gate] #payment-gate NOT FOUND'); return }
 
+    // Show payment gate - must be flex to display properly
     gate.classList.remove('hidden')
-    console.log('[gate] gate unhidden, classes:', gate.className)
-
+    gate.style.display = 'flex'
+    
+    // Ensure gate has proper layout classes
+    gate.classList.add('flex-col')
+    
     loadGateFee()
     const profile = getProfile()
     const pf = document.getElementById('payment-form-content')
@@ -838,17 +837,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       ps && ps.classList.add('hidden')
     }
     setupPaymentRealtime()
-    console.log('[gate] done. gate classes:', gate.className, 'display:', getComputedStyle(gate).display)
-
-    // One frame later, check if anyone re-hid us
-    requestAnimationFrame(() => {
-      const g = document.getElementById('payment-gate')
-      console.log('[gate] +1 frame. classes:', g.className, 'display:', getComputedStyle(g).display)
-    })
-    setTimeout(() => {
-      const g = document.getElementById('payment-gate')
-      console.log('[gate] +500ms. classes:', g.className, 'display:', getComputedStyle(g).display)
-    }, 500)
+    
   } catch (e) {
     console.error('[gate] ERROR:', e)
   }
@@ -873,15 +862,21 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
 
     async function showNormalApp() {
-      previewMode = false;
-      // Make sure the shell is mounted in the DOM (even if invisible) so
-      // images/layout can render while we fetch data.
-      const shell = document.getElementById('app-shell')
-      shell.classList.remove('hidden')
+  previewMode = false;
+  
+  // Hide payment gate
+  const gate = document.getElementById('payment-gate')
+  if (gate) {
+    gate.classList.add('hidden')
+    gate.style.display = ''
+  }
+  
+  // Show app shell
+  const shell = document.getElementById('app-shell')
+  shell.classList.remove('hidden')
 
-      document.getElementById('app-main').classList.remove('hidden')
-      document.getElementById('app-nav').classList.remove('hidden')
-      const gate = document.getElementById('payment-gate')
+  document.getElementById('app-main').classList.remove('hidden')
+  document.getElementById('app-nav').classList.remove('hidden')
       gate.classList.add('hidden')
       gate.classList.remove('flex')
       const profile = getProfile()
@@ -2643,7 +2638,7 @@ showToast('Opening WhatsApp...', 'success')
 
     // ============== PREVIEW MODE (Feature 4) ==============
     async function enterPreviewMode() {
-      previewMode = true
+      previewMode = false;
       document.getElementById('auth-screen').classList.add('hidden')
       document.getElementById('app-shell').classList.remove('hidden')
       document.getElementById('preview-banner').classList.remove('hidden')
@@ -2651,12 +2646,12 @@ showToast('Opening WhatsApp...', 'success')
       // Hide stuff that doesn't apply to guests
       document.getElementById('user-name').textContent = 'Guest'
       const logoutBtn = document.querySelector('[onclick="confirmLogout()"]')
-      if (logoutBtn) logoutBtn.style.display = 'none'
+      if (logoutBtn) logoutBtn.style.display = ''
       const profileNav = document.querySelector('[data-tab="profile"]')
-      if (profileNav) profileNav.style.display = 'none'
+      if (profileNav) profileNav.style.display = ''
       // Hide the personal-stats hero card (no user data to show)
       const hero = document.querySelector('#tab-home .hero-card')
-      if (hero) hero.style.display = 'none'
+      if (hero) hero.style.display = ''
 
       // Fetch fixtures anonymously
       try {
@@ -2683,7 +2678,7 @@ showToast('Opening WhatsApp...', 'success')
       switchTab('predictions')
     }
 
-    function exitPreviewMode() {
+function exitPreviewMode() {
   previewMode = false;
   
   // Restore all hidden elements
@@ -2704,11 +2699,14 @@ showToast('Opening WhatsApp...', 'success')
   
   // Hide app shell and show auth
   document.getElementById('app-shell').classList.add('hidden');
-  document.getElementById('payment-gate').classList.add('hidden'); // Ensure payment gate is hidden
+  const gate = document.getElementById('payment-gate');
+  if (gate) {
+    gate.classList.add('hidden');
+    gate.style.display = ''; // Clear inline display
+  }
   stopCountdownTicker();
   showAuth();
 }
-
     function renderPreviewLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       if (!c) return
@@ -2892,49 +2890,21 @@ showToast('Opening WhatsApp...', 'success')
       showToast('Please message the admin on WhatsApp to reset your password.', 'info')
     }
 async function showApp() {
-   previewMode = false;
-  const authScreen = document.getElementById('auth-screen')
-  const shell = document.getElementById('app-shell')
-  const authVisible = authScreen && !authScreen.classList.contains('hidden')
-
   try {
+    document.getElementById('auth-screen').classList.add('hidden')
+    document.getElementById('app-shell').classList.remove('hidden')
+
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
 
-    // Strategy: preload the entire app shell while the auth screen is still
-    // visible on top. We mount the shell using `screen-preloading` so it
-    // renders (layout + paint) but stays invisible behind the auth screen.
-    // Once data + DOM are ready we crossfade, so the user never sees a
-    // half-empty home screen.
-    if (authVisible) {
-      shell.classList.remove('hidden')
-      shell.classList.add('screen-preloading')
-    } else {
-      shell.classList.remove('hidden')
-    }
-
     if (!profile?.fee_paid && !isAdmin()) {
       showPaymentGate()
-    } else {
-      await showNormalApp()
+      return
     }
 
-    // Give the browser one frame to paint the now-populated shell before
-    // we start the crossfade — this is what makes the transition feel
-    // instant on the other side.
-   if (authVisible) {
-  authScreen.classList.add('hidden')   // ← hide FIRST, not after a 400ms timeout
-  window.scrollTo(0, 0)
-  shell.classList.remove('screen-preloading')
-  shell.classList.add('screen-fading-in')
-  await nextFrame()
-  shell.classList.remove('screen-fading-in')   // fades shell in via the 380ms CSS transition
-}
+    await showNormalApp()
   } catch (err) {
     console.error('showApp error:', err)
-    // Recover gracefully: make sure something is visible.
-    shell.classList.remove('screen-preloading', 'screen-fading-in')
-    if (authScreen) authScreen.classList.remove('screen-fading-out')
     showToast('Something went wrong loading the app. Please refresh.', 'error')
   }
 }
