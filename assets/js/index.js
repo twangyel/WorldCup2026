@@ -173,6 +173,126 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// ============== PROFILE AVATAR ==============
+let pendingAvatarFile = null;
+
+async function handleAvatarUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Please upload an image file', 'error');
+    input.value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Image too large. Max 2MB.', 'error');
+    input.value = '';
+    return;
+  }
+
+  pendingAvatarFile = file;
+
+  // Show preview immediately
+  const previewUrl = URL.createObjectURL(file);
+  const editImg = document.getElementById('profile-avatar-img');
+  const editInitials = document.getElementById('profile-avatar-initials');
+  if (editImg) {
+    editImg.src = previewUrl;
+    editImg.classList.remove('hidden');
+  }
+  if (editInitials) editInitials.classList.add('hidden');
+
+  // Also update header preview
+  const headerImg = document.getElementById('profile-avatar-img-header');
+  const headerInitials = document.getElementById('profile-avatar-initials-header');
+  if (headerImg) {
+    headerImg.src = previewUrl;
+    headerImg.classList.remove('hidden');
+  }
+  if (headerInitials) headerInitials.classList.add('hidden');
+
+  showToast('Photo selected — save profile to upload', 'info');
+}
+
+async function uploadAvatar() {
+  if (!pendingAvatarFile) return { url: null, error: null };
+
+  const user = getUser();
+  if (!user) return { url: null, error: new Error('Not authenticated') };
+
+  try {
+    const fileExt = pendingAvatarFile.name.split('.').pop();
+    const fileName = `avatars/${user.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabaseClient
+      .storage
+      .from('profile-photos')
+      .upload(fileName, pendingAvatarFile, { cacheControl: '3600', upsert: true });
+
+    if (uploadError) {
+      console.error('Avatar upload error:', uploadError);
+      return { url: null, error: uploadError };
+    }
+
+    const { data: urlData } = supabaseClient
+      .storage
+      .from('profile-photos')
+      .getPublicUrl(fileName);
+
+    pendingAvatarFile = null;
+    return { url: urlData?.publicUrl, error: null };
+  } catch (e) {
+    return { url: null, error: e };
+  }
+}
+
+function updateAvatarDisplay(url, name) {
+  // Update header avatar
+  const headerImg = document.getElementById('profile-avatar-img-header');
+  const headerInitials = document.getElementById('profile-avatar-initials-header');
+  const headerAvatar = document.getElementById('profile-avatar');
+
+  if (url && headerImg) {
+    headerImg.src = url;
+    headerImg.classList.remove('hidden');
+    if (headerInitials) headerInitials.classList.add('hidden');
+    if (headerAvatar) headerAvatar.classList.remove('bg-gradient-to-br');
+  } else if (headerInitials && name) {
+    headerInitials.textContent = getInitials(name);
+    headerInitials.classList.remove('hidden');
+    if (headerImg) headerImg.classList.add('hidden');
+  }
+
+  // Update edit panel avatar
+  const editImg = document.getElementById('profile-avatar-img');
+  const editInitials = document.getElementById('profile-avatar-initials');
+
+  if (url && editImg) {
+    editImg.src = url;
+    editImg.classList.remove('hidden');
+    if (editInitials) editInitials.classList.add('hidden');
+  } else if (editInitials && name) {
+    editInitials.textContent = getInitials(name);
+    editInitials.classList.remove('hidden');
+    if (editImg) editImg.classList.add('hidden');
+  }
+}
+
+// Update leaderboard avatar to show profile picture if available
+function getAvatarHtml(name, avatarUrl, rank, size = 32) {
+  const initials = getInitials(name);
+  const medalClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+
+  if (avatarUrl) {
+    return `<div class="lb-avatar ${medalClass}" style="width:${size}px;height:${size}px;padding:0;overflow:hidden;">
+      <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.textContent='${initials}'">
+    </div>`;
+  }
+  return `<div class="lb-avatar ${medalClass}">${initials}</div>`;
+}
+
+
     // ============== PWA ==============
     let deferredPrompt = null
     window.addEventListener('beforeinstallprompt', e => {
@@ -621,9 +741,25 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         department: document.getElementById('profile-dept').value,
         phone: document.getElementById('profile-phone').value
       }
+
+      // Upload avatar if pending
+      if (pendingAvatarFile) {
+        const { url, error: avatarError } = await uploadAvatar();
+        if (avatarError) {
+          showToast('Photo upload failed, but profile saved', 'warning');
+        } else if (url) {
+          updates.avatar_url = url;
+        }
+      }
+
       const { error } = await updateProfile(updates)
       if (error) showToast('Could not save', 'error')
-      else { showToast('Profile saved', 'success'); document.getElementById('user-name').textContent = updates.name || 'Player' }
+      else { 
+        showToast('Profile saved', 'success'); 
+        document.getElementById('user-name').textContent = updates.name || 'Player';
+        // Refresh avatar display with new data
+        updateAvatarDisplay(updates.avatar_url, updates.name);
+      }
     }
 
     // ============== PAYMENT GATE ==============
@@ -1585,13 +1721,13 @@ async function loadLeaderboard() {
 
         if (!stats?.length) {
           if (lbSubtab === 'matchday') {
-            c.innerHTML = `<div class="empty-state-warm p-8 text-center mx-3 rounded-2xl">
+            c.innerHTML = `<div class="empty-state-warm p-8 text-center rounded-2xl">
               <div class="empty-icon">🏟️</div>
               <div class="empty-title">Awaiting Kickoff</div>
               <p class="empty-desc">Matchday rankings appear once the first whistle blows. Stay tuned!</p>
             </div>`
           } else {
-            c.innerHTML = `<div class="empty-state-warm p-8 text-center mx-3 rounded-2xl">
+            c.innerHTML = `<div class="empty-state-warm p-8 text-center rounded-2xl">
               <div class="empty-icon">⚽</div>
               <div class="empty-title">Kickoff Soon</div>
               <p class="empty-desc">The leaderboard will light up once matches begin. Make your predictions now!</p>
@@ -1621,7 +1757,7 @@ async function loadLeaderboard() {
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
         const hasPoints = (s.points || 0) > 0
         // Medals ONLY when there are actual points
-        const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
         const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
         const rankDisplay = medal
           ? `<div class="${medalClass}" data-rank-wrap title="${rank}${rank===1?'st':rank===2?'nd':'rd'} Place">${medal}</div>`
@@ -1665,7 +1801,7 @@ async function loadLeaderboard() {
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           <div class="shrink-0">${rankDisplay}</div>
           <div class="shrink-0">
-            <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+            ${getAvatarHtml(s.name, s.avatar_url, rank, 32)}
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -2083,6 +2219,11 @@ function toggleEditProfile() {
   const isHidden = panel.classList.contains('hidden')
 
   if (isHidden) {
+    // Populate avatar from current profile
+    const profile = getProfile()
+    if (profile) {
+      updateAvatarDisplay(profile.avatar_url, profile.name)
+    }
     panel.classList.remove('hidden')
     panel.style.animation = 'glassFadeIn 300ms cubic-bezier(0.32, 0.72, 0, 1)'
   } else {
@@ -2098,9 +2239,10 @@ async function updateProfileHeader() {
   if (!profile || !myId) return
 
   const name = profile.name || 'Player'
-  const initials = name.split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase() || 'P'
-  const avatar = document.getElementById('profile-avatar')
-  if (avatar) avatar.textContent = initials
+  const initials = getInitials(name)
+
+  // Update avatar display (image or initials)
+  updateAvatarDisplay(profile.avatar_url, name)
 
   const nameEl = document.getElementById('profile-header-name')
   const adminBadge = document.getElementById('profile-admin-badge')
@@ -2535,14 +2677,15 @@ showToast('Opening WhatsApp...', 'success')
             ${fake.map((s, i) => {
               const rank = i + 1
               const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+              const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
               const rankDisp = medal
-                ? `<div class="rank-medal">${medal}</div>`
+                ? `<div class="${medalClass}">${medal}</div>`
                 : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
               return `
                 <div class="lb-row-compact flex items-center gap-3">
                   ${rankDisp}
                   <div class="shrink-0">
-                    <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+                    ${getAvatarHtml(s.name, null, rank, 32)}
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="player-name truncate">${s.name}</div>
@@ -3330,7 +3473,7 @@ async function loadLeagueLeaderboardView(leagueId) {
     if (prize) { prize.classList.add('hidden'); prize.innerHTML = '' }
 
     if (!stats?.length) {
-        c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
+        c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center mx-0">
             <div class="text-4xl mb-2">👥</div>
             <div class="font-semibold">No members yet</div>
             <p class="text-sm text-ink-500 mt-1">Invite friends with code: ${league?.invite_code || '---'}</p>
@@ -3354,7 +3497,7 @@ async function loadLeagueLeaderboardView(leagueId) {
         <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3">
             <div class="shrink-0">${rankDisplay}</div>
             <div class="shrink-0">
-                <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+                ${getAvatarHtml(s.name, s.avatar_url, rank, 32)}
             </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
