@@ -697,7 +697,6 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
           if (data?.currency) currency = data.currency
         }
         document.getElementById('gate-fee-amount').textContent = `${currency}${Number(fee).toLocaleString()}`
-        document.getElementById('gate-instructions').innerHTML = `Transfer <b>${currency}${Number(fee).toLocaleString()}</b> to the admin and upload your screenshot below. Your account will be activated once verified.`
       } catch (e) {
         console.error('loadGateFee error', e)
       }
@@ -876,7 +875,6 @@ function msToCountdown(ms) {
       predictions = predData || []
       renderFixtures()
       updatePredictionCount()
-      updatePredictTabBadge()
     }
 
     function getPrediction(id) { return predictions.find(p => p.fixture_id === id) }
@@ -1164,7 +1162,6 @@ async function loadHome() {
   let myIdx = stats?.findIndex(s => s.user_id === myId) ?? -1
   if (myIdx === -1 && stats?.length) {
     myIdx = stats.findIndex(s => s.id === myId)
-    updatePredictTabBadge()
   }
 
   const me = myIdx >= 0 ? stats[myIdx] : null
@@ -1464,38 +1461,37 @@ recentEl.innerHTML = finished.map(f => {
       return trend
     }
 
-// ===== PREDICT TAB BADGE =====
-function updatePredictTabBadge() {
-  const now = new Date()
-  const upcoming = (fixtures || [])
-    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-  const next = upcoming[0]
-  
-  const predictBtn = document.querySelector('[data-tab="predictions"]')
-  if (!predictBtn) return
-  
-  // Remove any existing badge
-  const existingBadge = predictBtn.querySelector('.nav-badge')
-  if (existingBadge) existingBadge.remove()
-  
-  if (!next || previewMode) return
-  
-  const ms = new Date(next.kickoff) - now
-  const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
-  
-  // Show badge only if:
-  // 1. Match locks in < 24h, OR
-  // 2. Match locks in < 48h and user hasn't predicted yet
-  const showBadge = (ms <= 24 * 3600 * 1000) || (!hasPred && ms <= 48 * 3600 * 1000)
-  
-  if (showBadge) {
-    const badge = document.createElement('span')
-    badge.className = 'nav-badge absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse'
-    predictBtn.style.position = 'relative'
-    predictBtn.appendChild(badge)
-  }
-}
+    // ===== Next-match CTA card =====
+    function renderLbCta() {
+      const host = document.getElementById('lb-cta')
+      if (!host) {
+        console.warn('[Leaderboard] lb-cta element not found in DOM')
+        return
+      }
+      if (previewMode) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const now = new Date()
+      const upcoming = (fixtures || [])
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const next = upcoming[0]
+      const myId = getUser()?.id
+      if (!next || !myId) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
+      if (hasPred) { host.classList.add('hidden'); host.innerHTML = ''; return }
+      const ms = new Date(next.kickoff) - now
+      const cd = msToCountdown(ms)
+      host.classList.remove('hidden')
+      host.innerHTML = `
+        <div class="lb-cta-card">
+          <span class="lb-cta-pulse"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold uppercase tracking-[0.15em] opacity-70">Next match — locks in <span data-cd-card="${next.id}">${cd}</span></div>
+            <div class="font-bold text-[14px] truncate mt-0.5">${next.home_team} vs ${next.away_team}</div>
+          </div>
+          <button class="lb-cta-btn tap" onclick="switchTab('predictions')">Predict</button>
+        </div>`
+    }
+
 
     async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
@@ -1537,7 +1533,8 @@ function updatePredictTabBadge() {
       }
       document.getElementById('lb-subtab-meta').textContent = metaText
 
-   
+      // Render CTA card + prize strip (use overall rank for "projected winning")
+      renderLbCta()
       const myOverallIdx = overallStats.findIndex(s => (s.user_id || s.id) === myId)
       const myOverallRank = myOverallIdx >= 0 ? myOverallIdx + 1 : null
       
@@ -2006,7 +2003,6 @@ function updatePredictTabBadge() {
     }
     function tickCountdowns() {
       const now = Date.now()
-      updatePredictTabBadge()
 
       // 1. Home page next-match countdown
       const homeCd = document.getElementById('home-next-countdown')
@@ -2948,6 +2944,12 @@ async function handleCreateLeague() {
 }
 
 async function handleJoinLeague() {
+    // Payment gate: unpaid users cannot join leagues
+    const profile = getProfile()
+    if (!profile?.fee_paid) {
+        showToast('Complete your entry fee to join private leagues', 'warning')
+        return
+    }
     const enabled = await checkPrivateLeaguesEnabled()
     if (!enabled) {
         showToast('Private leagues are coming soon! Stay tuned.', 'info')
@@ -3055,6 +3057,57 @@ function shareLeagueCode(leagueId, code, name) {
     const message = `🏆 Join my WC 2026 Prediction League: *"${name}"*\n\nUse code: *${code}*\n👉 ${appUrl}\n\nLet's see who predicts better! ⚽`
     const encoded = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encoded}`, '_blank')
+}
+
+// ============== LEAGUE LEADERBOARD ==============
+
+async function getLeagueLeaderboard(leagueId) {
+    // Get all members of this league
+    const { data: members, error: membersError } = await getLeagueMembers(leagueId)
+    if (membersError || !members?.length) return []
+
+    const userIds = members.map(m => m.id)
+
+    // Fetch prediction results for these users
+    const { data: results, error: resultsError } = await supabaseClient
+        .from('prediction_results')
+        .select('*')
+        .in('user_id', userIds)
+
+    if (resultsError) {
+        console.error('getLeagueLeaderboard: results error', resultsError)
+    }
+
+    // Aggregate stats per user
+    const stats = {}
+    members.forEach(m => {
+        stats[m.id] = {
+            ...m,
+            points: 0,
+            exact: 0,
+            gd: 0,
+            result: 0,
+            total_predictions: 0
+        }
+    })
+
+    ;(results || []).forEach(r => {
+        const s = stats[r.user_id]
+        if (!s) return
+        s.points += r.final_points || r.points_awarded || 0
+        if ((r.final_points || r.points_awarded || 0) === 5) s.exact++
+        else if ((r.final_points || r.points_awarded || 0) === 3) s.gd++
+        else if ((r.final_points || r.points_awarded || 0) === 2) s.result++
+        s.total_predictions++
+    })
+
+    // Sort by points desc, then exact, then gd, then result
+    return Object.values(stats).sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points
+        if (b.exact !== a.exact) return b.exact - a.exact
+        if (b.gd !== a.gd) return b.gd - a.gd
+        return b.result - a.result
+    })
 }
 
 // ============== LEAGUE LEADERBOARD OVERRIDE ==============
@@ -3177,4 +3230,73 @@ initApp = async function() {
     // Pre-check system settings
     await checkPrivateLeaguesEnabled()
     await _originalInitApp()
+}
+
+// ============== LEAGUE MANAGEMENT ==============
+
+async function deleteMyLeague(leagueId) {
+    if (!confirm('Delete this league? All members will be removed. This cannot be undone.')) return
+
+    const { error } = await supabaseClient
+        .from('leagues')
+        .delete()
+        .eq('id', leagueId)
+        .eq('created_by', getUser()?.id)
+
+    if (error) {
+        showToast(error.message, 'error')
+        return
+    }
+
+    activeLeagueId = null
+    await loadMyLeagues()
+    showToast('League deleted', 'success')
+}
+
+async function leaveLeagueHandler(leagueId) {
+    if (!confirm('Leave this league?')) return
+
+    const { error } = await leaveLeague(leagueId)
+    if (error) {
+        showToast(error.message, 'error')
+        return
+    }
+
+    if (activeLeagueId === leagueId) activeLeagueId = null
+    await loadMyLeagues()
+    showToast('Left league', 'success')
+}
+
+async function regenerateLeagueCode(leagueId) {
+    let newCode
+    let attempts = 0
+    do {
+        newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        attempts++
+        const { data: existing } = await supabaseClient
+            .from('leagues')
+            .select('id')
+            .eq('invite_code', newCode)
+            .single()
+        if (!existing) break
+    } while (attempts < 10)
+
+    if (attempts >= 10) {
+        showToast('Failed to generate new code. Try again.', 'error')
+        return
+    }
+
+    const { error } = await supabaseClient
+        .from('leagues')
+        .update({ invite_code: newCode })
+        .eq('id', leagueId)
+        .eq('created_by', getUser()?.id)
+
+    if (error) {
+        showToast(error.message, 'error')
+        return
+    }
+
+    await loadMyLeagues()
+    showToast(`New invite code: ${newCode}`, 'success')
 }

@@ -171,6 +171,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -989,6 +990,20 @@ function flagHtml(name, size = 24) {
     }
   })
   .subscribe()
+
+    // Realtime for leagues
+    supabaseClient.channel('admin-leagues')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leagues' }, () => {
+        loadLeagueStats()
+      })
+      .subscribe()
+
+    // Realtime for league memberships
+    supabaseClient.channel('admin-league-memberships')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, () => {
+        loadLeagueStats()
+      })
+      .subscribe()
 
 
     // ============== POINTS CALCULATION ==============

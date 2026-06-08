@@ -372,15 +372,6 @@
   transform: translateY(-1px);
 }
 
-/* Nav badge pulse */
-@keyframes navBadgePulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.2); }
-}
-.nav-badge {
-  animation: navBadgePulse 2s ease-in-out infinite;
-}
-
     .prize-dash-light .prize-dash-row.muted { color: #5C6B75; }
     .prize-dash-light .prize-dash-row.deduct { color: #B91C1C; }
     .prize-dash-light .prize-dash-row.total { color: #0A0F0D; }
@@ -859,6 +850,7 @@
       gap: 3px;
     }
 </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -1436,9 +1428,12 @@
         <!-- Glass leaderboard container -->
         <div class="rounded-3xl p-1" style="background: linear-gradient(135deg, rgba(250,250,247,0.9) 0%, rgba(255,255,255,0.95) 50%, rgba(250,250,247,0.9) 100%);">
 
-       
+        <!-- Prize pool strip -->
+        <div id="lb-prize" class="hidden mb-3"></div>
 
-      
+        <!-- Next-match CTA card -->
+        <div id="lb-cta" class="hidden"></div>
+
         <!-- Sub-tabs: Overall / Latest Matchday -->
         <div class="flex items-center justify-between px-1 mt-3">
           <div class="lb-subtabs" role="tablist">

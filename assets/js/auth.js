@@ -353,8 +353,24 @@ window.getSystemSettings = async function() {
 async function createLeague(name) {
     if (!currentUser) return { data: null, error: new Error('Not authenticated') }
 
-    // Generate a random 6-character invite code
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+    // Generate a unique 6-character invite code
+    let code
+    let attempts = 0
+    do {
+        code = Math.random().toString(36).substring(2, 8).toUpperCase()
+        attempts++
+        // Check if code already exists
+        const { data: existing } = await supabaseClient
+            .from('leagues')
+            .select('id')
+            .eq('invite_code', code)
+            .single()
+        if (!existing) break
+    } while (attempts < 10)
+
+    if (attempts >= 10) {
+        return { data: null, error: new Error('Failed to generate unique invite code. Please try again.') }
+    }
 
     const { data, error } = await supabaseClient
         .from('leagues')
