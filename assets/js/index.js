@@ -2534,6 +2534,7 @@ showToast('Opening WhatsApp...', 'success')
             <button onclick="exitPreviewMode()" class="bg-brand-900 text-white font-semibold px-5 py-2.5 rounded-xl text-sm tap">Sign in</button>
           </div>
         </div>`
+    }
 
     // ============== NAV ==============
     function showAuth() {
@@ -3430,4 +3431,3 @@ async function regenerateLeagueCode(leagueId) {
     await loadMyLeagues()
     showToast(`New invite code: ${newCode}`, 'success')
 }
-    }
