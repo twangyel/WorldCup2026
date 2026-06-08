@@ -1476,37 +1476,28 @@ recentEl.innerHTML = finished.map(f => {
 
     // ===== Next-match CTA card =====
     function renderLbCta() {
-      const host = document.getElementById('lb-cta')
-      if (!host) {
-        console.warn('[Leaderboard] lb-cta element not found in DOM')
-        return
-      }
-      if (previewMode) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const now = new Date()
-      const upcoming = (fixtures || [])
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const next = upcoming[0]
-      const myId = getUser()?.id
-      if (!next || !myId) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
-      if (hasPred) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const ms = new Date(next.kickoff) - now
-      const cd = msToCountdown(ms)
-      host.classList.remove('hidden')
-      host.innerHTML = `
-        <div class="lb-cta-card">
-          <span class="lb-cta-pulse"></span>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-[0.15em] opacity-70">Next match — locks in <span data-cd-card="${next.id}">${cd}</span></div>
-            <div class="font-bold text-[14px] truncate mt-0.5">${next.home_team} vs ${next.away_team}</div>
-          </div>
-          <button class="lb-cta-btn tap" onclick="switchTab('predictions')">Predict</button>
-        </div>`
-    }
+  // Use the compact strip instead of the big card
+  const strip = document.getElementById('lb-next-strip')
+  if (!strip) return
 
-
-    async function loadLeaderboard() {
+  if (previewMode) { strip.classList.add('hidden'); return }
+  const now = new Date()
+  const upcoming = (fixtures || [])
+    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  const next = upcoming[0]
+  const myId = getUser()?.id
+  if (!next || !myId) { strip.classList.add('hidden'); return }
+  const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
+  if (hasPred) { strip.classList.add('hidden'); return }
+  const ms = new Date(next.kickoff) - now
+  const cd = msToCountdown(ms)
+  strip.classList.remove('hidden')
+  document.getElementById('lb-next-teams').textContent = next.home_team + ' vs ' + next.away_team
+  document.getElementById('lb-next-countdown').textContent = cd
+  document.getElementById('lb-next-countdown').dataset.cdCard = next.id
+}
+async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
 
@@ -1580,12 +1571,12 @@ recentEl.innerHTML = finished.map(f => {
 
         if (!stats?.length) {
           if (lbSubtab === 'matchday') {
-            c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-              <div class="text-4xl mb-2">⏳</div><div class="font-semibold">No matchday yet</div><p class="text-sm text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
+            c.innerHTML = `<div class="bg-white p-6 text-center mx-3 rounded-2xl border border-paper-border">
+              <div class="text-3xl mb-1">⏳</div><div class="font-semibold text-sm">No matchday yet</div><p class="text-xs text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
             </div>`
           } else {
-            c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center">
-              <div class="text-4xl mb-2">📊</div><div class="font-semibold">No rankings yet</div><p class="text-sm text-ink-500 mt-1">Be the first to predict</p>
+            c.innerHTML = `<div class="bg-white p-6 text-center mx-3 rounded-2xl border border-paper-border">
+              <div class="text-3xl mb-1">📊</div><div class="font-semibold text-sm">No rankings yet</div><p class="text-xs text-ink-500 mt-1">Be the first to predict</p>
             </div>`
           }
           return
@@ -1611,13 +1602,13 @@ recentEl.innerHTML = finished.map(f => {
         const isMe = s.user_id === myId || s.id === myId
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
         const hasPoints = (s.points || 0) > 0
-        // Medals ONLY when there are actual points (avoids "silver for 0pts")
+        // Medals ONLY when there are actual points
         const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
         const rankDisplay = medal
-          ? `<div class="text-2xl relative" data-rank-wrap>${medal}</div>`
-          : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500 relative" data-rank-wrap>${rank}</div>`
+          ? `<div class="rank-medal" data-rank-wrap>${medal}</div>`
+          : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500" data-rank-wrap>${rank}</div>`
 
-        // Persistent trend badge (overall tab only — matchday is per-day, trend doesn't apply)
+        // Persistent trend badge (overall tab only)
         const tr = (lbSubtab === 'overall') ? lbTrendMap[uid] : null
         const trendHtml = tr
           ? (tr.dir === 'up'
@@ -1627,7 +1618,7 @@ recentEl.innerHTML = finished.map(f => {
                 : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
           : ''
 
-        // Streak flame (overall tab only; matchday is too short to streak)
+        // Streak flame (overall tab only)
         const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
         const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row">🔥${streakN}</span>` : ''
 
@@ -1638,7 +1629,7 @@ recentEl.innerHTML = finished.map(f => {
           if (amt > 0) projectedHtml = `<span class="lb-projected">Projected: ${fmtMoney(lbPrizeBreakdown.currency, amt)}</span>`
         }
 
-        // Matchday tab uses simpler stats (just points)
+        // Matchday tab uses simpler stats
         const statsLineOverall = `
           <span><b class="text-ink-900">${correct}</b> correct</span>
           <span class="text-ink-300">·</span>
@@ -1648,25 +1639,25 @@ recentEl.innerHTML = finished.map(f => {
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} px-4 py-5 flex items-start gap-4 w-[calc(100%+16px)] -mx-2"
+        <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
-          <div class="pt-1">${rankDisplay}</div>
+          <div class="shrink-0">${rankDisplay}</div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
-              ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="player-name truncate">${s.name || 'Anonymous'}</span>
+              ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
               ${trendHtml}
               ${streakHtml}
               ${leaderboardBadgeIcons(s, rank)}
             </div>
-            <div class="text-xs text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
+            <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
               ${statsLine}
             </div>
             ${projectedHtml}
           </div>
-          <div class="text-right shrink-0 pt-1">
-            <div class="text-2xl font-bold text-brand-700 leading-none" data-points-el>${s.points || 0}</div>
-            <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
+          <div class="text-right shrink-0">
+            <div class="points-num font-bold text-brand-700" data-points-el>${s.points || 0}</div>
+            <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
           </div>
         </div>`
       }).join('')
@@ -2498,7 +2489,8 @@ showToast('Opening WhatsApp...', 'success')
     function renderPreviewLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       if (!c) return
-      // Hide CTA, prize strip, and sub-tabs in preview mode (no real data)
+      // Hide strip, CTA, prize strip, and sub-tabs in preview mode (no real data)
+      const strip = document.getElementById('lb-next-strip'); if (strip) strip.classList.add('hidden')
       const cta = document.getElementById('lb-cta'); if (cta) { cta.classList.add('hidden'); cta.innerHTML = '' }
       const prize = document.getElementById('lb-prize'); if (prize) { prize.classList.add('hidden'); prize.innerHTML = '' }
       const subOv = document.getElementById('lb-subtab-overall'); const subMd = document.getElementById('lb-subtab-matchday')
@@ -2514,23 +2506,23 @@ showToast('Opening WhatsApp...', 'success')
       ]
       c.innerHTML = `
         <div class="preview-leaderboard-wrap">
-          <div class="preview-blur space-y-2.5">
+          <div class="preview-blur">
             ${fake.map((s, i) => {
               const rank = i + 1
               const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
               const rankDisp = medal
-                ? `<div class="text-2xl">${medal}</div>`
-                : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
+                ? `<div class="rank-medal">${medal}</div>`
+                : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
               return `
-                <div class="bg-white rounded-2xl border border-paper-border p-4 flex items-center gap-3">
+                <div class="lb-row-compact flex items-center gap-3">
                   ${rankDisp}
                   <div class="flex-1 min-w-0">
-                    <div class="font-bold text-[15px] truncate">${s.name}</div>
-                    <div class="text-xs text-ink-500 mt-1">${s.exact} exact · ${s.dept}</div>
+                    <div class="player-name truncate">${s.name}</div>
+                    <div class="player-stats text-ink-500">${s.exact} exact · ${s.dept}</div>
                   </div>
                   <div class="text-right shrink-0">
-                    <div class="text-2xl font-bold text-brand-700 leading-none">${s.points}</div>
-                    <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
+                    <div class="points-num font-bold text-brand-700">${s.points}</div>
+                    <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
                   </div>
                 </div>`
             }).join('')}
@@ -2542,7 +2534,6 @@ showToast('Opening WhatsApp...', 'success')
             <button onclick="exitPreviewMode()" class="bg-brand-900 text-white font-semibold px-5 py-2.5 rounded-xl text-sm tap">Sign in</button>
           </div>
         </div>`
-    }
 
     // ============== NAV ==============
     function showAuth() {
@@ -3327,26 +3318,26 @@ async function loadLeagueLeaderboardView(leagueId) {
         const hasPoints = (s.points || 0) > 0
         const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
         const rankDisplay = medal
-            ? `<div class="text-2xl relative">${medal}</div>`
-            : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
+            ? `<div class="rank-medal">${medal}</div>`
+            : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} px-4 py-5 flex items-start gap-4 w-[calc(100%+16px)] -mx-2">
-            <div class="pt-1">${rankDisplay}</div>
+        <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3">
+            <div class="shrink-0">${rankDisplay}</div>
             <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
-                    ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="player-name truncate">${s.name || 'Anonymous'}</span>
+                    ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
                 </div>
-                <div class="text-xs text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
+                <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
                     <span><b class="text-ink-900">${correct}</b> correct</span>
                     <span class="text-ink-300">·</span>
                     <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
                 </div>
             </div>
-            <div class="text-right shrink-0 pt-1">
-                <div class="text-2xl font-bold text-brand-700 leading-none">${s.points || 0}</div>
-                <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
+            <div class="text-right shrink-0">
+                <div class="points-num font-bold text-brand-700">${s.points || 0}</div>
+                <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
             </div>
         </div>`
     }).join('')
