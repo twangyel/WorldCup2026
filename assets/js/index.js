@@ -617,7 +617,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     // ============== PAYMENT GATE ==============
     let pendingPaymentFile = null
 
-     function showPaymentGate() {
+    function showPaymentGate() {
   // CRITICAL FIX: ensure the shell is fully visible (not opacity:0 from screen-preloading)
   const shell = document.getElementById('app-shell')
   if (shell) {
