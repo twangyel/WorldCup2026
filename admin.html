@@ -1250,63 +1250,56 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     }
 
         // FORCE override removeUser — deletes auth user via Edge Function, then cleans up data
-    window.removeUser = async function(id) {
-      try {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-          console.error('[ADMIN] Supabase client not available')
-          return { data: null, error: new Error('Supabase client not available') }
-        }
-        console.log('[ADMIN] Deleting user:', id)
-
-        // Step 1: Try to delete auth user via Edge Function (requires Service Role).
-        // If the function isn't deployed or fails, continue anyway — we'll still
-        // remove the profile + predictions so the user disappears from the app.
-        let authDeleted = false
-        try {
-          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('delete-auth-user', {
-            body: { user_id: id, action: 'delete' }
-          })
-          if (fnError) {
-            console.warn('[ADMIN] Auth delete skipped (edge function failed):', fnError.message || fnError)
-          } else {
-            console.log('[ADMIN] Auth user deleted via edge function:', fnData)
-            authDeleted = true
-          }
-        } catch (e) {
-          console.warn('[ADMIN] Auth delete skipped (edge function unreachable):', e.message || e)
-        }
-
-        // Step 2: Delete predictions first (FK safety)
-        const { error: predErr, data: predData } = await supabaseClient
-          .from('predictions')
-          .delete()
-          .eq('user_id', id)
-          .select()
-        if (predErr) {
-          console.error('[ADMIN] Predictions delete error:', predErr)
-        } else {
-          console.log('[ADMIN] Deleted predictions:', predData?.length || 0)
-        }
-
-        // Step 3: Delete profile row
-        const { error: delErr, data: delData } = await supabaseClient
-          .from('profiles')
-          .delete()
-          .eq('id', id)
-          .select()
-        if (delErr) {
-          console.error('[ADMIN] Profile delete error:', delErr)
-        } else {
-          console.log('[ADMIN] Profile delete result:', delData)
-        }
-
-        return { data: delData, error: null }
-      } catch (e) {
-        console.error('[ADMIN] removeUser exception:', e)
-        return { data: null, error: e }
-      }
+window.removeUser = async function(id) {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+      return { data: null, error: new Error('Supabase client not available') }
     }
 
+    // Try to delete auth user via Edge Function
+    let authDeleted = false
+    let authError = null
+    try {
+      const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('delete-auth-user', {
+        body: { user_id: id, action: 'delete' }
+      })
+      if (fnError) {
+        authError = fnError
+        console.warn('[ADMIN] Auth delete failed:', fnError.message || fnError)
+      } else if (fnData?.error) {
+        authError = new Error(fnData.error)
+        console.warn('[ADMIN] Auth delete failed:', fnData.error)
+      } else {
+        authDeleted = true
+        console.log('[ADMIN] Auth user deleted via edge function')
+      }
+    } catch (e) {
+      authError = e
+      console.warn('[ADMIN] Auth delete exception:', e.message || e)
+    }
+
+    // Delete predictions first (FK safety)
+    const { error: predErr } = await supabaseClient
+      .from('predictions')
+      .delete()
+      .eq('user_id', id)
+
+    // Delete profile row
+    const { error: delErr } = await supabaseClient
+      .from('profiles')
+      .delete()
+      .eq('id', id)
+
+    // Return error if auth delete failed, so caller knows
+    if (authError && !authDeleted) {
+      return { data: null, error: new Error(`Auth delete failed: ${authError.message}. Profile may have been deleted.`) }
+    }
+
+    return { data: { deleted: id, authDeleted }, error: null }
+  } catch (e) {
+    return { data: null, error: e }
+  }
+}
     function confirmRemoveUser(id, name) {
       showModal({
         icon: '🗑️',
@@ -1319,25 +1312,26 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       })
     }
 
-    async function doRemoveUser(id) {
-      const { error, data } = await removeUser(id)
-      if (error) {
-        console.error('[ADMIN] doRemoveUser failed:', error)
-        showToast(error.message || 'Delete failed — check console', 'error')
-        return
-      }
+async function doRemoveUser(id) {
+  const { error, data } = await removeUser(id)
 
-      // Verify the row is actually gone (RLS could silently block the delete)
-      const { data: remaining } = await supabaseClient.from('profiles').select('id').eq('id', id)
-      if (remaining && remaining.length > 0) {
-        showToast('Delete blocked by database — check RLS policy', 'error')
-        return
-      }
+  if (error) {
+    showToast(error.message || 'Delete failed', 'error')
+    return
+  }
 
-      allUsers = allUsers.filter(u => u.id !== id)
-      renderUsers(); renderPrize()
-      showToast('User removed permanently', 'success')
-    }
+  // ✅ ADD THIS HERE (replace your old data.authDeleted check)
+  if (!data?.success) {
+    showToast('Delete failed', 'error')
+    return
+  }
+
+  showToast('User removed permanently', 'success')
+
+  allUsers = allUsers.filter(u => u.id !== id)
+  renderUsers()
+  renderPrize()
+}
 
     // ============== ADD USER (WhatsApp-aligned) ==============
     function isValidAdminWhatsapp(num) {
@@ -2275,42 +2269,33 @@ A temporary password will be generated. Send it to the user via WhatsApp.`,
       })
     }
 
-    async function executeResetPassword(userId, tempPassword, name) {
-      try {
-        const { data, error } = await supabaseClient.functions.invoke('delete-auth-user', {
-          body: { 
-            user_id: userId, 
-            action: 'reset_password',
-            new_password: tempPassword 
-          }
-        })
+   async function executeResetPassword(userId, tempPassword, name) {
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('reset-password', {
+      body: { user_id: userId, temp_password: tempPassword }
+    })
 
-        if (error || !data?.success) {
-          showToast(error?.message || data?.error || 'Reset failed', 'error')
-          return
-        }
-
-        const pwd = data.temp_password || tempPassword
-        showModal({
-          icon: '✅',
-          title: 'Password Reset!',
-          message: `Temporary password for ${name}:
-
-${pwd}
-
-Copy this and send to the user via WhatsApp. They should change it after logging in.`,
-          actions: [
-            { text: 'Copy & Close', onclick: `navigator.clipboard.writeText('${pwd}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' }
-          ]
-        })
-
-        showToast('Password reset successfully', 'success')
-      } catch (e) {
-        console.error('Reset error:', e)
-        showToast('Reset failed: ' + e.message, 'error')
-      }
+    if (error || !data?.success) {
+      showToast(error?.message || data?.error || 'Reset failed', 'error')
+      return
     }
 
+    const pwd = data.temp_password || tempPassword
+    showModal({
+      icon: '✅',
+      title: 'Password Reset!',
+      message: `Temporary password for ${name}:\n\n${pwd}\n\nCopy this and send to the user via WhatsApp. They should change it after logging in.`,
+      actions: [
+        { text: 'Copy & Close', onclick: `navigator.clipboard.writeText('${pwd}'); hideModal(); showToast('Password copied', 'success')`, class: 'bg-brand-500 text-white' }
+      ]
+    })
+
+    showToast('Password reset successfully', 'success')
+  } catch (e) {
+    console.error('Reset error:', e)
+    showToast('Reset failed: ' + e.message, 'error')
+  }
+}
 </script>
 </body>
 </html>
