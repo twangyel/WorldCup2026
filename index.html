@@ -1402,6 +1402,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1866,6 +1867,141 @@
     </div>
   </div>
 
+     <!-- Payment Gate -->
+    <div id="payment-gate" class="hidden flex-1 flex-col overflow-y-auto">
+          <!-- Payment Gate Header -->
+    <header class="app-header sticky top-0 z-30 border-b border-paper-border/60 safe-top bg-white/95 backdrop-blur-xl">
+      <div class="max-w-lg mx-auto px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-15 h-15"><img src="/image/logo.svg" alt="WC Predictions Logo" class="w-15 h-12"></div>
+          <div>
+            <h1 class="font-bold text-[15px] leading-tight text-ink-900">WC Predictions League</h1>
+            <p class="text-xs text-ink-500" id="payment-gate-user-name">Loading…</p>
+          </div>
+        </div>
+        <button onclick="confirmLogout()" class="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 tap hover:bg-red-100 transition-colors shadow-sm">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        </button>
+      </div>
+    </header>
+
+<div class="flex-1 max-w-lg mx-auto w-full px-5 pt-8 pb-32">
+        <div class="text-center mb-8">
+          <div class="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center text-4xl mx-auto mb-4">🔒</div>
+          <h2 class="text-2xl font-bold tracking-tight">Payment Required</h2>
+          <p class="text-sm text-ink-500 mt-2">Complete your entry fee to unlock predictions and leaderboard.</p>
+        </div>
+
+                <div class="bg-white rounded-3xl shadow-card border border-paper-border p-6 mb-5">
+          <div id="payment-form-content">
+            <div class="text-center mb-5">
+              <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-1">Entry Fee</div>
+              <div class="text-4xl font-bold text-brand-700" id="gate-fee-amount">Nu. 500</div>
+            </div>
+            
+            <!-- Payment Methods -->
+            <div class="space-y-4 mb-5">
+            <div class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Payment Methods</div>
+
+            <!-- Bank Transfer -->
+            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg">🏦</div>
+                <div>
+                  <div class="font-semibold text-sm">Bank Transfer</div>
+                  <div class="text-xs text-ink-500">DK Bank</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
+                <!-- Replace src with your actual QR code image -->
+                <img src="/image/dk.png" alt="DK Bank QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
+                  <span>📷<<br>Upload your QR code<br>to /image/dkqrcode.jpeg/</span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div>
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Name</div>
+                    <div class="text-sm font-semibold text-ink-900">Tandin Wangyel</div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div class="min-w-0">
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
+                    <div class="text-sm font-semibold text-ink-900 truncate" id="acct-bnb">110148910019</div>
+                  </div>
+                  <button onclick="copyToClipboard('110148910019', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobile Wallet -->
+            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg">📱</div>
+                <div>
+                  <div class="font-semibold text-sm">Bank Transfer</div>
+                  <div class="text-xs text-ink-500">BOB</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
+                <!-- Replace src with your actual QR code image -->
+                <img src="/image/bob.png" alt="BOB QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
+                  <span>📷<<br>Upload your QR code<br>to /image/qr-bob.png</span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
+                  <div>
+                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
+                    <div class="text-sm font-semibold text-ink-900">203149951</div>
+                  </div>
+                  <button onclick="copyToClipboard('203149951', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="upload-section">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Upload Proof</label>
+            <div class="relative">
+              <input type="file" id="payment-screenshot" accept="image/*" class="hidden" onchange="handlePaymentFile(this)">
+              <label for="payment-screenshot" id="upload-label" class="flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed border-paper-border bg-paper hover:bg-white hover:border-brand-500 transition cursor-pointer tap overflow-hidden relative">
+                <div id="upload-placeholder" class="flex flex-col items-center pointer-events-none">
+                  <svg class="w-8 h-8 text-ink-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  <span class="text-sm text-ink-500 font-medium">Tap to upload screenshot</span>
+                  <span class="text-xs text-ink-400 mt-1">JPG, PNG up to 5MB</span>
+                </div>
+                <img id="upload-preview" class="hidden max-w-full max-h-full object-contain rounded-2xl pointer-events-none p-2" />
+              </label>
+              <button id="upload-clear" onclick="clearPaymentFile(event)" class="hidden absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-ink-500 hover:text-red-500 tap z-10">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+                       <button onclick="submitPaymentProof()" id="submit-payment-btn" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
+              Submit Payment Proof
+            </button>
+          </div>
+          </div>
+
+          <div id="pending-state" class="hidden text-center py-4">
+            <div class="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center text-3xl mx-auto mb-3">⏳</div>
+            <div class="font-bold text-ink-900">Verification Pending</div>
+            <p class="text-sm text-ink-500 mt-1">An admin will review your payment and activate your account.</p>
+            <button onclick="checkPaymentStatus()" class="mt-4 text-sm font-semibold text-brand-700 tap">Refresh Status</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   <!-- APP SHELL -->
   <div id="app-shell" class="hidden min-h-screen flex flex-col">
 
@@ -2311,124 +2447,7 @@
       </div>
     </nav>
 
-    <!-- Payment Gate -->
-    <div id="payment-gate" class="hidden flex-1 flex-col overflow-y-auto">
-      <div class="flex-1 max-w-lg mx-auto w-full px-5 pt-8 pb-32">
-        <div class="text-center mb-8">
-          <div class="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center text-4xl mx-auto mb-4">🔒</div>
-          <h2 class="text-2xl font-bold tracking-tight">Payment Required</h2>
-          <p class="text-sm text-ink-500 mt-2">Complete your entry fee to unlock predictions and leaderboard.</p>
-        </div>
-
-                <div class="bg-white rounded-3xl shadow-card border border-paper-border p-6 mb-5">
-          <div id="payment-form-content">
-            <div class="text-center mb-5">
-              <div class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-1">Entry Fee</div>
-              <div class="text-4xl font-bold text-brand-700" id="gate-fee-amount">Nu. 500</div>
-            </div>
-            
-            <!-- Payment Methods -->
-            <div class="space-y-4 mb-5">
-            <div class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Payment Methods</div>
-
-            <!-- Bank Transfer -->
-            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg">🏦</div>
-                <div>
-                  <div class="font-semibold text-sm">Bank Transfer</div>
-                  <div class="text-xs text-ink-500">DK Bank</div>
-                </div>
-              </div>
-              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
-                <!-- Replace src with your actual QR code image -->
-                <img src="/image/dk.png" alt="DK Bank QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
-                  <span>📷<<br>Upload your QR code<br>to /image/dkqrcode.jpeg/</span>
-                </div>
-              </div>
-              <div class="space-y-2">
-                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
-                  <div>
-                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Name</div>
-                    <div class="text-sm font-semibold text-ink-900">Tandin Wangyel</div>
-                  </div>
-                </div>
-                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
-                  <div class="min-w-0">
-                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
-                    <div class="text-sm font-semibold text-ink-900 truncate" id="acct-bnb">110148910019</div>
-                  </div>
-                  <button onclick="copyToClipboard('110148910019', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    <span class="copy-label">Copy</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Mobile Wallet -->
-            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg">📱</div>
-                <div>
-                  <div class="font-semibold text-sm">Bank Transfer</div>
-                  <div class="text-xs text-ink-500">BOB</div>
-                </div>
-              </div>
-              <div class="flex items-center justify-center bg-white rounded-xl border border-paper-border p-3 mb-3">
-                <!-- Replace src with your actual QR code image -->
-                <img src="/image/bob.png" alt="BOB QR Code" class="w-40 h-40 object-contain rounded-lg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="hidden w-40 h-40 bg-paper rounded-lg items-center justify-center text-xs text-ink-400 text-center px-2">
-                  <span>📷<<br>Upload your QR code<br>to /image/qr-bob.png</span>
-                </div>
-              </div>
-              <div class="space-y-2">
-                <div class="flex items-center justify-between bg-white rounded-xl border border-paper-border px-4 py-3">
-                  <div>
-                    <div class="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">Account Number</div>
-                    <div class="text-sm font-semibold text-ink-900">203149951</div>
-                  </div>
-                  <button onclick="copyToClipboard('203149951', this)" class="ml-3 shrink-0 bg-ink-900 text-white text-xs font-semibold px-3 py-2 rounded-lg tap flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    <span class="copy-label">Copy</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="upload-section">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Upload Proof</label>
-            <div class="relative">
-              <input type="file" id="payment-screenshot" accept="image/*" class="hidden" onchange="handlePaymentFile(this)">
-              <label for="payment-screenshot" id="upload-label" class="flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed border-paper-border bg-paper hover:bg-white hover:border-brand-500 transition cursor-pointer tap overflow-hidden relative">
-                <div id="upload-placeholder" class="flex flex-col items-center pointer-events-none">
-                  <svg class="w-8 h-8 text-ink-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                  <span class="text-sm text-ink-500 font-medium">Tap to upload screenshot</span>
-                  <span class="text-xs text-ink-400 mt-1">JPG, PNG up to 5MB</span>
-                </div>
-                <img id="upload-preview" class="hidden max-w-full max-h-full object-contain rounded-2xl pointer-events-none p-2" />
-              </label>
-              <button id="upload-clear" onclick="clearPaymentFile(event)" class="hidden absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-ink-500 hover:text-red-500 tap z-10">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-                       <button onclick="submitPaymentProof()" id="submit-payment-btn" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap text-[15px] mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
-              Submit Payment Proof
-            </button>
-          </div>
-          </div>
-
-          <div id="pending-state" class="hidden text-center py-4">
-            <div class="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center text-3xl mx-auto mb-3">⏳</div>
-            <div class="font-bold text-ink-900">Verification Pending</div>
-            <p class="text-sm text-ink-500 mt-1">An admin will review your payment and activate your account.</p>
-            <button onclick="checkPaymentStatus()" class="mt-4 text-sm font-semibold text-brand-700 tap">Refresh Status</button>
-          </div>
-        </div>
-      </div>
-    </div>
+ 
   </div>
   <script src="/assets/js/bonus-engine.js"></script>
   <script type="text/javascript" src="/assets/js/index.js"></script>

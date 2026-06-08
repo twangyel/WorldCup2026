@@ -824,9 +824,16 @@ function showPaymentGate() {
     
     // Ensure gate has proper layout classes
     gate.classList.add('flex-col')
+
+    // Update username in payment gate header
+    const pgProfile = getProfile()
+    const pgUserNameEl = document.getElementById('payment-gate-user-name')
+    if (pgUserNameEl && pgProfile) {
+      pgUserNameEl.textContent = pgProfile.name || 'Player'
+    }
     
     loadGateFee()
-    const profile = getProfile()
+    const profile = pgProfile || getProfile()
     const pf = document.getElementById('payment-form-content')
     const ps = document.getElementById('pending-state')
     if (profile?.payment_proof_url || profile?.payment_status === 'pending') {
@@ -839,7 +846,13 @@ function showPaymentGate() {
     setupPaymentRealtime()
     
   } catch (e) {
-    console.error('[gate] ERROR:', e)
+    console.log({
+  gateExists: !!gate,
+  gateDisplay: getComputedStyle(gate).display,
+  gateVisible: getComputedStyle(gate).visibility,
+  gateOpacity: getComputedStyle(gate).opacity,
+  gateParent: gate.parentElement?.id
+})
   }
 }
 
@@ -863,46 +876,44 @@ function showPaymentGate() {
 
     async function showNormalApp() {
   previewMode = false;
-  
+
   // Hide payment gate
   const gate = document.getElementById('payment-gate')
   if (gate) {
     gate.classList.add('hidden')
     gate.style.display = ''
+    gate.classList.remove('flex')
   }
-  
+
   // Show app shell
   const shell = document.getElementById('app-shell')
   shell.classList.remove('hidden')
 
   document.getElementById('app-main').classList.remove('hidden')
   document.getElementById('app-nav').classList.remove('hidden')
-      gate.classList.add('hidden')
-      gate.classList.remove('flex')
-      const profile = getProfile()
-      document.getElementById('profile-name').value = profile?.name || ''
-      document.getElementById('profile-dept').value = profile?.department || ''
-      document.getElementById('profile-phone').value = profile?.phone || ''
-      if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
 
-      // Update profile cards
-      await updateProfileCards()
+  const profile = getProfile()
+  document.getElementById('profile-name').value = profile?.name || ''
+  document.getElementById('profile-dept').value = profile?.department || ''
+  document.getElementById('profile-phone').value = profile?.phone || ''
+  if (isAdmin()) document.getElementById('admin-link').classList.remove('hidden')
 
-      // Load all home-screen data IN PARALLEL so the user doesn't wait for
-      // sequential network round-trips. We wrap each call in catch() so one
-      // slow/failing source can't block the rest of the home from rendering.
-      await Promise.all([
-        Promise.resolve().then(() => loadFixtures()).catch(e => console.error('loadFixtures', e)),
-        Promise.resolve().then(() => loadLeaderboard()).catch(e => console.error('loadLeaderboard', e)),
-        Promise.resolve().then(() => loadHome()).catch(e => console.error('loadHome', e)),
-      ])
+  // Update profile cards
+  await updateProfileCards()
 
-      renderBadges()
-      startCountdownTicker()
-      setupRealtime()
-    }
+  // Load all home-screen data IN PARALLEL so the user doesn't wait for
+  // sequential network round-trips. We wrap each call in catch() so one
+  // slow/failing source can't block the rest of the home from rendering.
+  await Promise.all([
+    Promise.resolve().then(() => loadFixtures()).catch(e => console.error('loadFixtures', e)),
+    Promise.resolve().then(() => loadLeaderboard()).catch(e => console.error('loadLeaderboard', e)),
+    Promise.resolve().then(() => loadHome()).catch(e => console.error('loadHome', e)),
+  ])
 
-    async function loadGateFee() {
+  renderBadges()
+  startCountdownTicker()
+  setupRealtime()
+}async function loadGateFee() {
       try {
         let fee = 500
         let currency = 'Nu.'
