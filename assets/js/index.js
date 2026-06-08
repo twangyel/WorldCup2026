@@ -127,12 +127,14 @@
 
 function flagHtml(name, size = 24) {
     const f = getFlag(name);
+    const flagClass = size >= 32 ? 'team-flag-lg' : size >= 24 ? 'team-flag-sm' : 'team-flag-xs';
 
     if (f.isTbd) {
         return `
             <div
-                class="inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+                class="${flagClass} flag-fallback inline-flex items-center justify-center"
                 style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+                title="To be determined"
             >
                 ?
             </div>
@@ -146,13 +148,13 @@ function flagHtml(name, size = 24) {
                 alt="${name}"
                 width="${size}"
                 height="${size}"
-                class="rounded-sm shadow-sm inline-block object-contain shrink-0"
-                style="border:1px solid #EEEDE7"
+                class="${flagClass} inline-block object-cover shrink-0"
                 onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"
             >
             <span
-                class="hidden inline-flex items-center justify-center rounded-full bg-paper border border-paper-border text-ink-400 font-bold"
+                class="hidden ${flagClass} flag-fallback inline-flex items-center justify-center"
                 style="width:${size}px;height:${size}px;font-size:${Math.max(10, size * 0.35)}px;"
+                title="${name || 'Unknown'}"
             >
                 ${f.emoji}
             </span>
@@ -160,6 +162,15 @@ function flagHtml(name, size = 24) {
     }
 
     return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`;
+}
+
+
+// Generate initials from a name
+function getInitials(name) {
+  if (!name || typeof name !== 'string') return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
     // ============== PWA ==============
@@ -929,10 +940,10 @@ function msToCountdown(ms) {
   }
 
   if (!fixtures.length) {
-    c.innerHTML = `<div class="glass-fixture rounded-3xl p-10 text-center">
-      <div class="text-5xl mb-3">⚽</div>
-      <div class="font-bold text-ink-900">No fixtures yet</div>
-      <p class="text-sm text-ink-500 mt-1">Matches will appear here once added.</p>
+    c.innerHTML = `<div class="empty-state-warm rounded-3xl p-10 text-center">
+      <div class="empty-icon">⚽</div>
+      <div class="empty-title">No fixtures yet</div>
+      <p class="empty-desc">Matches will appear here once the schedule is released.</p>
     </div>`
     return
   }
@@ -976,25 +987,26 @@ function msToCountdown(ms) {
         ${badge}
       </div>
 
-      <div class="flex items-center gap-3 mb-3">
+      <div class="flex items-center gap-3 mb-4">
         <div class="flex-1 text-center min-w-0">
-          <div class="flex flex-col items-center gap-1 w-full">
-            ${flagHtml(f.home_team, 32)}
-            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.home_team}</div>
+          <div class="fixture-team">
+            ${flagHtml(f.home_team, 44)}
+            <div class="fixture-team-name line-clamp-2">${f.home_team}</div>
           </div>
-          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Home</div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          ${locked
-            ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-xl">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
-            : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-xl">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
+        <div class="flex flex-col items-center gap-1 shrink-0">
+          <div class="fixture-vs-divider">VS</div>
+          <div class="flex items-center gap-1.5">
+            ${locked
+              ? `<div class="score-readonly">${hP !== '' ? hP : '–'}</div><span class="text-ink-300 font-bold text-lg">:</span><div class="score-readonly">${aP !== '' ? aP : '–'}</div>`
+              : `<input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${hP}" onchange="updatePrediction('${f.id}','home',this.value)"><span class="text-ink-300 font-bold text-lg">:</span><input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">`}
+          </div>
         </div>
         <div class="flex-1 text-center min-w-0">
-          <div class="flex flex-col items-center gap-1 w-full">
-            ${flagHtml(f.away_team, 32)}
-            <div class="font-bold text-[15px] line-clamp-2 leading-tight w-full">${f.away_team}</div>
+          <div class="fixture-team">
+            ${flagHtml(f.away_team, 44)}
+            <div class="fixture-team-name line-clamp-2">${f.away_team}</div>
           </div>
-          <div class="text-[10px] text-ink-400 uppercase tracking-wider mt-0.5">Away</div>
         </div>
       </div>
 
@@ -1249,16 +1261,18 @@ async function loadHome() {
   <div class="glass-light rounded-3xl overflow-hidden">
         <div class="p-3">
           <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-2">${f.stage}</div>
-          <div class="flex items-center justify-between mb-2">
-         <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.home_team, 36)}
-  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.home_team}</div>
-</div>
-            <div class="px-2 text-ink-300 font-bold text-sm">VS</div>
-          <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.away_team, 36)}
-  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.away_team}</div>
-</div>
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex-1 text-center flex flex-col items-center gap-2">
+              ${flagHtml(f.home_team, 44)}
+              <div class="font-bold text-sm line-clamp-2 leading-tight w-full">${f.home_team}</div>
+            </div>
+            <div class="px-3 flex flex-col items-center gap-1">
+              <div class="fixture-vs-divider" style="width:36px;height:36px;font-size:11px;">VS</div>
+            </div>
+            <div class="flex-1 text-center flex flex-col items-center gap-2">
+              ${flagHtml(f.away_team, 44)}
+              <div class="font-bold text-sm line-clamp-2 leading-tight w-full">${f.away_team}</div>
+            </div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium pb-0.5">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
@@ -1280,7 +1294,7 @@ async function loadHome() {
 
   const recentEl = document.getElementById('home-recent')
   if (!finished.length) {
-    recentEl.innerHTML = `<div class="glass-light rounded-2xl border border-white/30 p-6 text-center"><div class="text-2xl mb-2 opacity-60">⏳</div><div class="text-sm font-semibold text-ink-700">No results yet</div><p class="text-xs text-ink-500 mt-1">Match results will appear here</p></div>`
+    recentEl.innerHTML = `<div class="empty-state-warm rounded-2xl p-6 text-center"><div class="empty-icon">📋</div><div class="empty-title">No results yet</div><p class="empty-desc">Match results will appear once games finish.</p></div>`
   } else {
    // AFTER (glass-light)
 recentEl.innerHTML = finished.map(f => {
@@ -1571,12 +1585,16 @@ async function loadLeaderboard() {
 
         if (!stats?.length) {
           if (lbSubtab === 'matchday') {
-            c.innerHTML = `<div class="bg-white p-6 text-center mx-3 rounded-2xl border border-paper-border">
-              <div class="text-3xl mb-1">⏳</div><div class="font-semibold text-sm">No matchday yet</div><p class="text-xs text-ink-500 mt-1">Rankings appear after the first match finishes.</p>
+            c.innerHTML = `<div class="empty-state-warm p-8 text-center mx-3 rounded-2xl">
+              <div class="empty-icon">🏟️</div>
+              <div class="empty-title">Awaiting Kickoff</div>
+              <p class="empty-desc">Matchday rankings appear once the first whistle blows. Stay tuned!</p>
             </div>`
           } else {
-            c.innerHTML = `<div class="bg-white p-6 text-center mx-3 rounded-2xl border border-paper-border">
-              <div class="text-3xl mb-1">📊</div><div class="font-semibold text-sm">No rankings yet</div><p class="text-xs text-ink-500 mt-1">Be the first to predict</p>
+            c.innerHTML = `<div class="empty-state-warm p-8 text-center mx-3 rounded-2xl">
+              <div class="empty-icon">⚽</div>
+              <div class="empty-title">Kickoff Soon</div>
+              <p class="empty-desc">The leaderboard will light up once matches begin. Make your predictions now!</p>
             </div>`
           }
           return
@@ -1604,8 +1622,9 @@ async function loadLeaderboard() {
         const hasPoints = (s.points || 0) > 0
         // Medals ONLY when there are actual points
         const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : ''
+        const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
         const rankDisplay = medal
-          ? `<div class="rank-medal" data-rank-wrap>${medal}</div>`
+          ? `<div class="${medalClass}" data-rank-wrap title="${rank}${rank===1?'st':rank===2?'nd':'rd'} Place">${medal}</div>`
           : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500" data-rank-wrap>${rank}</div>`
 
         // Persistent trend badge (overall tab only)
@@ -1630,18 +1649,24 @@ async function loadLeaderboard() {
         }
 
         // Matchday tab uses simpler stats
-        const statsLineOverall = `
-          <span><b class="text-ink-900">${correct}</b> correct</span>
-          <span class="text-ink-300">·</span>
-          <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>`
-        const statsLineMatchday = `
-          <span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>`
+        const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0
+        const statsLineOverall = hasAnyStats
+          ? `<span><b class="text-ink-900">${correct}</b> correct</span>
+             <span class="text-ink-300">·</span>
+             <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>`
+          : `<span class="text-ink-400 italic">Awaiting kickoff…</span>`
+        const statsLineMatchday = (s.points || 0) > 0
+          ? `<span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>`
+          : `<span class="text-ink-400 italic">No points yet</span>`
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
         <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           <div class="shrink-0">${rankDisplay}</div>
+          <div class="shrink-0">
+            <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+          </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="player-name truncate">${s.name || 'Anonymous'}</span>
@@ -2516,6 +2541,9 @@ showToast('Opening WhatsApp...', 'success')
               return `
                 <div class="lb-row-compact flex items-center gap-3">
                   ${rankDisp}
+                  <div class="shrink-0">
+                    <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+                  </div>
                   <div class="flex-1 min-w-0">
                     <div class="player-name truncate">${s.name}</div>
                     <div class="player-stats text-ink-500">${s.exact} exact · ${s.dept}</div>
@@ -3325,6 +3353,9 @@ async function loadLeagueLeaderboardView(leagueId) {
         return `
         <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3">
             <div class="shrink-0">${rankDisplay}</div>
+            <div class="shrink-0">
+                <div class="lb-avatar ${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''}">${getInitials(s.name)}</div>
+            </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="player-name truncate">${s.name || 'Anonymous'}</span>
