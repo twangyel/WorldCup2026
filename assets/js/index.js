@@ -1639,15 +1639,13 @@ recentEl.innerHTML = finished.map(f => {
         const statsLineOverall = `
           <span><b class="text-ink-900">${correct}</b> correct</span>
           <span class="text-ink-300">·</span>
-          <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
-          ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}`
+          <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>`
         const statsLineMatchday = `
-          <span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>
-          ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}`
+          <span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>`
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3"
+        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-5 flex items-center gap-4"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           ${rankDisplay}
           <div class="flex-1 min-w-0">
@@ -3209,7 +3207,7 @@ async function loadLeagueLeaderboardView(leagueId) {
             : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-4 flex items-center gap-3">
+        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-5 flex items-center gap-4">
             ${rankDisplay}
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3220,7 +3218,6 @@ async function loadLeagueLeaderboardView(leagueId) {
                     <span><b class="text-ink-900">${correct}</b> correct</span>
                     <span class="text-ink-300">·</span>
                     <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
-                    ${s.department ? `<span class="text-ink-300">·</span><span class="truncate">${s.department}</span>` : ''}
                 </div>
             </div>
             <div class="text-right shrink-0">
