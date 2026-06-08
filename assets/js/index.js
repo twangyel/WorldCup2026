@@ -801,10 +801,15 @@ function showPaymentGate() {
             showNormalApp().then(() => switchTab('home'))
           }
           if (payload.new?.private_leagues_access === true && payload.old?.private_leagues_access !== true) {
+            // Update cached profile so hasLeagueAccess() returns true on next render
+            const cached = (typeof getProfile === 'function') ? getProfile() : null
+            if (cached) cached.private_leagues_access = true
             showToast('🎉 Private league access granted by admin!', 'success')
             if (typeof loadMyLeagues === 'function') loadMyLeagues()
           }
           if (payload.new?.private_leagues_access === false && payload.old?.private_leagues_access === true) {
+            const cached = (typeof getProfile === 'function') ? getProfile() : null
+            if (cached) cached.private_leagues_access = false
             showToast('Private league access has been revoked', 'info')
             if (typeof loadMyLeagues === 'function') loadMyLeagues()
           }
@@ -3249,10 +3254,51 @@ function hasLeagueAccess(profile) {
 function askAdminForLeagueAccess() {
     const profile = getProfile()
     const name = profile?.full_name || profile?.name || 'A player'
-    const message = `Hi! This is ${name}. Can I get early access to private leagues in the WC 2026 Predictions app? 🙏`
-    const adminNumber = '975XXXXXXXX' // <-- replace with admin WhatsApp number (digits only, with country code, no + sign)
-    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank')
+    const dept = profile?.department ? ` from ${profile.department}` : ''
+    const message = `Hi Admin 👋\n\nThis is ${name}${dept}. Could I please get early access to private leagues in the WC 2026 Predictions app?\n\nThanks! 🙏🏆`
+
+    const overlay = document.getElementById('ask-admin-overlay')
+    const panel = document.getElementById('ask-admin-content')
+    const textarea = document.getElementById('ask-admin-message')
+    if (!overlay || !panel || !textarea) {
+        // Fallback if the modal isn't in the DOM for any reason
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
+        return
+    }
+    textarea.value = message
+    overlay.classList.remove('hidden')
+    requestAnimationFrame(() => panel.classList.add('shown'))
 }
+
+function hideAskAdminModal() {
+    const overlay = document.getElementById('ask-admin-overlay')
+    const panel = document.getElementById('ask-admin-content')
+    if (!overlay || !panel) return
+    panel.classList.remove('shown')
+    setTimeout(() => overlay.classList.add('hidden'), 320)
+}
+
+function sendAskAdminWhatsApp() {
+    const textarea = document.getElementById('ask-admin-message')
+    const message = (textarea?.value || '').trim()
+    if (!message) {
+        showToast('Message cannot be empty', 'warning')
+        return
+    }
+    // No phone number → WhatsApp opens contact picker so user chooses admin
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
+    hideAskAdminModal()
+}
+
+// Close modal when tapping the backdrop
+document.addEventListener('DOMContentLoaded', () => {
+    const askOverlay = document.getElementById('ask-admin-overlay')
+    if (askOverlay) {
+        askOverlay.addEventListener('click', e => {
+            if (e.target.id === 'ask-admin-overlay') hideAskAdminModal()
+        })
+    }
+})
 
 async function handleCreateLeagueClick() {
     const profile = getProfile()
