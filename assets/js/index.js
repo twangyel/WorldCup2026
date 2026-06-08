@@ -1427,24 +1427,24 @@ async function loadHome() {
 
    nextEl.innerHTML = `
   <div class="glass-light rounded-3xl overflow-hidden">
-        <div class="p-3">
-          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-2">${f.stage}</div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;">
-            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
-              ${flagHtml(f.home_team, 48)}
-              <div style="font-weight:700;font-size:15px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.home_team}</div>
+        <div class="px-4 pt-3 pb-2">
+          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-1.5">${f.stage}</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:6px 4px 8px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0;">
+              ${flagHtml(f.home_team, 44)}
+              <div style="font-weight:700;font-size:14px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.home_team}</div>
             </div>
-            <div style="font-size:13px;font-weight:600;color:#B5BDC5;letter-spacing:0.05em;text-transform:uppercase;flex-shrink:0;padding:0 4px;">vs</div>
-            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
-              ${flagHtml(f.away_team, 48)}
-              <div style="font-weight:700;font-size:15px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.away_team}</div>
+            <div style="font-size:12px;font-weight:600;color:#B5BDC5;letter-spacing:0.05em;text-transform:uppercase;flex-shrink:0;padding:0 4px;">vs</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0;">
+              ${flagHtml(f.away_team, 44)}
+              <div style="font-weight:700;font-size:14px;color:#0A0F0D;text-align:center;line-height:1.2;">${f.away_team}</div>
             </div>
           </div>
-          <div class="text-center text-xs text-ink-500 font-medium pb-0.5">
+          <div class="text-center text-xs text-ink-500 font-medium">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
-        <div class="px-3 py-2 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
+        <div class="px-4 py-2 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-0.5">Your Pick</div>
