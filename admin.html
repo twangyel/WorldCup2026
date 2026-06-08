@@ -1055,12 +1055,7 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
       renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
 
-    // Hook loadSystemSettings into loadAll
-    const _originalLoadAll = loadAll
-    loadAll = async function() {
-      await _originalLoadAll()
-      await loadSystemSettings()
-    }
+    
 
 
     async function loadNotifications() {
@@ -1093,6 +1088,13 @@ async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
     console.error('loadNotifications error:', e)
   }
 }
+
+// Hook loadSystemSettings into loadAll
+    const _originalLoadAll = loadAll
+    loadAll = async function() {
+      await _originalLoadAll()
+      await loadSystemSettings()
+    }
 
     function adminTab(name) {
       document.querySelectorAll('.atab').forEach(el => el.classList.add('hidden'))
