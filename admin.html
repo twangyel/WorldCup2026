@@ -1373,7 +1373,7 @@ Good luck! ⚽🔥`
         // remove the profile + predictions so the user disappears from the app.
         let authDeleted = false
         try {
-          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('delete-auth-user', {
+          const { data: fnData, error: fnError } = await supabaseClient.functions.invoke('hyper-service', {
             body: { user_id: id, action: 'delete' }
           })
           if (fnError) {
