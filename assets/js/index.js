@@ -1247,32 +1247,32 @@ async function loadHome() {
 
    nextEl.innerHTML = `
   <div class="glass-light rounded-3xl overflow-hidden">
-        <div class="p-4">
-          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-3">${f.stage}</div>
-          <div class="flex items-center justify-between mb-4">
+        <div class="p-3">
+          <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-2">${f.stage}</div>
+          <div class="flex items-center justify-between mb-2">
          <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.home_team, 40)}
-  <div class="font-bold text-lg line-clamp-2 leading-tight w-full">${f.home_team}</div>
+  ${flagHtml(f.home_team, 36)}
+  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.home_team}</div>
 </div>
-            <div class="px-3 text-ink-300 font-bold text-sm">VS</div>
+            <div class="px-2 text-ink-300 font-bold text-sm">VS</div>
           <div class="flex-1 text-center flex flex-col items-center gap-1">
-  ${flagHtml(f.away_team, 40)}
-  <div class="font-bold text-lg line-clamp-2 leading-tight w-full">${f.away_team}</div>
+  ${flagHtml(f.away_team, 36)}
+  <div class="font-bold text-base line-clamp-2 leading-tight w-full">${f.away_team}</div>
 </div>
           </div>
-          <div class="text-center text-xs text-ink-500 font-medium pb-1">
+          <div class="text-center text-xs text-ink-500 font-medium pb-0.5">
             ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
-        <div class="px-4 py-3 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
+        <div class="px-3 py-2 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-0.5">Your Pick</div>
               ${pred
-                ? `<div class="text-xl font-bold text-brand-700">${pred.home_prediction} – ${pred.away_prediction}</div>`
+                ? `<div class="text-lg font-bold text-brand-700">${pred.home_prediction} – ${pred.away_prediction}</div>`
                 : `<div class="flex items-center gap-2 text-sm text-ink-500"><span class="w-2 h-2 rounded-full border-2 border-dashed border-ink-300"></span>Not predicted yet</div>`}
             </div>
-            <button onclick="switchTab('predictions')" class="bg-brand-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
+            <button onclick="switchTab('predictions')" class="bg-brand-900 text-white text-xs font-semibold px-3 py-2 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
           </div>
         </div>
       </div>`
@@ -1940,14 +1940,12 @@ recentEl.innerHTML = finished.map(f => {
             `).join('')}
           </div>
 
-          <div class="flex justify-center">
-            <button onclick="togglePrizeDashboard()" id="prize-dash-toggle"
+          <button onclick="togglePrizeDashboard()" id="prize-dash-toggle"
               aria-label="Toggle breakdown"
-              class="bg-white/10 hover:bg-white/15 text-white/80 rounded-full tap flex items-center justify-center"
-              style="width:34px;height:22px;">
+              class="absolute top-3 right-3 bg-white/10 hover:bg-white/20 text-white/70 rounded-full tap flex items-center justify-center z-10"
+              style="width:28px;height:28px;">
               <svg id="prize-dash-toggle-icon" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
             </button>
-          </div>
 
           <div id="prize-dash-details" class="${prizeDashExpanded ? '' : 'hidden'} mt-4">
             <div class="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-1">Where the money goes</div>
