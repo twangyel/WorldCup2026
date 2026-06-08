@@ -2838,10 +2838,57 @@ function exitPreviewMode() {
   window.open('https://wa.me/?text=' + encoded, '_blank')
   showToast('Opening WhatsApp to message admin...', 'info')
 }
+
+
+
+//AUTO LOGOUT USERS IF ADMIN DELETES THE ACCOUNT
+let _deletionChannel = null;
+
+function subscribeToOwnDeletion() {
+  const user = (typeof getUser === 'function') ? getUser() : null;
+  if (!user?.id) return;
+  if (_deletionChannel) return; // already subscribed
+
+  _deletionChannel = supabase
+    .channel(`profile-self-${user.id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`
+      },
+      async () => {
+        try {
+          localStorage.removeItem('wc-user');            // adjust to your actual key
+          localStorage.removeItem('remembered-whatsapp');
+        } catch (_) {}
+
+        showModal({
+          icon: '👋',
+          title: 'Account removed',
+          message: 'Your account was removed by the admin. You will be signed out.',
+          actions: [
+            { text: 'OK', onclick: 'hideModal(); location.reload()', class: 'bg-ink-900 text-white' }
+          ]
+        });
+
+        setTimeout(() => location.reload(), 4000);
+
+        try { await supabase.removeChannel(_deletionChannel); } catch (_) {}
+        _deletionChannel = null;
+      }
+    )
+    .subscribe();
+}
+
+
 async function showApp() {
   try {
     document.getElementById('auth-screen').classList.add('hidden')
     document.getElementById('app-shell').classList.remove('hidden')
+     subscribeToOwnDeletion()
 
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
@@ -2863,6 +2910,12 @@ async function showApp() {
 window.__rawSignOut = window.__rawSignOut || window.signOut
 window.signOut = async function smoothSignOut() {
   try {
+
+    if (_deletionChannel) {
+      try { await supabase.removeChannel(_deletionChannel); } catch (_) {}
+      _deletionChannel = null;
+    }
+    
     const shell = document.getElementById('app-shell')
     const authScreen = document.getElementById('auth-screen')
     // Fade the shell out before we tear down the session, so the user
