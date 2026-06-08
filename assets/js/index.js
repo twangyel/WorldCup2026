@@ -1645,9 +1645,9 @@ recentEl.innerHTML = finished.map(f => {
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-5 flex items-center gap-4"
+        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} px-4 py-5 flex items-start gap-4 w-[calc(100%+16px)] -mx-2"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
-          ${rankDisplay}
+          <div class="pt-1">${rankDisplay}</div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
@@ -1656,12 +1656,12 @@ recentEl.innerHTML = finished.map(f => {
               ${streakHtml}
               ${leaderboardBadgeIcons(s, rank)}
             </div>
-            <div class="text-xs text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+            <div class="text-xs text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
               ${statsLine}
             </div>
             ${projectedHtml}
           </div>
-          <div class="text-right shrink-0">
+          <div class="text-right shrink-0 pt-1">
             <div class="text-2xl font-bold text-brand-700 leading-none" data-points-el>${s.points || 0}</div>
             <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
           </div>
@@ -3207,20 +3207,20 @@ async function loadLeagueLeaderboardView(leagueId) {
             : `<div class="w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`
 
         return `
-        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} p-5 flex items-center gap-4">
-            ${rankDisplay}
+        <div class="lb-row bg-white rounded-2xl ${isMe ? 'border-2 border-brand-500 shadow-soft' : 'border border-paper-border'} px-4 py-5 flex items-start gap-4 w-[calc(100%+16px)] -mx-2">
+            <div class="pt-1">${rankDisplay}</div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="font-bold text-[15px] truncate">${s.name || 'Anonymous'}</span>
                     ${isMe ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
                 </div>
-                <div class="text-xs text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+                <div class="text-xs text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
                     <span><b class="text-ink-900">${correct}</b> correct</span>
                     <span class="text-ink-300">·</span>
                     <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
                 </div>
             </div>
-            <div class="text-right shrink-0">
+            <div class="text-right shrink-0 pt-1">
                 <div class="text-2xl font-bold text-brand-700 leading-none">${s.points || 0}</div>
                 <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mt-1">pts</div>
             </div>
