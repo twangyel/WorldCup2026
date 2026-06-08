@@ -3430,3 +3430,4 @@ async function regenerateLeagueCode(leagueId) {
     await loadMyLeagues()
     showToast(`New invite code: ${newCode}`, 'success')
 }
+    }
