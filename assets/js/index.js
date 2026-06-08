@@ -3289,6 +3289,35 @@ async function loadMyLeagues() {
         createBtn.classList.add('tap')
         createBtn.onclick = handleCreateLeagueClick
     }
+
+    // Payment gate: unpaid users cannot create or join leagues
+    const profile = getProfile()
+    if (!profile?.fee_paid) {
+        if (createBtn) {
+            createBtn.textContent = 'Pay to Create'
+            createBtn.classList.add('opacity-50', 'cursor-not-allowed')
+            createBtn.classList.remove('tap')
+            createBtn.onclick = () => showToast('Complete your entry fee first', 'warning')
+        }
+        if (joinWrap) {
+            joinWrap.innerHTML = `
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+                    <div class="text-2xl mb-2">🔒</div>
+                    <div class="text-sm font-bold text-amber-800">Payment Required</div>
+                    <p class="text-xs text-amber-700 mt-1">Pay Nu. 500 entry fee to join private leagues</p>
+                    <button onclick="switchTab('home')" class="mt-2 bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl tap">Go to Payment</button>
+                </div>
+            `
+        }
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="text-3xl mb-2 opacity-40">🏆</div>
+                <div class="text-sm font-semibold text-ink-700">Private Leagues</div>
+                <p class="text-xs text-ink-500 mt-1">Available after payment verification</p>
+            </div>`
+        return
+    }
+
     if (joinWrap) joinWrap.classList.remove('hidden')
 
     const { data, error } = await getMyLeagues()
