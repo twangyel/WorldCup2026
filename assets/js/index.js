@@ -876,6 +876,7 @@ function msToCountdown(ms) {
       predictions = predData || []
       renderFixtures()
       updatePredictionCount()
+      updatePredictTabBadge()
     }
 
     function getPrediction(id) { return predictions.find(p => p.fixture_id === id) }
@@ -1163,6 +1164,7 @@ async function loadHome() {
   let myIdx = stats?.findIndex(s => s.user_id === myId) ?? -1
   if (myIdx === -1 && stats?.length) {
     myIdx = stats.findIndex(s => s.id === myId)
+    updatePredictTabBadge()
   }
 
   const me = myIdx >= 0 ? stats[myIdx] : null
@@ -1462,66 +1464,38 @@ recentEl.innerHTML = finished.map(f => {
       return trend
     }
 
-    // ===== Next-match CTA card =====
-    function renderLbCta() {
-      const host = document.getElementById('lb-cta')
-      if (!host) {
-        console.warn('[Leaderboard] lb-cta element not found in DOM')
-        return
-      }
-      if (previewMode) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const now = new Date()
-      const upcoming = (fixtures || [])
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const next = upcoming[0]
-      const myId = getUser()?.id
-      if (!next || !myId) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
-      if (hasPred) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      const ms = new Date(next.kickoff) - now
-      const cd = msToCountdown(ms)
-      host.classList.remove('hidden')
-      host.innerHTML = `
-        <div class="lb-cta-card">
-          <span class="lb-cta-pulse"></span>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-[0.15em] opacity-70">Next match — locks in <span data-cd-card="${next.id}">${cd}</span></div>
-            <div class="font-bold text-[14px] truncate mt-0.5">${next.home_team} vs ${next.away_team}</div>
-          </div>
-          <button class="lb-cta-btn tap" onclick="switchTab('predictions')">Predict</button>
-        </div>`
-    }
-
-    // ===== Prize strip =====
-    function renderLbPrize(myRank) {
-      const host = document.getElementById('lb-prize')
-      if (!host) {
-        console.warn('[Leaderboard] lb-prize element not found in DOM')
-        return
-      }
-      const b = lbPrizeBreakdown
-      if (!b || b.gross <= 0) { host.classList.add('hidden'); host.innerHTML = ''; return }
-      host.classList.remove('hidden')
-      const split = (myRank >= 1 && myRank <= 3) ? b.splits[myRank - 1] : null
-      const projectedHtml = split
-        ? `<div class="projected">
-             <div class="proj-amount">${fmtMoney(b.currency, split.amount)}</div>
-             <div class="proj-label">if standings hold</div>
-           </div>`
-        : `<div class="projected">
-             <div class="proj-amount">${b.splits.map(p => fmtMoney(b.currency, p.amount).replace(b.currency + ' ', '')).join(' / ')}</div>
-             <div class="proj-label">top 3 payouts</div>
-           </div>`
-      host.innerHTML = `
-        <div class="lb-prize-strip">
-          <div>
-            <div class="pool-label">Prize Pool</div>
-            <div class="pool">${fmtMoney(b.currency, b.net)}</div>
-          </div>
-          ${projectedHtml}
-        </div>`
-    }
+// ===== PREDICT TAB BADGE =====
+function updatePredictTabBadge() {
+  const now = new Date()
+  const upcoming = (fixtures || [])
+    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  const next = upcoming[0]
+  
+  const predictBtn = document.querySelector('[data-tab="predictions"]')
+  if (!predictBtn) return
+  
+  // Remove any existing badge
+  const existingBadge = predictBtn.querySelector('.nav-badge')
+  if (existingBadge) existingBadge.remove()
+  
+  if (!next || previewMode) return
+  
+  const ms = new Date(next.kickoff) - now
+  const hasPred = (predictions || []).some(p => p.fixture_id === next.id)
+  
+  // Show badge only if:
+  // 1. Match locks in < 24h, OR
+  // 2. Match locks in < 48h and user hasn't predicted yet
+  const showBadge = (ms <= 24 * 3600 * 1000) || (!hasPred && ms <= 48 * 3600 * 1000)
+  
+  if (showBadge) {
+    const badge = document.createElement('span')
+    badge.className = 'nav-badge absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse'
+    predictBtn.style.position = 'relative'
+    predictBtn.appendChild(badge)
+  }
+}
 
     async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
@@ -1563,12 +1537,10 @@ recentEl.innerHTML = finished.map(f => {
       }
       document.getElementById('lb-subtab-meta').textContent = metaText
 
-      // Render CTA card + prize strip (use overall rank for "projected winning")
-      renderLbCta()
+   
       const myOverallIdx = overallStats.findIndex(s => (s.user_id || s.id) === myId)
       const myOverallRank = myOverallIdx >= 0 ? myOverallIdx + 1 : null
-      renderLbPrize(myOverallRank)
-
+      
       if (!stats?.length) {
         // Try to show users from profiles even if no predictions exist yet
         try {
@@ -2034,6 +2006,7 @@ recentEl.innerHTML = finished.map(f => {
     }
     function tickCountdowns() {
       const now = Date.now()
+      updatePredictTabBadge()
 
       // 1. Home page next-match countdown
       const homeCd = document.getElementById('home-next-countdown')
