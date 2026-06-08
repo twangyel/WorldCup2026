@@ -3281,8 +3281,7 @@ document.getElementById('league-modal-overlay')?.addEventListener('click', e => 
 // ============== ACCESS HELPERS ==============
 function hasLeagueAccess(profile) {
     if (!profile) return false
-    return profile.fee_paid === true
-        || profile.private_leagues_access === true
+    return profile.private_leagues_access === true
         || (typeof isAdmin === 'function' && isAdmin())
 }
 
@@ -3378,7 +3377,7 @@ async function handleCreateLeagueClick() {
 
     // Access gate: paid OR admin-granted OR admin
     if (!hasLeagueAccess(profile)) {
-        showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning')
+        showToast('Private leagues are invite-only. Tap "Ask admin" to request access.', 'warning')
         return
     }
 
