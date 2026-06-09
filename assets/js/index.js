@@ -3157,6 +3157,17 @@ async function getSystemSettings() {
 }
 
 // ============== PRIVATE LEAGUE FUNCTIONS ==============
+
+// Escape user-supplied strings for safe interpolation into HTML text/attributes.
+function escapeLeagueHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 async function createLeague(name) {
     const user = getUser();
     if (!user) throw new Error('Not authenticated');
@@ -3170,7 +3181,7 @@ async function createLeague(name) {
             .from('leagues')
             .select('id')
             .eq('invite_code', inviteCode)
-            .single();
+            .maybeSingle();
         if (!existing) break;
         attempts++;
     } while (attempts < 10);
@@ -3211,27 +3222,30 @@ async function joinLeagueByCode(inviteCode) {
   const user = getUser();
   if (!user) throw new Error('Not authenticated');
 
+  const normalizedCode = String(inviteCode || '').trim().toUpperCase();
+  if (!normalizedCode) throw new Error('Invalid invite code');
+
   // Find the league
   const { data: league, error: leagueError } = await supabaseClient
     .from('leagues')
     .select('*')
-    .eq('invite_code', inviteCode.toUpperCase())
-    .single();
+    .eq('invite_code', normalizedCode)
+    .maybeSingle();
 
   if (leagueError || !league) throw new Error('Invalid invite code');
 
   // Check if already a member
-  const { data: existing, error: existingError } = await supabaseClient
+  const { data: existing } = await supabaseClient
     .from('league_memberships')
     .select('id')
     .eq('league_id', league.id)
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (existing) throw new Error('You are already a member of this league');
 
   // Add membership
-  const { data, error } = await supabaseClient
+  const { error } = await supabaseClient
     .from('league_memberships')
     .insert({ league_id: league.id, user_id: user.id })
     .select()
@@ -3249,6 +3263,7 @@ async function getMyLeagues() {
     .from('league_memberships')
     .select(`
       league_id,
+      created_at,
       leagues:league_id (
         id,
         name,
@@ -3256,7 +3271,8 @@ async function getMyLeagues() {
         created_by
       )
     `)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
 
   if (error) return { data: [], error };
   // Flatten the result
@@ -3422,7 +3438,7 @@ async function handleCreateLeague() {
         return
     }
 
-    const btn = document.querySelector('#league-modal-content button[onclick="handleCreateLeague()"]')
+    const btn = document.getElementById('league-modal-submit-btn')
     btn.disabled = true
     btn.textContent = 'Creating...'
 
@@ -3444,15 +3460,17 @@ async function handleCreateLeague() {
 }
 
 async function handleJoinLeague() {
+    // Check global toggle FIRST (mirror handleCreateLeagueClick order)
+    const enabled = await checkPrivateLeaguesEnabled()
+    if (!enabled) {
+        showToast('Private leagues are coming soon! Stay tuned.', 'info')
+        return
+    }
+
     // Access gate: paid OR admin-granted users can join
     const profile = getProfile()
     if (!hasLeagueAccess(profile)) {
         showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning')
-        return
-    }
-    const enabled = await checkPrivateLeaguesEnabled()
-    if (!enabled) {
-        showToast('Private leagues are coming soon! Stay tuned.', 'info')
         return
     }
 
@@ -3560,19 +3578,182 @@ async function loadMyLeagues() {
         return
     }
 
-    container.innerHTML = myLeagues.map(l => `
-        <div class="flex items-center gap-3 p-3 rounded-2xl border ${activeLeagueId === l.id ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" onclick="selectLeague('${l.id}')">
-            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${(l.name || 'L').substring(0, 2).toUpperCase()}</div>
+    container.innerHTML = myLeagues.map(l => {
+        const isActive = activeLeagueId === l.id
+        const isCreator = l.created_by === getUser()?.id
+        const safeName = escapeLeagueHtml(l.name)
+        const safeCode = escapeLeagueHtml(l.invite_code)
+        const initials = escapeLeagueHtml((l.name || 'L').substring(0, 2).toUpperCase())
+
+        return `
+        <div class="flex items-center gap-3 p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap"
+             data-league-id="${escapeLeagueHtml(l.id)}"
+             data-league-action="select">
+            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${initials}</div>
             <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate">${l.name}</div>
-                <div class="text-[11px] text-ink-500 font-mono tracking-wider">${l.invite_code}</div>
+                <div class="font-semibold text-sm truncate">${safeName}</div>
+                <div class="text-[11px] text-ink-500 font-mono tracking-wider">${safeCode}</div>
             </div>
-            ${activeLeagueId === l.id ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">ACTIVE</span>' : ''}
-            <button onclick="event.stopPropagation(); shareLeagueCode('${l.id}', '${l.invite_code}', '${l.name.replace(/'/g, "\'")}')" class="text-ink-400 p-1.5 tap">
+            ${isActive ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">ACTIVE</span>' : ''}
+            <button data-league-id="${escapeLeagueHtml(l.id)}" data-league-action="share" data-league-code="${safeCode}" data-league-name="${safeName}" class="text-ink-400 p-1.5 tap" aria-label="Share invite code">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
             </button>
-        </div>
-    `).join('')
+            <button data-league-id="${escapeLeagueHtml(l.id)}" data-league-action="menu" class="text-ink-400 p-1.5 tap" aria-label="More options">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+        </div>`
+    }).join('')
+
+    // Wire up event delegation (idempotent — replaces previous handler)
+    container.onclick = (e) => {
+        const target = e.target.closest('[data-league-action]')
+        if (!target) return
+        const action = target.dataset.leagueAction
+        const id = target.dataset.leagueId
+        if (!id) return
+
+        if (action === 'select') {
+            selectLeague(id)
+        } else if (action === 'share') {
+            e.stopPropagation()
+            shareLeagueCode(id, target.dataset.leagueCode, target.dataset.leagueName)
+        } else if (action === 'menu') {
+            e.stopPropagation()
+            showLeagueActionsMenu(id)
+        }
+    }
+}
+
+// Simple action menu using confirm() chain. Could be promoted to a proper sheet later.
+function showLeagueActionsMenu(leagueId) {
+    const league = myLeagues.find(l => l.id === leagueId)
+    if (!league) return
+    const isCreator = league.created_by === getUser()?.id
+
+    const options = []
+    if (isCreator) {
+        options.push({ label: 'Regenerate invite code', action: () => regenerateLeagueCode(leagueId) })
+        options.push({ label: 'Delete league', action: () => deleteMyLeague(leagueId) })
+    } else {
+        options.push({ label: 'Leave league', action: () => leaveLeagueHandler(leagueId) })
+    }
+
+    // Lightweight prompt — replace with proper bottom sheet when convenient
+    const choice = window.prompt(
+        `${league.name}\n\n` + options.map((o, i) => `${i + 1}. ${o.label}`).join('\n') + '\n\nEnter number (or cancel):'
+    )
+    const idx = parseInt(choice, 10) - 1
+    if (Number.isInteger(idx) && options[idx]) {
+        options[idx].action()
+    }
+}
+
+// ============== ADMIN LEAGUE BROWSER ==============
+
+// Cache for filtering without re-querying
+let _adminLeaguesCache = []
+
+async function loadAdminLeagueBrowser() {
+    if (!isAdmin()) return;
+
+    const wrapper = document.getElementById('admin-league-browser');
+    const list = document.getElementById('admin-league-list');
+    if (!wrapper || !list) return;
+
+    wrapper.classList.remove('hidden');
+
+    const { data: leagues, error } = await supabaseClient
+        .from('leagues')
+        .select(`
+            *,
+            league_memberships(count),
+            creator:created_by (full_name, name)
+        `)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        list.innerHTML = `<div class="text-center py-4 text-red-500 text-sm">Failed to load leagues</div>`;
+        return;
+    }
+
+    _adminLeaguesCache = leagues || [];
+    renderAdminLeagues(_adminLeaguesCache);
+}
+
+function renderAdminLeagues(leagues) {
+    const list = document.getElementById('admin-league-list');
+    if (!list) return;
+
+    if (!leagues?.length) {
+        list.innerHTML = `
+            <div class="text-center py-6">
+                <div class="text-3xl mb-2 opacity-40">🏆</div>
+                <div class="text-sm font-semibold text-ink-700">No private leagues found</div>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = leagues.map(l => {
+        const memberCount = l.league_memberships?.[0]?.count || 0;
+        const creatorName = escapeLeagueHtml(l.creator?.full_name || l.creator?.name || 'Unknown');
+        const safeName = escapeLeagueHtml(l.name);
+        const safeCode = escapeLeagueHtml(l.invite_code);
+        const initials = escapeLeagueHtml((l.name || 'L').substring(0, 2).toUpperCase());
+        const isActive = activeLeagueId === l.id;
+        const safeId = escapeLeagueHtml(l.id);
+
+        return `
+        <div class="flex items-center gap-3 p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap"
+             data-admin-league-id="${safeId}">
+            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                ${initials}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm truncate">${safeName}</div>
+                <div class="text-[11px] text-ink-500">
+                    ${memberCount} member${memberCount !== 1 ? 's' : ''} · Code: ${safeCode} · by ${creatorName}
+                </div>
+            </div>
+            ${isActive ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">VIEWING</span>' : ''}
+            <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>`;
+    }).join('');
+
+    // Event delegation
+    list.onclick = (e) => {
+        const row = e.target.closest('[data-admin-league-id]');
+        if (!row) return;
+        adminViewLeague(row.dataset.adminLeagueId);
+    };
+}
+
+// Called by the search input's `oninput` handler
+function filterAdminLeagues(query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) {
+        renderAdminLeagues(_adminLeaguesCache);
+        return;
+    }
+    const filtered = _adminLeaguesCache.filter(l => {
+        const name = (l.name || '').toLowerCase();
+        const code = (l.invite_code || '').toLowerCase();
+        const creator = (l.creator?.full_name || l.creator?.name || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || creator.includes(q);
+    });
+    renderAdminLeagues(filtered);
+}
+
+async function adminViewLeague(leagueId) {
+    if (!isAdmin()) {
+        showToast('Admin access only', 'error');
+        return;
+    }
+    
+    activeLeagueId = leagueId;
+    switchTab('leaderboard');
+    showToast('Viewing league as admin', 'info');
 }
 
 function selectLeague(leagueId) {
@@ -3593,7 +3774,23 @@ function shareLeagueCode(leagueId, code, name) {
 
 
 async function getLeagueMembers(leagueId) {
-    // Step 1: Get all user_ids from league_memberships
+    const user = getUser();
+    if (!user) return { data: [], error: null };
+
+    // Admin can view any league; others only if they're members
+    if (!isAdmin()) {
+        const { data: myMembership } = await supabaseClient
+            .from('league_memberships')
+            .select('id')
+            .eq('league_id', leagueId)
+            .eq('user_id', user.id)
+            .single();
+        
+        if (!myMembership) {
+            return { data: [], error: new Error('Not a member of this league') };
+        }
+    }
+
     const { data: memberships, error: membershipError } = await supabaseClient
         .from('league_memberships')
         .select('user_id')
@@ -3610,7 +3807,6 @@ async function getLeagueMembers(leagueId) {
     
     const userIds = memberships.map(m => m.user_id);
     
-    // Step 2: Fetch profiles separately (avoids RLS issues with nested select)
     const { data: profiles, error: profileError } = await supabaseClient
         .from('profiles')
         .select('id, full_name, name, department, avatar_url')
@@ -3621,7 +3817,6 @@ async function getLeagueMembers(leagueId) {
         return { data: null, error: profileError };
     }
     
-    // Build a lookup map
     const profileMap = {};
     (profiles || []).forEach(p => {
         profileMap[p.id] = p;
@@ -3696,7 +3891,7 @@ async function getLeagueLeaderboard(leagueId) {
 
 // ============== LEAGUE LEADERBOARD OVERRIDE ==============
 
-const _originalLoadLeaderboard = loadLeaderboard
+const _originalLoadLeaderboard = typeof loadLeaderboard === 'function' ? loadLeaderboard : async function(){}
 loadLeaderboard = async function() {
     if (activeLeagueId && !previewMode) {
         await loadLeagueLeaderboardView(activeLeagueId)
@@ -3718,8 +3913,11 @@ loadLeaderboard = async function() {
 async function loadLeagueLeaderboardView(leagueId) {
     // Re-verify access — covers the case where admin revoked access or disabled
     // private leagues while the user was already inside a league view.
+    // Admins retain access even when the global toggle is off (so they can
+    // inspect / moderate without flipping the switch).
     const profile = getProfile()
-    if (!privateLeaguesEnabled || !hasLeagueAccess(profile)) {
+    const isAdminUser = typeof isAdmin === 'function' && isAdmin()
+    if ((!privateLeaguesEnabled && !isAdminUser) || !hasLeagueAccess(profile)) {
         activeLeagueId = null
         myLeagues = []
         showToast('Your access to private leagues is no longer available', 'warning')
@@ -3818,7 +4016,7 @@ async function loadLeagueLeaderboardView(leagueId) {
 
 // ============== PROFILE TAB: LOAD LEAGUES ==============
 
-const _originalSwitchTab = switchTab
+const _originalSwitchTab = typeof switchTab === 'function' ? switchTab : function(){}
 switchTab = function(tab) {
     if (tab === 'profile' && !previewMode) {
         loadMyLeagues()
@@ -3828,7 +4026,7 @@ switchTab = function(tab) {
 
 // ============== INIT: LOAD SYSTEM SETTINGS ==============
 
-const _originalInitApp = initApp
+const _originalInitApp = typeof initApp === 'function' ? initApp : async function(){}
 initApp = async function() {
     // Pre-check system settings
     await checkPrivateLeaguesEnabled()
@@ -3880,7 +4078,7 @@ async function regenerateLeagueCode(leagueId) {
             .from('leagues')
             .select('id')
             .eq('invite_code', newCode)
-            .single()
+            .maybeSingle()
         if (!existing) break
     } while (attempts < 10)
 

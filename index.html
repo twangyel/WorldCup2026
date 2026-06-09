@@ -1528,7 +1528,7 @@
           <input type="text" id="new-league-name" placeholder="e.g. Office Squad" 
             class="w-full px-4 py-3.5 rounded-2xl border border-paper-border bg-paper focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition text-[15px]">
         </div>
-        <button onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
+        <button id="league-modal-submit-btn" onclick="handleCreateLeague()" class="w-full bg-brand-900 text-white font-semibold py-4 rounded-2xl tap">Create League</button>
         <button onclick="hideLeagueModal()" class="w-full bg-paper border border-paper-border text-ink-700 font-semibold py-4 rounded-2xl tap">Cancel</button>
       </div>
     </div>
@@ -2194,8 +2194,7 @@
         <div id="home-prize-dashboard" class="hidden"></div>
 
         <!-- Next match -->
-        <div>
-          <div class="flex items-baseline justify-between mb-2 px-1">
+        <div class="flex items-baseline justify-between mb-2 px-1">
             <h2 class="text-lg font-bold tracking-tight">Next Match</h2>
             <span id="home-next-countdown" class="text-xs font-semibold text-brand-700"></span>
           </div>
@@ -2526,6 +2525,34 @@
       </div>
       <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
     </div>
+
+    <!-- Admin League Browser (admin only) -->
+<div id="admin-league-browser" class="hidden relative overflow-hidden rounded-3xl border border-white/40 p-5"
+     style="background: linear-gradient(135deg, rgba(30,58,95,0.08) 0%, rgba(250,250,247,0.9) 100%);
+            backdrop-filter: blur(24px) saturate(160%);
+            box-shadow: 0 8px 32px rgba(10,15,13,0.08), inset 0 1px 0 rgba(255,255,255,0.8);">
+    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-500/30 to-transparent"></div>
+    <div class="relative">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl border border-brand-500/20">👁️</div>
+            <div>
+                <h3 class="font-bold tracking-tight text-ink-900">All Private Leagues</h3>
+                <p class="text-xs text-ink-500">Admin view — click to inspect any league</p>
+            </div>
+        </div>
+        <!-- Search input -->
+        <div class="relative mb-3">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="admin-league-search" placeholder="Search by name, code, or creator…"
+                   oninput="filterAdminLeagues(this.value)"
+                   class="w-full bg-white border border-paper-border rounded-2xl pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500" />
+        </div>
+        <div id="admin-league-list" class="space-y-2">
+            <div class="text-center text-sm text-ink-500 py-4">Loading...</div>
+        </div>
+    </div>
+</div>
+
   </div><!-- Scoring rules -->
   <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
     <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
