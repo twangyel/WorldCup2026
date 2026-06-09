@@ -10,11 +10,13 @@ const BONUS_CONFIG = {
   streak: {
     enabled: true,
     // Consecutive matches with ANY points (>0)
+    // Trimmed to 3 tiers: Hot Streak (3), On Fire (5), Legendary (8).
+    // Dropped the old 7-match "Unstoppable" (redundant with 5/8) and the
+    // 10-match Legendary (almost never triggers in a 64-match tournament).
     tiers: [
-      { minStreak: 3, bonus: 2,  label: 'Hot Streak',      emoji: '🔥' },
-      { minStreak: 5, bonus: 5,  label: 'On Fire',         emoji: '🔥🔥' },
-      { minStreak: 7, bonus: 10, label: 'Unstoppable',    emoji: '🔥🔥🔥' },
-      { minStreak: 10, bonus: 15, label: 'Legendary',     emoji: '👑' }
+      { minStreak: 3, bonus: 2,  label: 'Hot Streak', emoji: '🔥' },
+      { minStreak: 5, bonus: 5,  label: 'On Fire',    emoji: '🔥🔥' },
+      { minStreak: 8, bonus: 10, label: 'Legendary',  emoji: '👑' }
     ],
     // Cap at highest tier reached (don't stack tiers)
     // If true, applies the highest tier bonus on EVERY match once reached
@@ -23,6 +25,9 @@ const BONUS_CONFIG = {
   },
 
   // --- Layer 2: Combo Bonus ---
+  // Only Exact Combo is active. GD Combo and Perfect Day are intentionally
+  // disabled — GD Combo overlapped with streak rewards (just noise), and
+  // Perfect Day requires all-exact-on-one-day which essentially never fires.
   combo: {
     enabled: true,
     exactCombo: {
@@ -34,16 +39,14 @@ const BONUS_CONFIG = {
       emoji: '⚡'
     },
     gdCombo: {
-      enabled: true,
-      // 2 correct GDs (but not exact) in a row
+      enabled: false, // DROPPED — too similar to streak bonus
       trigger: 2,
       bonus: 2,
       label: 'GD Combo',
       emoji: '🎯'
     },
     perfectDay: {
-      enabled: true,
-      // All predictions on a single matchday are exact scores
+      enabled: false, // DROPPED — virtually unattainable in practice
       bonus: 5,
       label: 'Perfect Day',
       emoji: '✨'
