@@ -379,6 +379,53 @@ function getAvatarHtml(name, avatarUrl, rank, size = 32) {
   const panel = document.getElementById('rules-panel')
   overlay.classList.remove('hidden')
   requestAnimationFrame(() => panel.classList.add('shown'))
+  // Inject live values (entry fee, prize split, organizer fee) from prize_settings.
+  // Defaults render in the HTML so the sheet is still readable if the fetch fails.
+  hydrateRulesSheet()
+}
+
+async function hydrateRulesSheet() {
+  if (typeof getPrizeSettings !== 'function') return
+  try {
+    const { data } = await getPrizeSettings()
+    if (!data) return
+
+    const currency = data.currency || 'Nu.'
+    const fee = Number(data.entry_fee != null ? data.entry_fee : 500)
+    const split1 = Number(data.split_1st != null ? data.split_1st : 50)
+    const split2 = Number(data.split_2nd != null ? data.split_2nd : 30)
+    const split3 = Number(data.split_3rd != null ? data.split_3rd : 20)
+    const houseFee = Number(data.house_fee_pct || 0)
+    const houseFeeNote = data.house_fee_note || 'Organizing & hosting'
+
+    // Entry fee
+    const feeEl = document.getElementById('rules-entry-fee')
+    if (feeEl) feeEl.textContent = `${currency} ${fee.toLocaleString()}`
+
+    // Prize splits
+    const e1 = document.getElementById('rules-prize-1st')
+    const e2 = document.getElementById('rules-prize-2nd')
+    const e3 = document.getElementById('rules-prize-3rd')
+    if (e1) e1.textContent = `${split1}% of pool`
+    if (e2) e2.textContent = `${split2}% of pool`
+    if (e3) e3.textContent = `${split3}% of pool`
+
+    // Intro line + organizer fee disclosure
+    const intro = document.getElementById('rules-prize-intro')
+    const feeNote = document.getElementById('rules-prize-fee-note')
+    if (houseFee > 0) {
+      if (intro) intro.innerHTML = `After a <b>${houseFee}% organizer fee</b> (${houseFeeNote.toLowerCase()}), the remaining pool is split among the top 3 finishers on the final leaderboard:`
+      if (feeNote) {
+        feeNote.textContent = `Example: on a Nu. 10,000 pool, organizer keeps Nu. ${(10000 * houseFee / 100).toLocaleString()}, the rest is split ${split1}/${split2}/${split3}.`
+        feeNote.classList.remove('hidden')
+      }
+    } else {
+      if (intro) intro.textContent = 'Total pool is split among the top 3 finishers on the final leaderboard:'
+      if (feeNote) feeNote.classList.add('hidden')
+    }
+  } catch (e) {
+    console.warn('[rules] could not hydrate prize settings, showing defaults:', e)
+  }
 }
 
 function hideRulesSheet() {
@@ -1799,12 +1846,8 @@ async function loadLeaderboard() {
         const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
         const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row">🔥${streakN}</span>` : ''
 
-        // Projected winnings inline for top 3 in overall tab
-        let projectedHtml = ''
-        if (lbSubtab === 'overall' && lbPrizeBreakdown && rank >= 1 && rank <= 3 && hasPoints) {
-          const amt = lbPrizeBreakdown.splits[rank - 1]?.amount || 0
-          if (amt > 0) projectedHtml = `<span class="lb-projected">Projected: ${fmtMoney(lbPrizeBreakdown.currency, amt)}</span>`
-        }
+        // (Projected winnings used to render here per row — moved to the Prize Pool
+        // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
 
         // Matchday tab uses simpler stats
         const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0
@@ -1836,7 +1879,6 @@ async function loadLeaderboard() {
             <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
               ${statsLine}
             </div>
-            ${projectedHtml}
           </div>
           <div class="text-right shrink-0">
             <div class="points-num font-bold text-brand-700" data-points-el>${s.points || 0}</div>

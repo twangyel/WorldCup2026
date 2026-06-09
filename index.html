@@ -1574,7 +1574,7 @@
           <h4 class="font-bold text-sm">Entry Fee</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
-          Entry fee is <b class="text-ink-900">Nu. 500</b> per player. Pay via online or cash and upload your payment screenshot. An admin will verify your payment before you can enter the game and start predicting.
+          Entry fee is <b class="text-ink-900" id="rules-entry-fee">Nu. 500</b> per player. Pay via online or cash and upload your payment screenshot. An admin will verify your payment before you can enter the game and start predicting.
         </p>
       </div>
 
@@ -1720,12 +1720,12 @@
       </div>
 
       <!-- Prize Pool -->
-      <div>
+      <div id="rules-prize-section">
         <div class="flex items-center gap-2 mb-2">
           <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">4</div>
           <h4 class="font-bold text-sm">Prize Distribution</h4>
         </div>
-        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2">
+        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2" id="rules-prize-intro">
           Total pool is split among the top 3 finishers on the final leaderboard:
         </p>
         <div class="pl-10 space-y-2">
@@ -1734,23 +1734,24 @@
               <span class="text-xl">🥇</span>
               <span class="text-sm font-semibold">1st Place</span>
             </div>
-            <span class="text-sm font-bold text-brand-700">50% of pool</span>
+            <span class="text-sm font-bold text-brand-700" id="rules-prize-1st">50% of pool</span>
           </div>
           <div class="flex items-center justify-between bg-paper rounded-xl p-3 border border-paper-border">
             <div class="flex items-center gap-2">
               <span class="text-xl">🥈</span>
               <span class="text-sm font-semibold">2nd Place</span>
             </div>
-            <span class="text-sm font-bold text-brand-700">30% of pool</span>
+            <span class="text-sm font-bold text-brand-700" id="rules-prize-2nd">30% of pool</span>
           </div>
           <div class="flex items-center justify-between bg-paper rounded-xl p-3 border border-paper-border">
             <div class="flex items-center gap-2">
               <span class="text-xl">🥉</span>
               <span class="text-sm font-semibold">3rd Place</span>
             </div>
-            <span class="text-sm font-bold text-brand-700">20% of pool</span>
+            <span class="text-sm font-bold text-brand-700" id="rules-prize-3rd">20% of pool</span>
           </div>
         </div>
+        <p class="text-xs text-ink-400 mt-2 pl-10 hidden" id="rules-prize-fee-note"></p>
       </div>
 
       <!-- Private Leagues -->
