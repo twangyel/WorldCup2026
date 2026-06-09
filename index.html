@@ -2244,6 +2244,143 @@
         </div>
       </div>
 
+      <!-- EXTRAS --><div id="tab-extras" class="tab-content hidden space-y-4">
+
+        <!-- Header -->
+        <div class="relative overflow-hidden rounded-3xl border border-white/20 p-5"
+             style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.92) 0%, rgba(11, 18, 33, 0.88) 100%);
+                    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+                    box-shadow: 0 8px 32px rgba(11, 18, 33, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);">
+          <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full opacity-25"
+               style="background: radial-gradient(circle, rgba(212, 162, 76, 0.6), transparent 70%);"></div>
+          <div class="relative flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl border border-white/15 backdrop-blur-sm">⭐</div>
+            <div class="flex-1 min-w-0">
+              <h2 class="text-lg font-bold text-white">Extras</h2>
+              <p class="text-xs text-white/60 mt-0.5">Leagues, rules, prizes & more</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Leagues Card (moved from Profile) -->
+        <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5" id="leagues-card"
+             style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
+                    backdrop-filter: blur(24px) saturate(160%);
+                    -webkit-backdrop-filter: blur(24px) saturate(160%);
+                    box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);">
+
+          <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"></div>
+          <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-15"
+               style="background: radial-gradient(circle, rgba(212, 162, 76, 0.3), transparent 70%);"></div>
+
+          <div class="relative">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl border border-brand-500/20">🏆</div>
+                <div>
+                  <h3 class="font-bold tracking-tight text-ink-900">Private Leagues</h3>
+                  <p class="text-[11px] text-ink-500 mt-0.5">Compete in mini-leagues with friends</p>
+                </div>
+              </div>
+              <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50/80 px-3 py-1.5 rounded-full tap backdrop-blur-sm border border-brand-500/20 hover:bg-brand-100 transition-colors">+ Create</button>
+            </div>
+
+            <!-- Join by code -->
+            <div class="flex gap-2 mt-4 mb-4" id="league-join-wrap">
+              <input type="text" id="league-join-code" placeholder="Enter invite code"
+                class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-white/60 text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition backdrop-blur-sm">
+              <button onclick="handleJoinLeague()" class="bg-gradient-to-r from-ink-900 to-brand-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm shadow-lg shadow-ink-900/20 hover:shadow-ink-900/30 transition-shadow">Join</button>
+            </div>
+
+            <!-- League list -->
+            <div id="my-leagues-list" class="space-y-2">
+              <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions Grid -->
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+          <h3 class="font-bold mb-3 tracking-tight text-ink-900">Quick Access</h3>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button onclick="showRulesSheet()" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+              <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-xl">📖</div>
+              <div>
+                <div class="text-sm font-bold text-ink-900">Rules & Regulations</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">How to play & win</div>
+              </div>
+            </button>
+            <button onclick="switchTab('home'); setTimeout(()=>{const el=document.querySelector('#tab-home .prize-dash, #tab-home [id*=prize]'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'})}, 250)" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl">💰</div>
+              <div>
+                <div class="text-sm font-bold text-ink-900">Prize Pool</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">See current pot & splits</div>
+              </div>
+            </button>
+            <button onclick="switchTab('leaderboard')" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl">📊</div>
+              <div>
+                <div class="text-sm font-bold text-ink-900">Leaderboard</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">Live rankings</div>
+              </div>
+            </button>
+            <button onclick="switchTab('profile')" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl">🎯</div>
+              <div>
+                <div class="text-sm font-bold text-ink-900">My Badges</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">Achievements & streaks</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Scoring rules (moved from Profile) -->
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold tracking-tight text-ink-900">Scoring</h3>
+            <button onclick="showRulesSheet()" class="text-xs font-bold text-brand-700 hover:text-brand-900 tap">Full rules →</button>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">5</div>
+              <div>
+                <div class="text-sm font-semibold">Exact score</div>
+                <div class="text-xs text-ink-500">e.g. you said 2–1, result was 2–1</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">3</div>
+              <div>
+                <div class="text-sm font-semibold">Correct goal difference</div>
+                <div class="text-xs text-ink-500">Right margin, wrong scoreline</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">2</div>
+              <div>
+                <div class="text-sm font-semibold">Correct outcome</div>
+                <div class="text-xs text-ink-500">Right winner or draw</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-paper-border flex items-center gap-2 text-[11px] text-ink-500">
+            <span>🔥</span><span>Bonuses for streaks · ⚡ exact combos · 🏆 stage multipliers in knockouts</span>
+          </div>
+        </div>
+
+        <!-- Help / Info card -->
+        <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl shrink-0">💡</div>
+            <div class="flex-1">
+              <div class="text-sm font-bold text-ink-900 mb-1">Need help?</div>
+              <p class="text-xs text-ink-500 leading-relaxed">Predictions lock at kickoff. Once a match starts, your pick is final. If something looks off, contact your league admin.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
       <!-- PROFILE --><div id="tab-profile" class="tab-content hidden space-y-5">
 
   <!-- Profile Header (Glassmorphism) -->
@@ -2368,38 +2505,6 @@
         </a>
       </div>
     </div>
-  </div><!-- My Leagues Card -->
-  <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5" id="leagues-card"
-       style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
-              backdrop-filter: blur(24px) saturate(160%);
-              -webkit-backdrop-filter: blur(24px) saturate(160%);
-              box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);">
-
-    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"></div>
-    <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-15"
-         style="background: radial-gradient(circle, rgba(212, 162, 76, 0.3), transparent 70%);"></div>
-
-    <div class="relative">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl border border-brand-500/20">🏆</div>
-          <h3 class="font-bold tracking-tight text-ink-900">My Leagues</h3>
-        </div>
-        <button onclick="handleCreateLeagueClick()" id="create-league-btn" class="text-xs font-bold text-brand-700 bg-brand-50/80 px-3 py-1.5 rounded-full tap backdrop-blur-sm border border-brand-500/20 hover:bg-brand-100 transition-colors">+ Create</button>
-      </div>
-
-      <!-- Join by code -->
-      <div class="flex gap-2 mb-4" id="league-join-wrap">
-        <input type="text" id="league-join-code" placeholder="Enter invite code" 
-          class="flex-1 px-4 py-3 rounded-2xl border border-paper-border bg-white/60 text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 outline-none transition backdrop-blur-sm">
-        <button onclick="handleJoinLeague()" class="bg-gradient-to-r from-ink-900 to-brand-900 text-white font-semibold px-5 py-3 rounded-2xl tap text-sm shadow-lg shadow-ink-900/20 hover:shadow-ink-900/30 transition-shadow">Join</button>
-      </div>
-
-      <!-- League list -->
-      <div id="my-leagues-list" class="space-y-2">
-        <div class="text-center text-sm text-ink-500 py-4">Loading leagues...</div>
-      </div>
-    </div>
   </div><!-- Share Rank Card (Glassmorphism) -->
   <div id="share-rank-card" class="hidden">
     <div class="relative overflow-hidden rounded-3xl border border-white/15 p-5" 
@@ -2506,37 +2611,11 @@
       </div>
       <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
     </div>
-  </div><!-- Scoring rules -->
-  <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
-    <h3 class="font-bold mb-4 tracking-tight">Scoring</h3>
-    <div class="space-y-3">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-sm font-bold">5</div>
-        <div>
-          <div class="text-sm font-semibold">Exact score</div>
-          <div class="text-xs text-ink-500">e.g. you said 2–1, result was 2–1</div>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold">3</div>
-        <div>
-          <div class="text-sm font-semibold">Correct goal difference</div>
-          <div class="text-xs text-ink-500">Right margin, wrong scoreline</div>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">2</div>
-        <div>
-          <div class="text-sm font-semibold">Correct outcome</div>
-          <div class="text-xs text-ink-500">Right winner or draw</div>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 <!-- Bottom Nav -->
     <nav id="app-nav" class="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-paper-border safe-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-      <div class="max-w-lg mx-auto grid grid-cols-4 px-2 py-2">
+      <div class="max-w-lg mx-auto grid grid-cols-5 px-1 py-2">
         <button onclick="switchTab('home')" data-tab="home" class="nav-btn active flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
           <span class="text-[11px] font-bold tracking-wide">Home</span>
@@ -2550,6 +2629,11 @@
         <button onclick="switchTab('leaderboard')" data-tab="leaderboard" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           <span class="text-[11px] font-bold tracking-wide">Ranks</span>
+          <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
+        </button>
+        <button onclick="switchTab('extras')" data-tab="extras" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118L2.075 10.1c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          <span class="text-[11px] font-bold tracking-wide">Extras</span>
           <div class="nav-dot w-1 h-1 rounded-full bg-brand-900"></div>
         </button>
         <button onclick="switchTab('profile')" data-tab="profile" class="nav-btn flex flex-col items-center gap-0.5 py-2 tap">

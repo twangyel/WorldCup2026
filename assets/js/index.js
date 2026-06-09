@@ -3155,6 +3155,9 @@ window.signOut = async function smoothSignOut() {
       if (tab === 'home') loadHome()
       if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
       if (tab === 'predictions') previewMode ? renderFixtures() : loadFixtures()
+      if (tab === 'extras' && !previewMode) {
+        if (typeof loadMyLeagues === 'function') loadMyLeagues()
+      }
       if (tab === 'profile' && !previewMode) {
     renderBadges()
     updateProfileCards()
@@ -4095,7 +4098,7 @@ async function loadLeagueLeaderboardView(leagueId) {
 
 const _originalSwitchTab = switchTab
 switchTab = function(tab) {
-    if (tab === 'profile' && !previewMode) {
+    if (tab === 'extras' && !previewMode) {
         loadMyLeagues()
     }
     _originalSwitchTab(tab)
