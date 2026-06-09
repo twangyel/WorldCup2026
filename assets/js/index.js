@@ -3271,24 +3271,6 @@ if (typeof getPrizePool !== 'function') {
   }
 }
 
-// ============== URL INVITE CODE PICKUP ==============
-function checkUrlInviteCode() {
-  try {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('join')
-    if (code && code.trim()) {
-      localStorage.setItem('pendingInviteCode', code.trim().toUpperCase())
-      // Clean URL so refresh/bookmark doesn't keep showing ?join=ABC123
-      const cleanUrl = window.location.pathname + window.location.hash
-      window.history.replaceState({}, document.title, cleanUrl)
-    }
-  } catch (e) {
-    console.warn('[invite] URL parse failed:', e)
-  }
-}
-// Run immediately on load
-checkUrlInviteCode()
-
   async function initApp() {
   await initAuth(); 
   async function waitForUser(maxMs = 1500, stepMs = 50) {
@@ -3725,16 +3707,6 @@ async function loadMyLeagues() {
             createBtn.onclick = () => showToast('Private leagues are coming soon!', 'info')
         }
         if (joinWrap) joinWrap.classList.add('hidden')
-              // Pre-fill invite code if user arrived via ?join=ABC123
-    const pendingCode = localStorage.getItem('pendingInviteCode')
-    if (pendingCode && joinWrap) {
-      const input = document.getElementById('league-join-code')
-      if (input && !input.value) {
-        input.value = pendingCode
-        // Optional: clear it so it only pre-fills once
-        localStorage.removeItem('pendingInviteCode')
-      }
-    }
         container.innerHTML = `
             <div class="text-center py-6">
                 <div class="text-3xl mb-2">🔜</div>
