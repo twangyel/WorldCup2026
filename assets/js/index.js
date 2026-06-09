@@ -789,7 +789,13 @@ function showPaymentGate() {
         function setupPaymentRealtime() {
       const user = getUser()
       if (!user) return
-      supabaseClient.channel('payment-status-' + user.id)
+
+      // FIX: Prevent duplicate channels
+      if (window._paymentChannel) {
+        try { supabaseClient.removeChannel(window._paymentChannel) } catch (_) {}
+      }
+
+      window._paymentChannel = supabaseClient.channel('payment-status-' + user.id)
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
@@ -3170,7 +3176,7 @@ async function createLeague(name) {
             .from('leagues')
             .select('id')
             .eq('invite_code', inviteCode)
-            .single();
+            .maybeSingle();  // FIXED: .single() throws when no row found
         if (!existing) break;
         attempts++;
     } while (attempts < 10);
@@ -3216,7 +3222,7 @@ async function joinLeagueByCode(inviteCode) {
     .from('leagues')
     .select('*')
     .eq('invite_code', inviteCode.toUpperCase())
-    .single();
+    .maybeSingle();  // FIXED: Use maybeSingle to avoid throwing on not found
 
   if (leagueError || !league) throw new Error('Invalid invite code');
 
@@ -3268,6 +3274,17 @@ async function leaveLeague(leagueId) {
   const user = getUser();
   if (!user) throw new Error('Not authenticated');
 
+  // FIX: Prevent creator from leaving their own league (orphaning it)
+  const { data: league } = await supabaseClient
+    .from('leagues')
+    .select('created_by')
+    .eq('id', leagueId)
+    .maybeSingle();
+
+  if (league?.created_by === user.id) {
+    throw new Error('You cannot leave a league you created. Delete it instead.');
+  }
+
   const { error } = await supabaseClient
     .from('league_memberships')
     .delete()
@@ -3310,10 +3327,38 @@ document.getElementById('league-modal-overlay')?.addEventListener('click', e => 
 })
 
 // ============== ACCESS HELPERS ==============
-function hasLeagueAccess(profile) {
-    if (!profile) return false
+
+/**
+ * Check if user has been explicitly granted private league access by admin.
+ * This does NOT check payment status - use canAccessLeagues() for full check.
+ */
+function hasAdminLeagueAccess(profile) {
+    if (!profile) return false;
     return profile.private_leagues_access === true
-        || (typeof isAdmin === 'function' && isAdmin())
+        || (typeof isAdmin === 'function' && isAdmin());
+}
+
+/**
+ * Centralized access control for private leagues.
+ * Returns { allowed, reason } where reason explains why access was granted/denied.
+ */
+async function canAccessLeagues() {
+    const profile = getProfile();
+    if (!profile) return { allowed: false, reason: 'not_authenticated' };
+
+    const enabled = await checkPrivateLeaguesEnabled();
+    if (!enabled) return { allowed: false, reason: 'disabled' };
+
+    if (isAdmin()) return { allowed: true, reason: 'admin' };
+    if (profile.fee_paid === true) return { allowed: true, reason: 'paid' };
+    if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
+
+    return { allowed: false, reason: 'unpaid' };
+}
+
+// DEPRECATED: Use hasAdminLeagueAccess() or canAccessLeagues() instead
+function hasLeagueAccess(profile) {
+    return hasAdminLeagueAccess(profile);
 }
 
 // Forcibly evict the user from any league view they're currently in.
@@ -3397,22 +3442,20 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 
 async function handleCreateLeagueClick() {
-    const profile = getProfile()
+    const access = await canAccessLeagues();
 
-    // Check if private leagues are enabled globally
-    const enabled = await checkPrivateLeaguesEnabled()
-    if (!enabled) {
-        showToast('Private leagues are coming soon! Stay tuned.', 'info')
-        return
+    if (!access.allowed) {
+        if (access.reason === 'disabled') {
+            showToast('Private leagues are coming soon! Stay tuned.', 'info');
+        } else if (access.reason === 'unpaid') {
+            showToast('Private leagues are invite-only. Tap "Ask admin" to request access.', 'warning');
+        } else {
+            showToast('Access denied. Please sign in or pay entry fee.', 'error');
+        }
+        return;
     }
 
-    // Access gate: paid OR admin-granted OR admin
-    if (!hasLeagueAccess(profile)) {
-        showToast('Private leagues are invite-only. Tap "Ask admin" to request access.', 'warning')
-        return
-    }
-
-    showCreateLeagueModal()
+    showCreateLeagueModal();
 }
 
 async function handleCreateLeague() {
@@ -3444,16 +3487,14 @@ async function handleCreateLeague() {
 }
 
 async function handleJoinLeague() {
-    // Access gate: paid OR admin-granted users can join
-    const profile = getProfile()
-    if (!hasLeagueAccess(profile)) {
-        showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning')
-        return
-    }
-    const enabled = await checkPrivateLeaguesEnabled()
-    if (!enabled) {
-        showToast('Private leagues are coming soon! Stay tuned.', 'info')
-        return
+    const access = await canAccessLeagues();
+    if (!access.allowed) {
+        if (access.reason === 'disabled') {
+            showToast('Private leagues are coming soon! Stay tuned.', 'info');
+        } else {
+            showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning');
+        }
+        return;
     }
 
     const code = document.getElementById('league-join-code').value.trim()
@@ -3509,9 +3550,9 @@ async function loadMyLeagues() {
         createBtn.onclick = handleCreateLeagueClick
     }
 
-    // Access gate: paid OR admin-granted users can create/join
-    const profile = getProfile()
-    if (!hasLeagueAccess(profile)) {
+    // Access gate using centralized helper
+    const access = await canAccessLeagues();
+    if (!access.allowed) {
         if (createBtn) {
             createBtn.textContent = '🔒 Locked'
             createBtn.classList.add('opacity-50', 'cursor-not-allowed')
@@ -3608,9 +3649,33 @@ async function loadAdminLeagueBrowser() {
         return;
     }
     
-    container.innerHTML = leagues.map(l => {
-        const memberCount = l.league_memberships?.[0]?.count || 0;
-        const creatorName = l.creator?.full_name || l.creator?.name || 'Unknown';
+    // Query 2: Get member counts per league
+    const leagueIds = leagues.map(l => l.id);
+    const { data: memberships } = await supabaseClient
+        .from('league_memberships')
+        .select('league_id')
+        .in('league_id', leagueIds);
+
+    const memberCounts = {};
+    (memberships || []).forEach(m => {
+        memberCounts[m.league_id] = (memberCounts[m.league_id] || 0) + 1;
+    });
+
+    // Query 3: Get creator profiles
+    const creatorIds = [...new Set(leagues.map(l => l.created_by))];
+    const { data: creators } = await supabaseClient
+        .from('profiles')
+        .select('id, full_name, name')
+        .in('id', creatorIds);
+
+    const creatorMap = {};
+    (creators || []).forEach(c => {
+        creatorMap[c.id] = c.full_name || c.name || 'Unknown';
+    });
+
+    listContainer.innerHTML = leagues.map(l => {
+        const memberCount = memberCounts[l.id] || 0;
+        const creatorName = creatorMap[l.created_by] || 'Unknown';
         const isActive = activeLeagueId === l.id;
         
         return `
@@ -3801,8 +3866,8 @@ loadLeaderboard = async function() {
 async function loadLeagueLeaderboardView(leagueId) {
     // Re-verify access — covers the case where admin revoked access or disabled
     // private leagues while the user was already inside a league view.
-    const profile = getProfile()
-    if (!privateLeaguesEnabled || !hasLeagueAccess(profile)) {
+    const access = await canAccessLeagues();
+    if (!access.allowed) {
         activeLeagueId = null
         myLeagues = []
         showToast('Your access to private leagues is no longer available', 'warning')
@@ -3923,11 +3988,27 @@ initApp = async function() {
 async function deleteMyLeague(leagueId) {
     if (!confirm('Delete this league? All members will be removed. This cannot be undone.')) return
 
+    const user = getUser();
+    if (!user) return;
+
+    // FIX: Delete memberships FIRST to avoid FK constraint violation
+    const { error: membershipError } = await supabaseClient
+        .from('league_memberships')
+        .delete()
+        .eq('league_id', leagueId);
+
+    if (membershipError) {
+        console.error('Failed to delete memberships:', membershipError);
+        showToast('Could not delete league memberships', 'error');
+        return;
+    }
+
+    // Now delete the league
     const { error } = await supabaseClient
         .from('leagues')
         .delete()
         .eq('id', leagueId)
-        .eq('created_by', getUser()?.id)
+        .eq('created_by', user.id)
 
     if (error) {
         showToast(error.message, 'error')
@@ -3963,7 +4044,7 @@ async function regenerateLeagueCode(leagueId) {
             .from('leagues')
             .select('id')
             .eq('invite_code', newCode)
-            .single()
+            .maybeSingle()  // FIXED: Use maybeSingle
         if (!existing) break
     } while (attempts < 10)
 
