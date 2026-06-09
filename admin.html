@@ -1215,30 +1215,37 @@ async function executeRecalcAll() {
         list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">👤</div><div class="text-sm font-semibold text-ink-700">No users found</div><p class="text-xs text-ink-500 mt-1">Try a different search term</p></div>'
         return
       }
-      list.innerHTML = displayUsers.map(u => {
-        const paid = u.fee_paid === true
-        const initials = (u.name || u.email || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()
-        return `
-        <div class="px-5 py-3.5 flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl ${paid ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-500'} flex items-center justify-center font-bold text-sm shrink-0 border ${paid ? 'border-brand-100' : 'border-paper-border'}">${initials}</div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="font-semibold text-sm truncate">${u.name || '(no name)'}</span>
-              ${u.is_admin ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>' : ''}
-              ${u.payment_proof_url && !u.fee_paid ? `<a href="${u.payment_proof_url}" target="_blank" class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider tap">View Proof</a>` : ''}
-            </div>
-            <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
-          </div>
-          <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
-          <button onclick="toggleLeagueAccess('${u.id}', ${!(u.private_leagues_access === true)})" class="text-[11px] font-bold px-2.5 py-1.5 rounded-full tap shrink-0 ${u.private_leagues_access ? 'bg-purple-500 text-white' : 'bg-paper text-ink-500 border border-paper-border'}" title="${u.private_leagues_access ? 'Revoke private league access' : 'Grant private league access'}">${u.private_leagues_access ? '🔓 LEAGUE' : '🔒'}</button>
-          <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
-          </button>
-          <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-red-500 p-1.5 tap" title="Remove user">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>`
-      }).join('')
+  list.innerHTML = displayUsers.map(u => {
+  const paid = u.fee_paid === true
+  const initials = (u.name || u.email || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()
+  return `
+  <div class="px-5 py-3.5">
+    <!-- Line 1: Avatar + Identity (full width) -->
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-11 h-11 rounded-2xl ${paid ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-500'} flex items-center justify-center font-bold text-sm shrink-0 border ${paid ? 'border-brand-100' : 'border-paper-border'}">${initials}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-sm truncate">${u.name || '(no name)'}</span>
+          ${u.is_admin ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>' : ''}
+          ${u.payment_proof_url && !u.fee_paid ? `<a href="${u.payment_proof_url}" target="_blank" class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider tap">View Proof</a>` : ''}
+        </div>
+        <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
+      </div>
+    </div>
+    
+    <!-- Line 2: Status badges + Actions (left-aligned under identity) -->
+    <div class="flex items-center gap-2 pl-14"> <!-- pl-14 = avatar width (44px) + gap (12px) -->
+      <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
+      <button onclick="toggleLeagueAccess('${u.id}', ${!(u.private_leagues_access === true)})" class="text-[11px] font-bold px-2.5 py-1.5 rounded-full tap shrink-0 ${u.private_leagues_access ? 'bg-purple-500 text-white' : 'bg-paper text-ink-500 border border-paper-border'}" title="${u.private_leagues_access ? 'Revoke private league access' : 'Grant private league access'}">${u.private_leagues_access ? '🔓 LEAGUE' : '🔒'}</button>
+      <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
+      </button>
+      <button onclick="confirmRemoveUser('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-red-500 p-1.5 tap" title="Remove user">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>`
+}).join('')
     }
 
         async function toggleFee(userId, paid) {
