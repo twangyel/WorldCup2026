@@ -3798,7 +3798,7 @@ async function loadAdminLeagueBrowser() {
         creatorMap[c.id] = c.full_name || c.name || 'Unknown';
     });
 
-    listContainer.innerHTML = leagues.map(l => {
+    container.innerHTML = leagues.map(l => {
         const memberCount = memberCounts[l.id] || 0;
         const creatorName = creatorMap[l.created_by] || 'Unknown';
         const isActive = activeLeagueId === l.id;
