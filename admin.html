@@ -17,6 +17,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
   <script src="/assets/js/bonus-engine.js"></script>
+  
   <script>
     tailwind.config = {
       theme: {
@@ -37,6 +38,7 @@
       }
     }
   </script>
+
   <style>
     html, body { background: #FAFAF7; -webkit-tap-highlight-color: transparent; }
     body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
@@ -152,6 +154,7 @@
     .split-sum-ok { color: #047857; }
     .split-sum-bad { color: #B91C1C; }
   </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -2376,6 +2379,371 @@ async function executeSaveScore(id) {
         }
       }
     }
+
+    // ===== LEAGUE VARIABLES =====
+let activeLeagueId = null;
+let myLeagues = [];
+let privateLeaguesEnabled = false;
+
+// ===== LEAGUE HELPERS =====
+function getInitials(name) {
+  if (!name || typeof name !== 'string') return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getAvatarHtml(name, avatarUrl, rank, size = 32) {
+  const initials = getInitials(name);
+  const medalClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+  if (avatarUrl) {
+    return `<div class="lb-avatar ${medalClass}" style="width:${size}px;height:${size}px;padding:0;overflow:hidden;">
+      <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.textContent='${initials}'">
+    </div>`;
+  }
+  return `<div class="lb-avatar ${medalClass}">${initials}</div>`;
+}
+
+async function getSystemSettings() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .select('private_leagues_enabled')
+      .eq('id', 1)
+      .single();
+    if (error) throw error;
+    return { data: data || { private_leagues_enabled: false }, error: null };
+  } catch (e) {
+    return { data: { private_leagues_enabled: false }, error: e };
+  }
+}
+
+async function checkPrivateLeaguesEnabled() {
+  const { data } = await getSystemSettings();
+  privateLeaguesEnabled = data?.private_leagues_enabled || false;
+  return privateLeaguesEnabled;
+}
+
+function hasAdminLeagueAccess(profile) {
+  if (!profile) return false;
+  return profile.private_leagues_access === true
+    || (typeof isAdmin === 'function' && isAdmin());
+}
+
+async function canAccessLeagues() {
+  const profile = getProfile();
+  if (!profile) return { allowed: false, reason: 'not_authenticated' };
+  const enabled = await checkPrivateLeaguesEnabled();
+  if (!enabled) return { allowed: false, reason: 'disabled' };
+  if (isAdmin()) return { allowed: true, reason: 'admin' };
+  if (profile.fee_paid === true) return { allowed: true, reason: 'paid' };
+  if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
+  return { allowed: false, reason: 'unpaid' };
+}
+
+async function getLeagueMembers(leagueId) {
+  const user = getUser();
+  if (!user) return { data: [], error: null };
+  if (!isAdmin()) {
+    const { data: myMembership } = await supabaseClient
+      .from('league_memberships')
+      .select('id')
+      .eq('league_id', leagueId)
+      .eq('user_id', user.id)
+      .single();
+    if (!myMembership) return { data: [], error: new Error('Not a member of this league') };
+  }
+  const { data: memberships, error: membershipError } = await supabaseClient
+    .from('league_memberships')
+    .select('user_id')
+    .eq('league_id', leagueId);
+  if (membershipError) return { data: null, error: membershipError };
+  if (!memberships || memberships.length === 0) return { data: [], error: null };
+  const userIds = memberships.map(m => m.user_id);
+  const { data: profiles, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id, full_name, name, department, avatar_url')
+    .in('id', userIds);
+  if (profileError) return { data: null, error: profileError };
+  const profileMap = {};
+  (profiles || []).forEach(p => { profileMap[p.id] = p; });
+  const members = memberships.map(row => {
+    const p = profileMap[row.user_id] || {};
+    return {
+      id: row.user_id,
+      name: p.full_name || p.name || 'Anonymous',
+      department: p.department || '',
+      avatar_url: p.avatar_url || null
+    };
+  });
+  return { data: members, error: null };
+}
+
+async function getLeagueLeaderboard(leagueId) {
+  const { data: members, error: membersError } = await getLeagueMembers(leagueId);
+  if (membersError || !members?.length) return { data: [], error: membersError };
+  const userIds = members.map(m => m.id);
+  const { data: results, error: resultsError } = await supabaseClient
+    .from('prediction_results')
+    .select('*')
+    .in('user_id', userIds);
+  if (resultsError) console.error('getLeagueLeaderboard: results error', resultsError);
+  const stats = {};
+  members.forEach(m => {
+    stats[m.id] = { ...m, points: 0, exact: 0, gd: 0, result: 0, total_predictions: 0 };
+  });
+  (results || []).forEach(r => {
+    const s = stats[r.user_id];
+    if (!s) return;
+    s.points += r.final_points || r.points_awarded || 0;
+    const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0);
+    if (base === 5) s.exact++;
+    else if (base === 3) s.gd++;
+    else if (base === 2) s.result++;
+    s.total_predictions++;
+  });
+  const result = Object.values(stats).sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.exact !== a.exact) return b.exact - a.exact;
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    return b.result - a.result;
+  });
+  return { data: result, error: null };
+}
+
+async function loadLeagueLeaderboardView(leagueId) {
+  const access = await canAccessLeagues();
+  if (!access.allowed) {
+    activeLeagueId = null;
+    myLeagues = [];
+    showToast('Your access to private leagues is no longer available', 'warning');
+    const backBtn = document.getElementById('lb-back-to-global');
+    if (backBtn) backBtn.classList.add('hidden');
+    const subOv = document.getElementById('lb-subtab-overall');
+    const subMd = document.getElementById('lb-subtab-matchday');
+    if (subOv) subOv.classList.remove('hidden');
+    if (subMd) subMd.classList.remove('hidden');
+    return;
+  }
+  const c = document.getElementById('leaderboard-list');
+  const myId = getUser()?.id;
+  const [{ data: stats }, { data: league }] = await Promise.all([
+    getLeagueLeaderboard(leagueId),
+    supabaseClient.from('leagues').select('name, invite_code').eq('id', leagueId).single()
+  ]);
+  const subOv = document.getElementById('lb-subtab-overall');
+  const subMd = document.getElementById('lb-subtab-matchday');
+  if (subOv) subOv.classList.add('hidden');
+  if (subMd) subMd.classList.add('hidden');
+  let backBtn = document.getElementById('lb-back-to-global');
+  if (!backBtn) {
+    backBtn = document.createElement('button');
+    backBtn.id = 'lb-back-to-global';
+    backBtn.className = 'lb-subtab tap active';
+    backBtn.textContent = '← Global';
+    backBtn.onclick = () => { activeLeagueId = null; loadMyLeagues(); switchTab('leaderboard'); };
+    document.querySelector('.lb-subtabs')?.prepend(backBtn);
+  } else {
+    backBtn.classList.remove('hidden');
+  }
+  if (document.getElementById('lb-subtab-meta')) {
+    document.getElementById('lb-subtab-meta').textContent = league?.name || 'League';
+  }
+  const cta = document.getElementById('lb-cta');
+  if (cta) { cta.classList.add('hidden'); cta.innerHTML = ''; }
+  const prize = document.getElementById('lb-prize');
+  if (prize) { prize.classList.add('hidden'); prize.innerHTML = ''; }
+  if (!stats?.length) {
+    c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center mx-0">
+      <div class="text-4xl mb-2">👥</div>
+      <div class="font-semibold">No members yet</div>
+      <p class="text-sm text-ink-500 mt-1">Invite friends with code: ${league?.invite_code || '---'}</p>
+    </div>`;
+    return;
+  }
+  c.innerHTML = stats.map((s, i) => {
+    const rank = i + 1;
+    const uid = s.user_id || s.id;
+    const isMe = uid === myId;
+    const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0);
+    const hasPoints = (s.points || 0) > 0;
+    const medal = hasPoints && rank === 1 ? '🥇' : hasPoints && rank === 2 ? '🥈' : hasPoints && rank === 3 ? '🥉' : '';
+    const rankDisplay = medal
+      ? `<div class="rank-medal">${medal}</div>`
+      : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500">${rank}</div>`;
+    return `
+    <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3">
+      <div class="shrink-0">${rankDisplay}</div>
+      <div class="shrink-0">${getAvatarHtml(s.name, s.avatar_url, rank, 32)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="player-name truncate">${s.name || 'Anonymous'}</span>
+          ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
+        </div>
+        <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
+          <span><b class="text-ink-900">${correct}</b> correct</span>
+          <span class="text-ink-300">·</span>
+          <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="points-num font-bold text-brand-700">${s.points || 0}</div>
+        <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function adminViewLeague(leagueId) {
+  if (!isAdmin()) {
+    showToast('Admin access only', 'error');
+    return;
+  }
+  activeLeagueId = leagueId;
+
+  // Show the league leaderboard inline in the admin leagues tab
+  // instead of trying to call switchTab() which doesn't exist in admin.html
+  const container = document.getElementById('admin-league-browser');
+  if (!container) return;
+
+  // Show loading state
+  container.innerHTML = `<div class="text-center py-6">
+    <div class="flex items-center justify-center gap-2 text-sm text-ink-500">
+      <span class="w-4 h-4 border-2 border-ink-300 border-t-brand-500 rounded-full animate-spin"></span>
+      Loading league leaderboard...
+    </div>
+  </div>`;
+
+  // Load the league leaderboard data
+  const [{ data: stats }, { data: league }] = await Promise.all([
+    getLeagueLeaderboard(leagueId),
+    supabaseClient.from('leagues').select('name, invite_code').eq('id', leagueId).single()
+  ]);
+
+  if (!stats?.length) {
+    container.innerHTML = `
+      <div class="card p-5 mb-4">
+        <div class="flex items-center gap-3 mb-4">
+          <button onclick="loadAdminLeagueBrowser()" class="text-ink-400 hover:text-ink-700 tap">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h3 class="font-bold text-lg">${league?.name || 'League'}</h3>
+            <p class="text-xs text-ink-500">Code: ${league?.invite_code || '---'}</p>
+          </div>
+        </div>
+        <div class="text-center py-8">
+          <div class="text-4xl mb-2">👥</div>
+          <div class="font-semibold text-sm">No members yet</div>
+          <p class="text-xs text-ink-500 mt-1">Invite friends to join this league</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Render the league leaderboard
+  container.innerHTML = `
+    <div class="card p-5 mb-4">
+      <div class="flex items-center gap-3 mb-4">
+        <button onclick="loadAdminLeagueBrowser()" class="text-ink-400 hover:text-ink-700 tap p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="flex-1 min-w-0">
+          <h3 class="font-bold text-lg truncate">${league?.name || 'League'}</h3>
+          <p class="text-xs text-ink-500">Code: ${league?.invite_code || '---'} · ${stats.length} member${stats.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+      <div class="space-y-2">
+        ${stats.map((s, i) => {
+          const rank = i + 1;
+          const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0);
+          const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+          const rankDisplay = medal
+            ? `<div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold text-sm shrink-0">${medal}</div>`
+            : `<div class="w-8 h-8 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500 shrink-0">${rank}</div>`;
+          const initials = (s.name || 'A').split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase();
+          return `
+          <div class="flex items-center gap-3 p-3 rounded-2xl ${rank <= 3 ? 'bg-brand-50/50 border border-brand-100' : 'bg-paper border border-paper-border'}">
+            ${rankDisplay}
+            <div class="w-9 h-9 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-sm truncate">${s.name || 'Anonymous'}</div>
+              <div class="text-xs text-ink-500">${correct} correct · ${s.exact || 0} exact</div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="font-bold text-brand-700">${s.points || 0}</div>
+              <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold">pts</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  showToast('Viewing league: ' + (league?.name || 'League'), 'info');
+}
+
+async function loadAdminLeagueBrowser() {
+  if (!isAdmin()) return;
+  const container = document.getElementById('admin-league-browser');
+  if (!container) return;
+  container.classList.remove('hidden');
+  const { data: leagues, error } = await supabaseClient
+    .from('leagues')
+    .select('*, creator:created_by (full_name, name)')
+    .order('created_at', { ascending: false });
+  if (error) {
+    container.innerHTML = `<div class="text-center py-4 text-red-500 text-sm">Failed to load leagues</div>`;
+    return;
+  }
+  if (!leagues?.length) {
+    container.innerHTML = `
+      <div class="text-center py-6">
+        <div class="text-3xl mb-2 opacity-40">🏆</div>
+        <div class="text-sm font-semibold text-ink-700">No private leagues yet</div>
+      </div>`;
+    return;
+  }
+  const leagueIds = leagues.map(l => l.id);
+  const { data: memberships } = await supabaseClient
+    .from('league_memberships')
+    .select('league_id')
+    .in('league_id', leagueIds);
+  const memberCounts = {};
+  (memberships || []).forEach(m => {
+    memberCounts[m.league_id] = (memberCounts[m.league_id] || 0) + 1;
+  });
+  const creatorIds = [...new Set(leagues.map(l => l.created_by))];
+  const { data: creators } = await supabaseClient
+    .from('profiles')
+    .select('id, full_name, name')
+    .in('id', creatorIds);
+  const creatorMap = {};
+  (creators || []).forEach(c => {
+    creatorMap[c.id] = c.full_name || c.name || 'Unknown';
+  });
+  container.innerHTML = leagues.map(l => {
+    const memberCount = memberCounts[l.id] || 0;
+    const creatorName = creatorMap[l.created_by] || 'Unknown';
+    const isActive = activeLeagueId === l.id;
+    return `
+    <div class="flex items-center gap-3 p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" 
+         onclick="adminViewLeague('${l.id}')">
+      <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
+        ${(l.name || 'L').substring(0, 2).toUpperCase()}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm truncate">${l.name}</div>
+        <div class="text-[11px] text-ink-500">
+          ${memberCount} member${memberCount !== 1 ? 's' : ''} · Code: ${l.invite_code} · by ${creatorName}
+        </div>
+      </div>
+      ${isActive ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">VIEWING</span>' : ''}
+      <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+    </div>`;
+  }).join('');
+}
 
     init()
   
