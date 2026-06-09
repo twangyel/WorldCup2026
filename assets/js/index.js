@@ -1253,7 +1253,14 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
           .eq('fixture_id', id)
       } catch (e) { /* column may not exist yet — ignore */ }
 
-      showToast('Prediction saved', 'success')
+      // Show different toast if this prediction is being saved close to kickoff
+      const fx = fixtures.find(f => f.id === id)
+      const minsToKick = fx ? (new Date(fx.kickoff) - new Date()) / 60000 : Infinity
+      if (minsToKick > 0 && minsToKick < 30) {
+        showToast('🔒 Locked in! No changes after kickoff.', 'success')
+      } else {
+        showToast('Prediction saved', 'success')
+      }
       const existing = getPrediction(id)
       if (existing) {
         existing.home_prediction = home
@@ -1573,17 +1580,19 @@ recentEl.innerHTML = finished.map(f => {
           .select('user_id, points_awarded, fixture_id')
           .in('fixture_id', md.fixtureIds)
         if (!data) return []
-        // Need user names — pull from profiles (or fall back to "Anonymous")
+        // Need user names — pull from profiles (paid users only, to match Overall behavior)
         const userIds = [...new Set(data.map(p => p.user_id))]
         let profMap = {}
         if (userIds.length) {
           const { data: profs } = await supabaseClient
-            .from('profiles').select('id, name, department').in('id', userIds)
+            .from('profiles').select('id, name, department, fee_paid').in('id', userIds).eq('fee_paid', true)
           ;(profs || []).forEach(p => { profMap[p.id] = p })
         }
         const agg = {}
         data.forEach(p => {
           const uid = p.user_id
+          // Skip unpaid users — they shouldn't appear on the global matchday leaderboard
+          if (!profMap[uid]) return
           if (!agg[uid]) agg[uid] = { user_id: uid, points: 0, exact: 0, gd: 0, result: 0, name: profMap[uid]?.name || 'Anonymous', department: profMap[uid]?.department || '' }
           agg[uid].points += (p.points_awarded || 0)
           // crude bucketing — exact = full match points, others lumped into "result"
@@ -1767,6 +1776,7 @@ async function loadLeaderboard() {
           const { data: allProfiles } = await supabaseClient
             .from('profiles')
             .select('id, full_name, department, name')
+            .eq('fee_paid', true)
             .order('created_at', { ascending: false })
 
           if (allProfiles && allProfiles.length > 0) {
@@ -1818,8 +1828,32 @@ async function loadLeaderboard() {
       })
       const hadAnyRows = Object.keys(oldRects).length > 0
 
+      // Matchday MVP card: crown the #1 scorer (only on matchday tab, only if they have points)
+      const mvp = stats[0]
+      const mvpHtml = (lbSubtab === 'matchday' && mvp && (mvp.points || 0) > 0)
+        ? `
+        <div class="relative overflow-hidden rounded-2xl border border-amber-200 p-4 mb-3"
+             style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+                    box-shadow: 0 4px 16px rgba(212, 162, 76, 0.18);">
+          <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30"
+               style="background: radial-gradient(circle, rgba(212, 162, 76, 0.6), transparent 70%);"></div>
+          <div class="relative flex items-center gap-3">
+            <div class="text-3xl shrink-0">👑</div>
+            <div class="shrink-0">${getAvatarHtml(mvp.name, mvp.avatar_url, 1, 36)}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-amber-900/70">Matchday MVP</div>
+              <div class="text-sm font-bold text-ink-900 truncate">${mvp.name || 'Anonymous'}${(mvp.user_id === myId || mvp.id === myId) ? ' <span class="text-[9px] font-bold text-brand-700 bg-white/60 px-1.5 py-0.5 rounded ml-1">YOU</span>' : ''}</div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-xl font-bold text-amber-900" style="font-variant-numeric: tabular-nums;">${mvp.points || 0}</div>
+              <div class="text-[10px] font-semibold text-amber-900/60 uppercase tracking-wider">pts</div>
+            </div>
+          </div>
+        </div>`
+        : ''
+
       // Render fresh HTML
-      c.innerHTML = stats.map((s, i) => {
+      c.innerHTML = mvpHtml + stats.map((s, i) => {
         const rank = i + 1
         const uid = s.user_id || s.id
         const isMe = s.user_id === myId || s.id === myId
