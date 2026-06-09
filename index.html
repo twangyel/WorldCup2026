@@ -50,12 +50,14 @@
     input[type=number] { -moz-appearance: textfield; }
 
     /* Number score input – big, friendly */
-    .score-input {
-      width: 56px; height: 56px;
-      text-align: center; font-weight: 700; font-size: 24px;
-      background: #FAFAF7; border: 1.5px solid #EEEDE7; border-radius: 14px;
-      outline: none; transition: all 150ms ease; color: #0A0F0D;
-    }
+   .fixture-score-box {
+  width: 56px; height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;  /* ✅ flex centering */
+  text-align: center;       /* ✅ fallback centering */
+}
     .score-input:focus { border-color: #D4A24C; background: #fff; box-shadow: 0 0 0 4px rgba(212,162,76,0.12); }
     .score-readonly {
       width: 56px; height: 56px; border-radius: 14px;
