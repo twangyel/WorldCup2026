@@ -3512,10 +3512,9 @@ async function canAccessLeagues() {
     if (!enabled) return { allowed: false, reason: 'disabled' };
 
     if (isAdmin()) return { allowed: true, reason: 'admin' };
-    if (profile.fee_paid === true) return { allowed: true, reason: 'paid' };
     if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
 
-    return { allowed: false, reason: 'unpaid' };
+    return { allowed: false, reason: 'not_granted' };
 }
 
 // DEPRECATED: Use hasAdminLeagueAccess() or canAccessLeagues() instead
@@ -3609,10 +3608,10 @@ async function handleCreateLeagueClick() {
     if (!access.allowed) {
         if (access.reason === 'disabled') {
             showToast('Private leagues are coming soon! Stay tuned.', 'info');
-        } else if (access.reason === 'unpaid') {
-            showToast('Private leagues are invite-only. Tap "Ask admin" to request access.', 'warning');
+        } else if (access.reason === 'not_granted') {
+            showToast('League access not yet granted. Tap "Ask admin" to request access.', 'warning');
         } else {
-            showToast('Access denied. Please sign in or pay entry fee.', 'error');
+            showToast('Access denied. Please sign in to continue.', 'error');
         }
         return;
     }
@@ -3653,8 +3652,10 @@ async function handleJoinLeague() {
     if (!access.allowed) {
         if (access.reason === 'disabled') {
             showToast('Private leagues are coming soon! Stay tuned.', 'info');
+        } else if (access.reason === 'not_granted') {
+            showToast('League access not yet granted. Ask the admin to unlock private leagues for you.', 'warning');
         } else {
-            showToast('Private leagues are invite-only. Pay your entry fee or ask the admin for access.', 'warning');
+            showToast('Access denied. Please sign in to continue.', 'error');
         }
         return;
     }

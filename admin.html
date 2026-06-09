@@ -2436,9 +2436,8 @@ async function canAccessLeagues() {
   const enabled = await checkPrivateLeaguesEnabled();
   if (!enabled) return { allowed: false, reason: 'disabled' };
   if (isAdmin()) return { allowed: true, reason: 'admin' };
-  if (profile.fee_paid === true) return { allowed: true, reason: 'paid' };
   if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
-  return { allowed: false, reason: 'unpaid' };
+  return { allowed: false, reason: 'not_granted' };
 }
 
 async function getLeagueMembers(leagueId) {
