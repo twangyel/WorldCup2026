@@ -186,6 +186,7 @@ async function signUpUser(name, whatsapp, password) {
                 id: data.user.id,
                 email,           // synthesized — keeps the column populated
                 name: cleanName,
+                full_name: cleanName,
                 whatsapp: wa,
                 fee_paid: false,
                 role: 'user'
