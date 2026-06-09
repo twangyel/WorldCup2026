@@ -1138,6 +1138,11 @@ function msToCountdown(ms) {
         ? `<button onclick="exitPreviewMode()" class="fixture-save-btn tap" style="background:linear-gradient(135deg,#1E3A5F,#0B1221);">🔓 Sign in to predict</button>`
         : ''
 
+        // Submitted timestamp display
+const submittedStamp = (pred?.submitted_at && !previewMode)
+  ? `<div class="px-5 pb-3"><span class="submitted-stamp">Locked in ${relativeTimeAgo(pred.submitted_at)}</span></div>`
+  : ''
+
     return `
     <div class="glass-fixture relative" data-fixture="${f.id}">
       ${ptsBadge}
@@ -1161,8 +1166,9 @@ function msToCountdown(ms) {
 
       <div class="fixture-datetime">${dateStr} · ${timeStr}</div>
 
-      ${scoreSection}
+        ${scoreSection}
       ${saveBtn}
+      ${submittedStamp}
     </div>`
   }).join('')
 }
@@ -2459,6 +2465,15 @@ async function renderPredictionHistory() {
     const f = h.fixture
     const pts = h.pts
     const predicted = h.predicted
+    
+    // NEW: Format submitted_at timestamp in Bhutan time
+    const submittedAt = h.submitted_at 
+      ? new Date(h.submitted_at).toLocaleString('en-US', { 
+          timeZone: 'Asia/Thimphu',
+          month: 'short', day: 'numeric', 
+          hour: '2-digit', minute: '2-digit'
+        }) + ' (Bhutan)'
+      : null
 
     let statusBadge, scoreDisplay
 
@@ -2475,7 +2490,7 @@ async function renderPredictionHistory() {
       scoreDisplay = '<div class="flex items-center gap-2"><span class="text-sm font-bold ' + (pts > 0 ? 'text-ink-900' : 'text-ink-400') + '">' + h.home_prediction + ' – ' + h.away_prediction + '</span><span class="text-ink-300 text-xs">vs</span><span class="text-sm font-bold text-ink-900">' + f.home_score + ' – ' + f.away_score + '</span></div>'
     }
 
-    return '<div class="flex items-center gap-3 p-3 rounded-2xl ' + (h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border') + '"><div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 20) + '<span class="text-xs font-bold text-ink-400">vs</span>' + flagHtml(f.away_team, 20) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-ink-700 truncate">' + f.home_team + ' vs ' + f.away_team + '</span>' + statusBadge + '</div><div class="text-[11px] text-ink-500">' + new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage + '</div>' + (predicted ? '<div class="mt-1">' + scoreDisplay + '</div>' : '') + '</div></div>'
+    return '<div class="flex items-center gap-3 p-3 rounded-2xl ' + (h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border') + '"><div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 20) + '<span class="text-xs font-bold text-ink-400">vs</span>' + flagHtml(f.away_team, 20) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-ink-700 truncate">' + f.home_team + ' vs ' + f.away_team + '</span>' + statusBadge + '</div><div class="text-[11px] text-ink-500">' + new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage + '</div>' + (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Predicted: ' + submittedAt + '</div>' : '') + (predicted ? '<div class="mt-1">' + scoreDisplay + '</div>' : '') + '</div></div>'
   }).join('')
 }
 

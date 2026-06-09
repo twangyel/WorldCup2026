@@ -1682,7 +1682,8 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
       document.getElementById('fix-count').textContent = `${allFixtures.length} fixture${allFixtures.length === 1 ? '' : 's'}`
       if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => {
-        const localIso = new Date(f.kickoff).toISOString().slice(0, 16)
+               const d = new Date(f.kickoff)
+        const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
         const locked = f.home_score !== null
         return `
         <div class="px-5 py-4 space-y-3">
@@ -1712,7 +1713,9 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
     async function saveKickoff(id) {
       const val = pendingKickoffs[id]; if (!val) { showToast('No change', 'warning'); return }
       if (typeof updateFixtureKickoff !== 'function') { showToast('updateFixtureKickoff helper missing', 'error'); return }
-      const iso = new Date(val).toISOString()
+      // datetime-local gives local time without timezone — convert to UTC ISO
+const localDate = new Date(val)
+const iso = new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000).toISOString()
       const { error } = await updateFixtureKickoff(id, iso)
       if (error) return showToast(error.message, 'error')
       const f = allFixtures.find(x => x.id === id); if (f) f.kickoff = iso
