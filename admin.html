@@ -1512,17 +1512,21 @@ Good luck! ⚽🔥`
           console.warn('[ADMIN] Auth delete skipped (edge function unreachable):', e.message || e)
         }
 
-        // Step 2: Delete predictions first (FK safety)
-        const { error: predErr, data: predData } = await supabaseClient
-          .from('predictions')
-          .delete()
-          .eq('user_id', id)
-          .select()
-        if (predErr) {
-          console.error('[ADMIN] Predictions delete error:', predErr)
-        } else {
-          console.log('[ADMIN] Deleted predictions:', predData?.length || 0)
-        }
+        // Step 2: Delete dependent rows first (FK + leaderboard cleanup).
+        // prediction_results MUST be deleted or stale points keep showing on the leaderboard.
+        // league_memberships MUST be deleted or the user lingers as a ghost in private leagues.
+        const cleanup = await Promise.all([
+          supabaseClient.from('predictions').delete().eq('user_id', id).select(),
+          supabaseClient.from('prediction_results').delete().eq('user_id', id).select(),
+          supabaseClient.from('league_memberships').delete().eq('user_id', id).select()
+        ])
+        const [predRes, resultsRes, memRes] = cleanup
+        if (predRes.error)    console.error('[ADMIN] Predictions delete error:', predRes.error)
+        else                  console.log('[ADMIN] Deleted predictions:', predRes.data?.length || 0)
+        if (resultsRes.error) console.error('[ADMIN] prediction_results delete error:', resultsRes.error)
+        else                  console.log('[ADMIN] Deleted prediction_results:', resultsRes.data?.length || 0)
+        if (memRes.error)     console.error('[ADMIN] league_memberships delete error:', memRes.error)
+        else                  console.log('[ADMIN] Deleted league_memberships:', memRes.data?.length || 0)
 
         // Step 3: Delete profile row
         const { error: delErr, data: delData } = await supabaseClient
@@ -1532,11 +1536,17 @@ Good luck! ⚽🔥`
           .select()
         if (delErr) {
           console.error('[ADMIN] Profile delete error:', delErr)
-        } else {
-          console.log('[ADMIN] Profile delete result:', delData)
+          return { data: null, error: delErr }
+        }
+        console.log('[ADMIN] Profile delete result:', delData)
+
+        // Surface a partial-failure error so the UI doesn't claim success when child rows survived.
+        const childErr = predRes.error || resultsRes.error || memRes.error
+        if (childErr) {
+          return { data: delData, error: new Error('Profile removed but some related data could not be deleted: ' + (childErr.message || childErr)) }
         }
 
-        return { data: delData, error: null }
+        return { data: delData, error: null, authDeleted }
       } catch (e) {
         console.error('[ADMIN] removeUser exception:', e)
         return { data: null, error: e }

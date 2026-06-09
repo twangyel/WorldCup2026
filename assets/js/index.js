@@ -1303,9 +1303,10 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
     // ── Bonus Engine Helpers ──
 async function getLeaderboardFromResults() {
   // Fetch prediction_results and profiles separately (no FK relationship between them)
+  // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
   const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
     supabaseClient.from('prediction_results').select('*'),
-    supabaseClient.from('profiles').select('id, full_name, department')
+    supabaseClient.from('profiles').select('id, full_name, department, fee_paid').eq('fee_paid', true)
   ])
 
   // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
@@ -1349,7 +1350,9 @@ async function getLeaderboardFromResults() {
     profiles.forEach(p => { profileMap[p.id] = p })
   }
 
-  const userIds = [...new Set((results || []).map(r => r.user_id))]
+  // Only include user_ids that belong to a paid profile.
+  // This drops unpaid users (and unpaid admins) even if they have rows in prediction_results.
+  const userIds = [...new Set((results || []).map(r => r.user_id))].filter(uid => profileMap[uid])
   const stats = userIds.map(uid => {
     const userResults = results.filter(r => r.user_id === uid)
     let engineStats
