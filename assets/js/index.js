@@ -848,7 +848,7 @@ function showPaymentGate() {
           schema: 'public',
           table: 'profiles',
           filter: `id=eq.${user.id}`
-        }, (payload) => {
+        }, async (payload) => {
           if (payload.new?.fee_paid === true && payload.old?.fee_paid !== true) {
             showToast('Payment verified! Welcome aboard.', 'success')
             showNormalApp().then(() => switchTab('home'))
@@ -857,12 +857,23 @@ function showPaymentGate() {
             // Update cached profile so hasLeagueAccess() returns true on next render
             const cached = (typeof getProfile === 'function') ? getProfile() : null
             if (cached) cached.private_leagues_access = true
+            // Defensive: force fresh DB read in case getProfile() returns a fresh copy each call
+            try {
+              const { data: fresh } = await supabaseClient
+                .from('profiles').select('*').eq('id', user.id).single()
+              if (fresh && cached) Object.assign(cached, fresh)
+            } catch (e) { /* ignore */ }
             showToast('🎉 Private league access granted by admin!', 'success')
             if (typeof loadMyLeagues === 'function') loadMyLeagues()
           }
           if (payload.new?.private_leagues_access === false && payload.old?.private_leagues_access === true) {
             const cached = (typeof getProfile === 'function') ? getProfile() : null
             if (cached) cached.private_leagues_access = false
+            try {
+              const { data: fresh } = await supabaseClient
+                .from('profiles').select('*').eq('id', user.id).single()
+              if (fresh && cached) Object.assign(cached, fresh)
+            } catch (e) { /* ignore */ }
             showToast('Private league access has been revoked', 'info')
             if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('revoked')
             if (typeof loadMyLeagues === 'function') loadMyLeagues()
@@ -3720,26 +3731,53 @@ async function loadMyLeagues() {
             createBtn.textContent = '🔒 Locked'
             createBtn.classList.add('opacity-50', 'cursor-not-allowed')
             createBtn.classList.remove('tap')
-            createBtn.onclick = () => showToast('Pay your entry fee or ask the admin for access', 'warning')
+            createBtn.onclick = () => showToast('League access not yet granted — ask the admin', 'warning')
         }
         if (joinWrap) {
-            joinWrap.innerHTML = `
-                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
-                    <div class="text-2xl mb-2">🔒</div>
-                    <div class="text-sm font-bold text-amber-800">Invite-Only Access</div>
-                    <p class="text-xs text-amber-700 mt-1">Pay Nu. 500 entry fee, or request early access from the admin.</p>
-                    <div class="flex gap-2 mt-2 justify-center">
-                        <button onclick="switchTab('home')" class="bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl tap">Pay Entry Fee</button>
-                        <button onclick="askAdminForLeagueAccess()" class="bg-white border border-amber-300 text-amber-800 text-xs font-bold px-3 py-2 rounded-xl tap">Ask Admin</button>
+            const profile = (typeof getProfile === 'function') ? getProfile() : null
+            const isPaid = profile?.fee_paid === true
+            if (isPaid) {
+                // Paid users: only need admin grant — no pay button, no fee mention
+                joinWrap.innerHTML = `
+                    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+                        <div class="text-2xl mb-2">🔒</div>
+                        <div class="text-sm font-bold text-amber-800">Awaiting Admin Approval</div>
+                        <p class="text-xs text-amber-700 mt-1">Private leagues are unlocked individually. Tap below to ask the admin for access.</p>
+                        <div class="flex gap-2 mt-2 justify-center">
+                            <button onclick="askAdminForLeagueAccess()" class="bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl tap">Ask Admin</button>
+                        </div>
                     </div>
-                </div>
-            `
+                `
+            } else {
+                // Unpaid users: read dynamic fee instead of hardcoding 500
+                let feeLine = 'Pay your entry fee, or request early access from the admin.'
+                try {
+                    if (typeof getPrizeSettings === 'function') {
+                        const { data } = await getPrizeSettings()
+                        if (data?.entry_fee) {
+                            const cur = data.currency || 'Nu.'
+                            feeLine = `Pay ${cur} ${Number(data.entry_fee).toLocaleString()} entry fee, or request early access from the admin.`
+                        }
+                    }
+                } catch (e) { /* fall back to generic copy */ }
+                joinWrap.innerHTML = `
+                    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+                        <div class="text-2xl mb-2">🔒</div>
+                        <div class="text-sm font-bold text-amber-800">Invite-Only Access</div>
+                        <p class="text-xs text-amber-700 mt-1">${feeLine}</p>
+                        <div class="flex gap-2 mt-2 justify-center">
+                            <button onclick="switchTab('home')" class="bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl tap">Pay Entry Fee</button>
+                            <button onclick="askAdminForLeagueAccess()" class="bg-white border border-amber-300 text-amber-800 text-xs font-bold px-3 py-2 rounded-xl tap">Ask Admin</button>
+                        </div>
+                    </div>
+                `
+            }
         }
         container.innerHTML = `
             <div class="text-center py-4">
                 <div class="text-3xl mb-2 opacity-40">🏆</div>
                 <div class="text-sm font-semibold text-ink-700">Private Leagues</div>
-                <p class="text-xs text-ink-500 mt-1">Locked — paid members or admin-granted users only</p>
+                <p class="text-xs text-ink-500 mt-1">Locked — admin-granted users only</p>
             </div>`
         return
     }
