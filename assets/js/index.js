@@ -2443,17 +2443,30 @@ async function renderPredictionHistory() {
     }
   }
 
+  // Load this user's resolved results (with bonus breakdown) and index by fixture_id.
+  // Falls back silently if the table is empty / engine hasn't run yet.
+  let resultsByFixture = {}
+  try {
+    const results = await getUserResults(myId)
+    ;(results || []).forEach(r => { resultsByFixture[r.fixture_id] = r })
+  } catch (e) {
+    console.warn('[history] could not load prediction_results, using legacy points:', e)
+  }
+
   const history = predictions
     .map(p => {
       const f = fixtures.find(x => x.id === p.fixture_id)
       if (!f) return null
       const hasResult = f.home_score !== null && f.away_score !== null
-      const pts = p.points_awarded || 0
+      const resultRow = resultsByFixture[p.fixture_id] || null
+      // Prefer the engine's final_points if present; fall back to legacy points_awarded.
+      const pts = resultRow?.final_points ?? p.points_awarded ?? 0
       return {
         ...p,
         fixture: f,
         hasResult,
         pts,
+        resultRow,
         predicted: p.home_prediction !== null && p.away_prediction !== null
       }
     })
@@ -2475,17 +2488,18 @@ async function renderPredictionHistory() {
     const f = h.fixture
     const pts = h.pts
     const predicted = h.predicted
-    
+    const r = h.resultRow // may be null for legacy / unscored
+
     // NEW: Format submitted_at timestamp in Bhutan time
-    const submittedAt = h.submitted_at 
-      ? new Date(h.submitted_at).toLocaleString('en-US', { 
+    const submittedAt = h.submitted_at
+      ? new Date(h.submitted_at).toLocaleString('en-US', {
           timeZone: 'Asia/Thimphu',
-          month: 'short', day: 'numeric', 
+          month: 'short', day: 'numeric',
           hour: '2-digit', minute: '2-digit'
         }) + ' (Bhutan)'
       : null
 
-    let statusBadge, scoreDisplay
+    let statusBadge, scoreDisplay, breakdownLine = ''
 
     if (!predicted) {
       statusBadge = '<span class="text-[10px] font-bold bg-gray-100 text-gray-400 px-2 py-1 rounded-full">MISSED</span>'
@@ -2494,13 +2508,49 @@ async function renderPredictionHistory() {
       statusBadge = '<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full">PENDING</span>'
       scoreDisplay = '<span class="text-sm font-bold text-ink-900">' + h.home_prediction + ' – ' + h.away_prediction + '</span>'
     } else {
-      const ptsColor = pts === 5 ? 'bg-emerald-500 text-white' : pts === 3 ? 'bg-blue-500 text-white' : pts === 2 ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-500'
-      const ptsLabel = pts === 5 ? '+5 EXACT' : pts === 3 ? '+3 GD' : pts === 2 ? '+2 WIN' : '0 PTS'
+      // Badge tier should reflect prediction skill (base_points), not the multiplied total.
+      // An exact score in the Final = 12.5 final pts but still "EXACT" tier.
+      const basePts = r?.base_points ?? pts
+      const ptsColor = basePts === 5 ? 'bg-emerald-500 text-white'
+                     : basePts === 3 ? 'bg-blue-500 text-white'
+                     : basePts === 2 ? 'bg-amber-500 text-white'
+                     : 'bg-gray-200 text-gray-500'
+      // Show the FINAL number on the badge so players see the real points they earned
+      const ptsLabel = basePts === 5 ? '+' + pts + ' EXACT'
+                     : basePts === 3 ? '+' + pts + ' GD'
+                     : basePts === 2 ? '+' + pts + ' WIN'
+                     : '0 PTS'
       statusBadge = '<span class="text-[10px] font-bold ' + ptsColor + ' px-2 py-1 rounded-full">' + ptsLabel + '</span>'
       scoreDisplay = '<div class="flex items-center gap-2"><span class="text-sm font-bold ' + (pts > 0 ? 'text-ink-900' : 'text-ink-400') + '">' + h.home_prediction + ' – ' + h.away_prediction + '</span><span class="text-ink-300 text-xs">vs</span><span class="text-sm font-bold text-ink-900">' + f.home_score + ' – ' + f.away_score + '</span></div>'
+
+      // Build the breakdown line — only show if something interesting happened
+      // (a stage multiplier above 1× or any bonus). Skip pure base-points rows.
+      if (r && basePts > 0) {
+        const parts = []
+        const mult = r.stage_multiplier || 1
+        const multBase = r.multiplied_base ?? basePts
+        if (mult !== 1) {
+          parts.push(basePts + ' base × ' + mult + '× = ' + multBase)
+        } else {
+          parts.push(basePts + ' base')
+        }
+        // Bonuses from the breakdown array, skipping the 'stage_multiplier' entry
+        // (we already represented it above).
+        const bonusItems = (r.bonus_breakdown || []).filter(b => b.type !== 'stage_multiplier')
+        bonusItems.forEach(b => {
+          parts.push((b.emoji || '') + ' ' + b.label + ' +' + b.value)
+        })
+        // Only render if there was a multiplier OR at least one bonus
+        if (mult !== 1 || bonusItems.length > 0) {
+          breakdownLine = '<div class="text-[10px] text-ink-500 mt-1 leading-snug">' +
+            parts.join(' &nbsp;·&nbsp; ') +
+            ' &nbsp;=&nbsp; <b class="text-ink-700">' + pts + ' pts</b>' +
+            '</div>'
+        }
+      }
     }
 
-    return '<div class="flex items-center gap-3 p-3 rounded-2xl ' + (h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border') + '"><div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 20) + '<span class="text-xs font-bold text-ink-400">vs</span>' + flagHtml(f.away_team, 20) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-ink-700 truncate">' + f.home_team + ' vs ' + f.away_team + '</span>' + statusBadge + '</div><div class="text-[11px] text-ink-500">' + new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage + '</div>' + (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Predicted: ' + submittedAt + '</div>' : '') + (predicted ? '<div class="mt-1">' + scoreDisplay + '</div>' : '') + '</div></div>'
+    return '<div class="flex items-center gap-3 p-3 rounded-2xl ' + (h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border') + '"><div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 20) + '<span class="text-xs font-bold text-ink-400">vs</span>' + flagHtml(f.away_team, 20) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-ink-700 truncate">' + f.home_team + ' vs ' + f.away_team + '</span>' + statusBadge + '</div><div class="text-[11px] text-ink-500">' + new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage + '</div>' + (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Predicted: ' + submittedAt + '</div>' : '') + (predicted ? '<div class="mt-1">' + scoreDisplay + '</div>' : '') + breakdownLine + '</div></div>'
   }).join('')
 }
 
