@@ -2602,7 +2602,10 @@ showToast('Opening WhatsApp...', 'success')
 }
 
 // ============== BADGES (Feature 2) ==============
-    function computeMyBadges() {
+    // resultsByFixture (optional): { [fixture_id]: prediction_results row }
+    // When provided, we use the engine's real points (base_points / final_points)
+    // for streak detection. Without it, we fall back to legacy predictions.points_awarded.
+    function computeMyBadges(resultsByFixture = {}) {
       // Inputs: predictions[] (current user), fixtures[], + leaderboard stats fetched separately
       const earned = new Set()
       const myId = getUser()?.id
@@ -2635,17 +2638,31 @@ showToast('Opening WhatsApp...', 'success')
       })
       if (earlyBird) earned.add('earlybird')
 
-      // On Fire: current streak of 3+ point-scoring predictions in finished matches
+      // On Fire: current streak of 3+ point-scoring predictions in finished matches.
+      // FIX: prefer prediction_results.base_points (the engine's source of truth).
+      // Falls back to legacy predictions.points_awarded only if no result row exists.
       let streak = 0
       for (let i = finishedPreds.length - 1; i >= 0; i--) {
-        if ((finishedPreds[i].p.points_awarded || 0) > 0) streak++
+        const { p, f } = finishedPreds[i]
+        const r = resultsByFixture[f.id]
+        const scored = r
+          ? (r.base_points || 0) > 0
+          : (p.points_awarded || 0) > 0
+        if (scored) streak++
         else break
       }
       if (streak >= 3) earned.add('streak')
 
-      // All In: predicted every match that has either finished or has a prediction window
-      const predictableFixtures = fixtures.filter(f => predictions.find(p => p.fixture_id === f.id))
-      if (fixtures.length > 0 && predictableFixtures.length === fixtures.length) earned.add('allin')
+      // All In: predicted every FINISHED match (relaxed from "every fixture ever").
+      // FIX: original required predictions.length === fixtures.length, which broke
+      // whenever knockout fixtures were added mid-tournament. Now: if every match
+      // that has resolved has a prediction from this user, they've gone all in so far.
+      if (finishedPreds.length > 0) {
+        const missedAny = finishedPreds.some(({ p }) =>
+          p.home_prediction === null || p.away_prediction === null
+        )
+        if (!missedAny) earned.add('allin')
+      }
 
       return { earned, streak, exactCount }
     }
@@ -2655,12 +2672,24 @@ showToast('Opening WhatsApp...', 'success')
       const streakEl = document.getElementById('profile-streak')
       if (!host) return
 
-      const { earned, streak } = computeMyBadges()
+      // Load this user's prediction_results so On Fire / streak use the engine's
+      // real points (base_points), not the legacy predictions.points_awarded field.
+      const myId = getUser()?.id
+      let resultsByFixture = {}
+      if (myId) {
+        try {
+          const results = await getUserResults(myId)
+          ;(results || []).forEach(r => { resultsByFixture[r.fixture_id] = r })
+        } catch (e) {
+          console.warn('[badges] could not load prediction_results, using legacy points:', e)
+        }
+      }
+
+      const { earned, streak } = computeMyBadges(resultsByFixture)
 
       // Champion + Centurion need leaderboard data
       try {
         const { data: stats } = await getLeaderboardFromResults()
-        const myId = getUser()?.id
         if (stats?.length) {
           const sorted = [...stats].sort((a, b) => (b.points || 0) - (a.points || 0))
           const me = sorted.find(s => s.user_id === myId || s.id === myId)
