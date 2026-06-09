@@ -3158,37 +3158,53 @@ async function getSystemSettings() {
 
 // ============== PRIVATE LEAGUE FUNCTIONS ==============
 async function createLeague(name) {
-  const user = getUser();
-  if (!user) throw new Error('Not authenticated');
+    const user = getUser();
+    if (!user) throw new Error('Not authenticated');
 
-  // Generate a unique 6-character invite code
-  let inviteCode;
-  let attempts = 0;
-  do {
-    inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const { data: existing } = await supabaseClient
-      .from('leagues')
-      .select('id')
-      .eq('invite_code', inviteCode)
-      .single();
-    if (!existing) break;
-    attempts++;
-  } while (attempts < 10);
+    // Generate unique invite code
+    let inviteCode;
+    let attempts = 0;
+    do {
+        inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const { data: existing } = await supabaseClient
+            .from('leagues')
+            .select('id')
+            .eq('invite_code', inviteCode)
+            .single();
+        if (!existing) break;
+        attempts++;
+    } while (attempts < 10);
 
-  if (attempts >= 10) throw new Error('Failed to generate unique code');
+    if (attempts >= 10) throw new Error('Failed to generate unique code');
 
-  const { data, error } = await supabaseClient
-    .from('leagues')
-    .insert({
-      name: name,
-      invite_code: inviteCode,
-      created_by: user.id,
-    })
-    .select()
-    .single();
+    // Create league
+    const { data: league, error: leagueError } = await supabaseClient
+        .from('leagues')
+        .insert({
+            name: name,
+            invite_code: inviteCode,
+            created_by: user.id,
+        })
+        .select()
+        .single();
 
-  if (error) throw error;
-  return { data, error: null };
+    if (leagueError) throw leagueError;
+
+    // CRITICAL: Add creator as first member so they can see their own league
+    const { error: memberError } = await supabaseClient
+        .from('league_memberships')
+        .insert({
+            league_id: league.id,
+            user_id: user.id
+        });
+
+    if (memberError) {
+        console.error('Auto-membership failed:', memberError);
+        // League exists but creator can't see it — warn but don't fail
+        showToast('League created! Refresh if not visible.', 'warning');
+    }
+
+    return { data: league, error: null };
 }
 
 async function joinLeagueByCode(inviteCode) {
@@ -3577,17 +3593,50 @@ function shareLeagueCode(leagueId, code, name) {
 
 
 async function getLeagueMembers(leagueId) {
-    const { data, error } = await supabaseClient
+    // Step 1: Get all user_ids from league_memberships
+    const { data: memberships, error: membershipError } = await supabaseClient
         .from('league_memberships')
-        .select('user_id, profiles:user_id (id, full_name, name, department, avatar_url)')
+        .select('user_id')
         .eq('league_id', leagueId);
-    if (error) return { data: null, error };
-    const members = (data || []).map(row => ({
-        id: row.user_id,
-        name: row.profiles?.full_name || row.profiles?.name || 'Anonymous',
-        department: row.profiles?.department || '',
-        avatar_url: row.profiles?.avatar_url || null
-    }));
+    
+    if (membershipError) {
+        console.error('getLeagueMembers: membership error', membershipError);
+        return { data: null, error: membershipError };
+    }
+    
+    if (!memberships || memberships.length === 0) {
+        return { data: [], error: null };
+    }
+    
+    const userIds = memberships.map(m => m.user_id);
+    
+    // Step 2: Fetch profiles separately (avoids RLS issues with nested select)
+    const { data: profiles, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('id, full_name, name, department, avatar_url')
+        .in('id', userIds);
+    
+    if (profileError) {
+        console.error('getLeagueMembers: profile error', profileError);
+        return { data: null, error: profileError };
+    }
+    
+    // Build a lookup map
+    const profileMap = {};
+    (profiles || []).forEach(p => {
+        profileMap[p.id] = p;
+    });
+    
+    const members = memberships.map(row => {
+        const p = profileMap[row.user_id] || {};
+        return {
+            id: row.user_id,
+            name: p.full_name || p.name || 'Anonymous',
+            department: p.department || '',
+            avatar_url: p.avatar_url || null
+        };
+    });
+    
     return { data: members, error: null };
 }
 
@@ -3597,7 +3646,7 @@ async function getLeagueMembers(leagueId) {
 async function getLeagueLeaderboard(leagueId) {
     // Get all members of this league
     const { data: members, error: membersError } = await getLeagueMembers(leagueId)
-    if (membersError || !members?.length) return []
+    if (membersError || !members?.length) return { data: [], error: membersError }
 
     const userIds = members.map(m => m.id)
 
@@ -3635,12 +3684,14 @@ async function getLeagueLeaderboard(leagueId) {
     })
 
     // Sort by points desc, then exact, then gd, then result
-    return Object.values(stats).sort((a, b) => {
+    const result = Object.values(stats).sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points
         if (b.exact !== a.exact) return b.exact - a.exact
         if (b.gd !== a.gd) return b.gd - a.gd
         return b.result - a.result
     })
+
+    return { data: result, error: null }
 }
 
 // ============== LEAGUE LEADERBOARD OVERRIDE ==============
