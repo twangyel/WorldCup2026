@@ -418,6 +418,26 @@
           </div>
           <div id="admin-fixtures" class="divide-y divide-paper-border"></div>
         </div>
+
+        <!-- Recalculate All Bonuses -->
+        <div class="card overflow-hidden mt-4">
+          <div class="p-5">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg shrink-0">🔧</div>
+              <div class="flex-1">
+                <h2 class="font-bold text-base tracking-tight">Recalculate All Bonuses</h2>
+                <p class="text-xs text-ink-500 mt-0.5 leading-relaxed">
+                  Replays every player's match history in kickoff order and rebuilds streaks, combos, and multipliers. Use this if scores were entered out of order, or before declaring the final leaderboard.
+                </p>
+              </div>
+            </div>
+            <button id="recalc-all-btn" onclick="confirmRecalcAll()"
+              class="w-full bg-ink-900 text-white font-semibold py-3 rounded-2xl tap flex items-center justify-center gap-2">
+              <span id="recalc-all-label">Recalculate All Bonuses</span>
+              <span id="recalc-all-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- PRIZE -->
@@ -1026,6 +1046,54 @@ function calculatePoints(predHome, predAway, actualHome, actualAway) {
 async function awardPointsForFixture(fixtureId, actualHome, actualAway) {
   // Use bonus engine to calculate and save all points with streaks, combos & multipliers
   await BonusEngine.awardPointsWithBonuses(fixtureId, actualHome, actualAway)
+}
+
+// ============== RECALC ALL BONUSES (admin nuclear option) ==============
+function confirmRecalcAll() {
+  if (typeof BonusEngine === 'undefined' || !BonusEngine.recalculateAllBonuses) {
+    showToast('Bonus engine not loaded', 'error')
+    return
+  }
+  showModal({
+    icon: '🔧',
+    title: 'Recalculate all bonuses?',
+    message: 'This replays every player\'s match history and rewrites streak, combo, and multiplier points. The leaderboard may shift. Safe to run, but cannot be undone — proceed?',
+    actions: [
+      { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+      { text: 'Recalculate', onclick: 'hideModal(); executeRecalcAll()', class: 'bg-ink-900 text-white' }
+    ]
+  })
+}
+
+async function executeRecalcAll() {
+  const btn = document.getElementById('recalc-all-btn')
+  const label = document.getElementById('recalc-all-label')
+  const spinner = document.getElementById('recalc-all-spinner')
+
+  if (btn) btn.disabled = true
+  if (btn) btn.classList.add('opacity-60', 'pointer-events-none')
+  if (label) label.textContent = 'Recalculating…'
+  if (spinner) spinner.classList.remove('hidden')
+
+  try {
+    const result = await BonusEngine.recalculateAllBonuses()
+    const { users = 0, updated = 0, errors = 0 } = result || {}
+    if (errors > 0) {
+      showToast(`Done with ${errors} error${errors === 1 ? '' : 's'}. ${updated} row${updated === 1 ? '' : 's'} updated across ${users} player${users === 1 ? '' : 's'}. Check console.`, 'error')
+    } else if (updated === 0) {
+      showToast(`All ${users} player${users === 1 ? '' : 's'} already in sync — nothing to update.`, 'success')
+    } else {
+      showToast(`Recalculated ${users} player${users === 1 ? '' : 's'}, ${updated} row${updated === 1 ? '' : 's'} updated.`, 'success')
+    }
+  } catch (err) {
+    console.error('[recalc-all] Failed:', err)
+    showToast('Recalculation failed. Check console for details.', 'error')
+  } finally {
+    if (btn) btn.disabled = false
+    if (btn) btn.classList.remove('opacity-60', 'pointer-events-none')
+    if (label) label.textContent = 'Recalculate All Bonuses'
+    if (spinner) spinner.classList.add('hidden')
+  }
 }
 
     // ============== INIT ==============

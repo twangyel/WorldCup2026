@@ -506,8 +506,9 @@ function aggregateUserStats(userId, allMatchResults) {
     else if (m.base_points === 2) stats.result++;
     else stats.wrong++;
 
-    // Streak tracking
-    if (m.final_points > 0) {
+    // Streak tracking — must use base_points to stay consistent with calculateStreak()
+    // (a 0-base-points match shouldn't count toward a streak even if bonuses somehow appear)
+    if (m.base_points > 0) {
       currentStreak++;
       bestStreak = Math.max(bestStreak, currentStreak);
     } else {
@@ -699,11 +700,141 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
 
       if (upsertError) {
         console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
+      } else {
+        // FIX (out-of-order scoring): if any LATER match was already scored,
+        // its streak/combo was computed without this match in history.
+        // Recalculate this user's downstream bonuses to heal the chain.
+        try {
+          await recalculateUserBonuses(pred.user_id);
+        } catch (recalcErr) {
+          console.error(`[recalc] downstream heal failed for ${pred.user_id}:`, recalcErr);
+        }
       }
     } catch (err) {
       console.error(`Failed to process prediction ${pred.id}:`, err);
     }
   }
+}
+
+// ============== RECALCULATION (out-of-order scoring fix) ==============
+
+/**
+ * Recompute streak + combo + multiplier for ALL of a user's resolved matches
+ * in chronological order. Use this after any score entry, or as a manual
+ * "Recalculate all bonuses" admin action.
+ *
+ * Why this exists:
+ * Streaks and combos depend on the order matches resolve. If an admin scores
+ * Match 5 before Match 4, Match 5's streak was computed without Match 4.
+ * This function rebuilds the chain correctly by clearing all bonus fields
+ * and replaying every match for the user in kickoff order.
+ *
+ * @param {string} userId
+ * @returns {Promise<{updated: number, errors: number}>}
+ */
+async function recalculateUserBonuses(userId) {
+  // 1. Load all of this user's resolved results, oldest first
+  const { data: results, error } = await supabaseClient
+    .from('prediction_results')
+    .select('*')
+    .eq('user_id', userId)
+    .order('kickoff', { ascending: true });
+
+  if (error) {
+    console.error(`[recalc] Failed to load results for ${userId}:`, error);
+    return { updated: 0, errors: 1 };
+  }
+  if (!results?.length) return { updated: 0, errors: 0 };
+
+  // 2. Walk through chronologically, rebuilding history as we go
+  const rebuiltHistory = [];
+  let updated = 0, errors = 0;
+
+  for (const r of results) {
+    try {
+      const fresh = calculateFullPoints({
+        fixtureId: r.fixture_id,
+        userId: r.user_id,
+        stage: r.stage || '',
+        kickoff: r.kickoff,
+        matchdayKey: r.matchday_key || getMatchdayKey(r.kickoff),
+        predHome: r.home_prediction,
+        predAway: r.away_prediction,
+        actualHome: r.actual_home, // may be null if not stored — base_points already has the answer
+        actualAway: r.actual_away,
+        basePoints: r.base_points
+      }, rebuiltHistory);
+
+      // Only write back if something actually changed (avoid churn)
+      const changed = (
+        fresh.streak_bonus !== r.streak_bonus ||
+        fresh.combo_bonus !== r.combo_bonus ||
+        fresh.multiplied_base !== r.multiplied_base ||
+        fresh.final_points !== r.final_points
+      );
+
+      if (changed) {
+        const { error: upErr } = await supabaseClient
+          .from('prediction_results')
+          .update({
+            stage_multiplier: fresh.stage_multiplier,
+            multiplied_base: fresh.multiplied_base,
+            streak_bonus: fresh.streak_bonus,
+            combo_bonus: fresh.combo_bonus,
+            total_bonus: fresh.total_bonus,
+            final_points: fresh.final_points,
+            streak_count: fresh.streak_count,
+            streak_tier: fresh.streak_tier,
+            combos_earned: fresh.combos_earned,
+            bonus_breakdown: fresh.bonus_breakdown
+          })
+          .eq('prediction_id', r.prediction_id);
+
+        if (upErr) {
+          console.error(`[recalc] Update failed for ${r.prediction_id}:`, upErr);
+          errors++;
+        } else {
+          updated++;
+        }
+      }
+
+      // Push the FRESH result into history for the next iteration
+      rebuiltHistory.push(fresh);
+    } catch (err) {
+      console.error(`[recalc] Failed on result ${r.prediction_id}:`, err);
+      errors++;
+      // Still push original into history so chain doesn't break
+      rebuiltHistory.push(r);
+    }
+  }
+
+  return { updated, errors };
+}
+
+/**
+ * Recalculate bonuses for EVERY user. Use sparingly — this is the
+ * "nuclear option" admin button. Safe to run; just slow with many users.
+ */
+async function recalculateAllBonuses() {
+  const { data: users, error } = await supabaseClient
+    .from('prediction_results')
+    .select('user_id');
+
+  if (error || !users) {
+    console.error('[recalc-all] Failed to load users:', error);
+    return { users: 0, updated: 0, errors: 1 };
+  }
+
+  const uniqueUserIds = [...new Set(users.map(u => u.user_id))];
+  let totalUpdated = 0, totalErrors = 0;
+
+  for (const uid of uniqueUserIds) {
+    const { updated, errors } = await recalculateUserBonuses(uid);
+    totalUpdated += updated;
+    totalErrors += errors;
+  }
+
+  return { users: uniqueUserIds.length, updated: totalUpdated, errors: totalErrors };
 }
 
 // ============== EXPORTS ==============
@@ -716,7 +847,9 @@ const BonusEngine = {
   getMatchdayKey,
   calculateStreak,
   createMatchResult,
-  awardPointsWithBonuses
+  awardPointsWithBonuses,
+  recalculateUserBonuses,
+  recalculateAllBonuses
 };
 
 // Browser global

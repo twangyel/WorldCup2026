@@ -1292,13 +1292,17 @@ async function getLeaderboardFromResults() {
       if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
         engineStats = BonusEngine.aggregateUserStats(uid, userResults)
       } else {
-        // Fallback: calculate stats manually if BonusEngine is not loaded
+        // Fallback: calculate stats manually if BonusEngine is not loaded.
+        // IMPORTANT: tier classification (exact/gd/result) must check base_points,
+        // because final_points includes the stage multiplier. An exact score in the
+        // Semi Final has final_points = 10 (5 × 2), not 5 — we'd miscount it as "wrong" otherwise.
         let points = 0, exact = 0, gd = 0, result = 0
         userResults.forEach(r => {
           points += r.final_points || r.points_awarded || 0
-          if (r.final_points === 5 || r.points_awarded === 5) exact++
-          else if (r.final_points === 3 || r.points_awarded === 3) gd++
-          else if (r.final_points === 2 || r.points_awarded === 2) result++
+          const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)
+          if (base === 5) exact++
+          else if (base === 3) gd++
+          else if (base === 2) result++
         })
         engineStats = { points, exact, gd, result, total_predictions: userResults.length }
       }
@@ -3825,9 +3829,11 @@ async function getLeagueLeaderboard(leagueId) {
         const s = stats[r.user_id]
         if (!s) return
         s.points += r.final_points || r.points_awarded || 0
-        if ((r.final_points || r.points_awarded || 0) === 5) s.exact++
-        else if ((r.final_points || r.points_awarded || 0) === 3) s.gd++
-        else if ((r.final_points || r.points_awarded || 0) === 2) s.result++
+        // Tier classification must use base_points (final_points includes stage multiplier)
+        const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)
+        if (base === 5) s.exact++
+        else if (base === 3) s.gd++
+        else if (base === 2) s.result++
         s.total_predictions++
     })
 
