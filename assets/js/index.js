@@ -1330,7 +1330,7 @@ async function getLeaderboardFromResults() {
   // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
   const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
     supabaseClient.from('prediction_results').select('*'),
-    supabaseClient.from('profiles').select('id, full_name, department, fee_paid').eq('fee_paid', true)
+    supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid').eq('fee_paid', true)
   ])
 
   // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
@@ -1354,8 +1354,8 @@ async function getLeaderboardFromResults() {
       const stats = profiles.map(p => ({
         user_id: p.id,
         id: p.id,
-        name: p.full_name || 'Unknown',
-        full_name: p.full_name || 'Unknown',
+        name: p.full_name || p.name || 'Unknown',
+        full_name: p.full_name || p.name || 'Unknown',
         department: p.department || '',
         points: 0,
         exact: 0,
@@ -1405,8 +1405,8 @@ async function getLeaderboardFromResults() {
     const profile = profileMap[uid] || {}
     return {
       user_id: uid,
-      name: profile.full_name || 'Unknown',
-      full_name: profile.full_name || 'Unknown',
+      name: profile.full_name || profile.name || 'Unknown',
+      full_name: profile.full_name || profile.name || 'Unknown',
       department: profile.department || '',
       ...engineStats
     }
