@@ -2068,6 +2068,31 @@ async function loadLeaderboard() {
   supabaseClient.channel('prize-pool')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
       console.log('[Realtime] Profile change detected:', payload.eventType, payload.new?.id)
+
+      // Detect admin revoking this user's paid status while they're in the app.
+      // The 'payment-status-' channel only runs while on the gate, so paid users
+      // already inside the app rely on this listener to catch the revoke.
+      const myId = (typeof getUser === 'function') ? getUser()?.id : null
+      if (
+        myId &&
+        payload.eventType === 'UPDATE' &&
+        payload.new?.id === myId &&
+        payload.new?.fee_paid === false &&
+        payload.old?.fee_paid === true
+      ) {
+        const cached = (typeof getProfile === 'function') ? getProfile() : null
+        if (cached) cached.fee_paid = false
+        showModal({
+          icon: '🔒',
+          title: 'Payment status revoked',
+          message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
+          actions: [
+            { text: 'OK', onclick: 'hideModal(); if (typeof signOut === "function") signOut()', class: 'bg-red-600 text-white' }
+          ]
+        })
+        return
+      }
+
       loadHome()
       loadLeaderboard()
     })
