@@ -734,6 +734,13 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       requestAnimationFrame(() => { if (typeof signOut === 'function') signOut() })
     }
 
+    // Used by the "Payment status revoked" modal. Named helper avoids putting
+    // quotes inside an inline onclick string (which would close the attribute).
+    function beginRevokeSignOut() {
+      hideModal()
+      requestAnimationFrame(() => { if (typeof signOut === 'function') signOut() })
+    }
+
     async function handleSaveProfile() {
       const updates = {
         name: document.getElementById('profile-name').value,
@@ -863,7 +870,7 @@ function showPaymentGate() {
               title: 'Payment status revoked',
               message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
               actions: [
-                { text: 'OK', onclick: 'hideModal(); if (typeof signOut === "function") signOut()', class: 'bg-red-600 text-white' }
+                { text: 'OK', onclick: 'beginRevokeSignOut()', class: 'bg-red-600 text-white' }
               ]
             })
           }
@@ -2090,7 +2097,7 @@ async function loadLeaderboard() {
           title: 'Payment status revoked',
           message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
           actions: [
-            { text: 'OK', onclick: 'hideModal(); if (typeof signOut === "function") signOut()', class: 'bg-red-600 text-white' }
+            { text: 'OK', onclick: 'beginRevokeSignOut()', class: 'bg-red-600 text-white' }
           ]
         })
         return
