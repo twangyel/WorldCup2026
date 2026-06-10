@@ -1922,7 +1922,7 @@ async function loadLeaderboard() {
         // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
 
         // Matchday tab uses simpler stats
-        const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0
+        const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0 || (s.wrong || 0) > 0
         const statsLineOverall = hasAnyStats
           ? `<span><b class="text-ink-900">${correct}</b> correct</span>
              <span class="text-ink-300">·</span>
