@@ -1994,7 +1994,7 @@ document.getElementById('csv-input').value = '';
 
       // Find the single next upcoming match (not yet scored, earliest kickoff in future)
       const upcoming = allFixtures
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .filter(f => f.home_score === null)
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
       const nextMatchId = upcoming[0]?.id || null
 
@@ -2011,8 +2011,10 @@ document.getElementById('csv-input').value = '';
         const isNext = f.id === nextMatchId
         const hasScore = f.home_score !== null && f.away_score !== null
         const timeLocked = new Date() >= new Date(f.kickoff)
-        // Only the next upcoming match is editable. Everything else is locked.
-        const locked = !isNext || timeLocked
+        // Only the next unscored match is editable. Past-kickoff is FINE —
+        // that's exactly when you'd be entering the result. `timeLocked` is
+        // kept only for the visual "PAST — needs score" badge.
+        const locked = !isNext
 
         // Status badge
         let statusBadge
@@ -2085,7 +2087,7 @@ document.getElementById('csv-input').value = '';
       // Enforce: only the next upcoming match can be scored
       const now = new Date()
       const upcoming = allFixtures
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .filter(f => f.home_score === null)
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
       const nextMatchId = upcoming[0]?.id
       if (id !== nextMatchId) {
@@ -2126,7 +2128,7 @@ async function executeSaveScore(id) {
   // Double-check: only the next upcoming match can be scored
   const now = new Date()
   const upcoming = allFixtures
-    .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+    .filter(f => f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
   const nextMatchId = upcoming[0]?.id
   if (id !== nextMatchId) {
