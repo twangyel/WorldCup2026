@@ -140,8 +140,21 @@ async function signInUser(whatsapp, password) {
     if (!isValidWhatsapp(whatsapp)) {
         return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
     }
+    const digits = String(whatsapp).replace(/\D/g, '')
     const email = whatsappToEmail(whatsapp)
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
+    let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
+
+    // Backwards-compat: legacy Bhutan accounts were stored with '975' auto-prepended.
+    // If user typed only the 8-digit local number, retry with '975' prefix.
+    if (!data?.session && digits.length === 8) {
+        const legacyEmail = `975${digits}@wa.predict.local`
+        const retry = await supabaseClient.auth.signInWithPassword({ email: legacyEmail, password })
+        if (retry.data?.session) {
+            data = retry.data
+            error = null
+        }
+    }
+
     if (data?.session) {
         currentUser = data.user
         await loadProfile()
