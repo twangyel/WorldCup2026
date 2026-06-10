@@ -2679,30 +2679,36 @@ async function renderPredictionHistory() {
       statusBadge = '<span class="text-[10px] font-bold ' + ptsColor + ' px-2 py-1 rounded-full">' + ptsLabel + '</span>'
       scoreDisplay = '<div class="flex items-center gap-2"><span class="text-sm font-bold ' + (pts > 0 ? 'text-ink-900' : 'text-ink-400') + '">' + h.home_prediction + ' – ' + h.away_prediction + '</span><span class="text-ink-300 text-xs">vs</span><span class="text-sm font-bold text-ink-900">' + f.home_score + ' – ' + f.away_score + '</span></div>'
 
-      // Build the breakdown line — only show if something interesting happened
-      // (a stage multiplier above 1× or any bonus). Skip pure base-points rows.
-      if (r && basePts > 0) {
+      // Build the breakdown line — show for EVERY scored prediction so players
+      // always understand where their points came from (or why they got zero).
+      if (r) {
         const parts = []
         const mult = r.stage_multiplier || 1
         const multBase = r.multiplied_base ?? basePts
-        if (mult !== 1) {
-          parts.push(basePts + ' base × ' + mult + '× = ' + multBase)
+
+        // Label the base tier so it's not just a bare number
+        let baseLabel
+        if (basePts === 5) baseLabel = '5 (exact)'
+        else if (basePts === 3) baseLabel = '3 (goal diff)'
+        else if (basePts === 2) baseLabel = '2 (winner)'
+        else baseLabel = '0 (wrong)'
+
+        if (mult !== 1 && basePts > 0) {
+          parts.push(baseLabel + ' × ' + mult + '× = ' + multBase)
         } else {
-          parts.push(basePts + ' base')
+          parts.push(baseLabel)
         }
-        // Bonuses from the breakdown array, skipping the 'stage_multiplier' entry
-        // (we already represented it above).
+
+        // Bonuses (skip the 'stage_multiplier' entry — already shown above)
         const bonusItems = (r.bonus_breakdown || []).filter(b => b.type !== 'stage_multiplier')
         bonusItems.forEach(b => {
           parts.push((b.emoji || '') + ' ' + b.label + ' +' + b.value)
         })
-        // Only render if there was a multiplier OR at least one bonus
-        if (mult !== 1 || bonusItems.length > 0) {
-          breakdownLine = '<div class="text-[10px] text-ink-500 mt-1 leading-snug">' +
-            parts.join(' &nbsp;·&nbsp; ') +
-            ' &nbsp;=&nbsp; <b class="text-ink-700">' + pts + ' pts</b>' +
-            '</div>'
-        }
+
+        breakdownLine = '<div class="text-[10px] text-ink-500 mt-1 leading-snug">' +
+          parts.join(' &nbsp;·&nbsp; ') +
+          ' &nbsp;=&nbsp; <b class="' + (pts > 0 ? 'text-ink-700' : 'text-ink-400') + '">' + pts + ' pts</b>' +
+          '</div>'
       }
     }
 
