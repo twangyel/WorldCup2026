@@ -478,14 +478,16 @@ function saveRememberMe(whatsapp, checked) {
 
 // Check if WhatsApp number is already registered
 // ============== WHATSAPP VALIDATION ==============
+// Accept any international WhatsApp number. Users must include the country
+// code. E.164 allows up to 15 digits; minimum 7 covers the shortest valid
+// national numbering plans.
 function isValidLocalWhatsapp(num) {
     const clean = num.replace(/\D/g, '')
-    return /^\d{8}$/.test(clean)
+    return clean.length >= 7 && clean.length <= 15
 }
 
 function isEligibleForSignup(num) {
-  const clean = num.replace(/\D/g, '')
-  return /^\d{8}$/.test(clean) && /^(16|17|77)/.test(clean)
+  return isValidLocalWhatsapp(num)
 }
 
 // ========== MANUAL AUTH MODE TOGGLE ==========
@@ -538,7 +540,7 @@ function toggleAuthMode() {
   if (authMode === 'login') {
     const whatsapp = document.getElementById('whatsapp').value.trim()
     if (whatsapp && !isEligibleForSignup(whatsapp)) {
-      showToast('This number is not eligible for registration. Must start with 16, 17, or 77.', 'error')
+      showToast('Enter a valid WhatsApp number including country code.', 'error')
       return
     }
     setAuthMode('signup')
@@ -650,19 +652,14 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   const confirmPassword = document.getElementById('confirm-password').value
 
   const clean = whatsapp.replace(/\D/g, '')
-  if (!/^\d{8}$/.test(clean)) {
-    showToast('Enter a valid 8-digit WhatsApp number', 'error')
+  if (clean.length < 7 || clean.length > 15) {
+    showToast('Enter a valid WhatsApp number with country code (7–15 digits)', 'error')
     return
   }
 
   setAuthButtonLoading(true, authMode === 'login' ? 'Signing in…' : 'Creating account…')
 
   if (authMode === 'signup') {
-    if (!/^(16|17|77)/.test(clean)) {
-      showToast('This number is not eligible. Must start with 16, 17, or 77.', 'error')
-      setAuthButtonLoading(false)
-      return
-    }
     if (!name) {
       showToast('Please enter your name', 'error')
       setAuthButtonLoading(false)
@@ -2552,7 +2549,12 @@ async function updateProfileHeader() {
 
   const phoneEl = document.getElementById('profile-header-phone')
   const phone = profile.phone || ''
-  if (phoneEl) phoneEl.textContent = phone.replace('+975', '') || '—'
+  if (phoneEl) {
+    // Display the full number with a leading + if it looks international.
+    let display = phone
+    if (display && !display.startsWith('+')) display = '+' + display.replace(/\D/g, '')
+    phoneEl.textContent = display || '—'
+  }
 
   try {
     const [{ data: stats }, { data: myPreds }] = await Promise.all([

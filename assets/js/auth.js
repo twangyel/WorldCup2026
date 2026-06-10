@@ -15,17 +15,13 @@ let currentProfile = null
 // user's WhatsApp number. The real WhatsApp number lives in profiles.whatsapp
 // so it can be used for sending template messages.
 const WA_EMAIL_DOMAIN = 'wa.predict.local'
-const DEFAULT_COUNTRY_CODE = '975' // Bhutan
 
-// Strip everything except digits. If the result is short (local number without
-// country code), prepend the default country code.
+// Strip everything except digits. Users are expected to enter the full
+// international number including country code (e.g. "971501234567",
+// "447911123456", "97517123456"). No auto-prepending of any country code.
 function normalizeWhatsapp(raw) {
     if (!raw) return ''
-    let digits = String(raw).replace(/\D/g, '')
-    if (!digits) return ''
-    // Local numbers (e.g. "17123456" in Bhutan) -> add country code
-    // Heuristic: anything under 10 digits is treated as local
-    if (digits.length < 10) digits = DEFAULT_COUNTRY_CODE + digits
+    const digits = String(raw).replace(/\D/g, '')
     return digits
 }
 
@@ -36,8 +32,8 @@ function whatsappToEmail(raw) {
 
 function isValidWhatsapp(raw) {
     const d = normalizeWhatsapp(raw)
-    // Reasonable bounds: 10-15 digits per E.164
-    return d.length >= 10 && d.length <= 15
+    // E.164: country code + subscriber number. Min 7, max 15 digits total.
+    return d.length >= 7 && d.length <= 15
 }
 
 // =====================
