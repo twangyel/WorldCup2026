@@ -1507,7 +1507,18 @@ async function loadHome() {
     const ko = new Date(f.kickoff)
     const diff = ko - now
     cdEl.dataset.cdHome = ko.toISOString()
+    
     cdEl.textContent = `in ${msToCountdown(diff)}`
+// Initial color class based on time remaining
+const minsToKick = diff / 60000
+cdEl.classList.remove('countdown-green', 'countdown-amber', 'countdown-red')
+if (minsToKick > 120) {
+  cdEl.classList.add('next-match-countdown', 'countdown-green')
+} else if (minsToKick > 30) {
+  cdEl.classList.add('next-match-countdown', 'countdown-amber')
+} else {
+  cdEl.classList.add('next-match-countdown', 'countdown-red')
+}
 
    nextEl.innerHTML = `
   <div class="glass-light rounded-3xl overflow-hidden">
@@ -2374,22 +2385,85 @@ async function loadLeaderboard() {
     function stopCountdownTicker() {
       if (countdownTickerId) { clearInterval(countdownTickerId); countdownTickerId = null }
     }
-    function tickCountdowns() {
-      const now = Date.now()
+ function tickCountdowns() {
+  const now = Date.now()
 
-      // 1. Home page next-match countdown
-      const homeCd = document.getElementById('home-next-countdown')
-      if (homeCd && homeCd.dataset.cdHome) {
-        const ms = new Date(homeCd.dataset.cdHome).getTime() - now
-        if (ms <= 0) {
-          homeCd.textContent = 'kicking off'
-          delete homeCd.dataset.cdHome
-          // refresh the home view so the now-locked match transitions correctly
-          setTimeout(() => { if (typeof loadHome === 'function') loadHome() }, 2000)
+  // 1. Home page next-match countdown
+  const homeCd = document.getElementById('home-next-countdown')
+  if (homeCd && homeCd.dataset.cdHome) {
+    const ms = new Date(homeCd.dataset.cdHome).getTime() - now
+    if (ms <= 0) {
+      homeCd.textContent = 'Kicking off now!'
+      homeCd.className = 'next-match-countdown countdown-red'
+      delete homeCd.dataset.cdHome
+      setTimeout(() => { if (typeof loadHome === 'function') loadHome() }, 2000)
+    } else {
+      const mins = ms / 60000
+      const hrs = mins / 60
+      homeCd.textContent = `in ${msToCountdown(ms)}`
+      
+      // Color transition: green (>2h) → amber (30m-2h) → red (<30m)
+      homeCd.classList.remove('countdown-green', 'countdown-amber', 'countdown-red')
+      if (mins > 120) {
+        homeCd.classList.add('next-match-countdown', 'countdown-green')
+      } else if (mins > 30) {
+        homeCd.classList.add('next-match-countdown', 'countdown-amber')
+      } else {
+        homeCd.classList.add('next-match-countdown', 'countdown-red')
+      }
+    }
+  }
+
+  // 2. Per-card mini countdowns on predictions tab
+  document.querySelectorAll('[data-cd-card]').forEach(el => {
+    const fId = el.dataset.cdCard
+    const f = fixtures.find(x => x.id == fId)
+    if (!f) return
+    const ms = new Date(f.kickoff).getTime() - now
+    if (ms <= 0) {
+      if (typeof renderFixtures === 'function') renderFixtures()
+    } else {
+      el.textContent = msToCountdown(ms)
+      const mins = ms / 60000
+      el.classList.remove('card-countdown', 'urgent')
+      if (mins > 120) {
+        el.classList.add('card-countdown')
+        el.style.background = '#F0FDF4'
+        el.style.color = '#15803D'
+      } else if (mins > 30) {
+        el.classList.add('card-countdown')
+        el.style.background = '#FEF3C7'
+        el.style.color = '#92400E'
+      } else {
+        el.classList.add('card-countdown', 'urgent')
+        el.style.background = '#FEE2E2'
+        el.style.color = '#7F1D1D'
+      }
+    }
+  })
+
+  // 3. Lock-warning banner timer
+  document.querySelectorAll('[data-lockwarn]').forEach(el => {
+    const fId = el.dataset.lockwarn
+    const f = fixtures.find(x => x.id == fId)
+    if (!f) return
+    const ms = new Date(f.kickoff).getTime() - now
+    if (ms <= 0) {
+      if (typeof renderFixtures === 'function') renderFixtures()
+    } else {
+      el.textContent = msToCountdown(ms)
+      const banner = el.closest('.lock-warn')
+      const mins = ms / 60000
+      if (banner) {
+        if (mins <= 30) {
+          banner.classList.add('urgent')
         } else {
-          homeCd.textContent = `in ${msToCountdown(ms)}`
+          banner.classList.remove('urgent')
         }
       }
+    }
+  })
+
 
       // 2. Per-card mini countdowns on predictions tab
       document.querySelectorAll('[data-cd-card]').forEach(el => {

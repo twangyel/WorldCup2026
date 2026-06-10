@@ -1330,6 +1330,49 @@
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
+
+    /* ===== Countdown Timer Color States ===== */
+.countdown-green {
+  color: #15803D !important; /* green-700 */
+  background: #F0FDF4 !important; /* green-50 */
+  border: 1.5px solid #86EFAC !important; /* green-300 */
+  transition: all 0.8s ease;
+}
+.countdown-amber {
+  color: #92400E !important; /* amber-800 */
+  background: #FEF3C7 !important; /* amber-100 */
+  border: 1.5px solid #FCD34D !important; /* amber-300 */
+  transition: all 0.8s ease;
+}
+.countdown-red {
+  color: #7F1D1D !important; /* red-900 */
+  background: #FEE2E2 !important; /* red-100 */
+  border: 1.5px solid #FCA5A5 !important; /* red-300 */
+  animation: countdownPulse 1.4s ease-in-out infinite;
+  transition: all 0.8s ease;
+}
+@keyframes countdownPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); transform: scale(1); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); transform: scale(1.02); }
+}
+
+/* Home next-match countdown badge */
+.next-match-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.next-match-countdown::before {
+  content: '⏱';
+  font-size: 11px;
+}
+
+
     .lb-next-strip .predict-btn {
       background: #D4A24C;
       color: #1a1208;
