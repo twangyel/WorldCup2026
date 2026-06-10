@@ -1372,6 +1372,74 @@
       padding: 0 !important;
       background: transparent !important;
     }
+
+    /* ============== CHAMPION CELEBRATION ============== */
+    #champion-overlay {
+      background: radial-gradient(circle at 50% 0%, #1E3A5F 0%, #0A0F0D 70%);
+    }
+    #champion-overlay.show { animation: champFadeIn 600ms ease forwards; }
+    @keyframes champFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .champ-crown {
+      animation: champCrownDrop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both,
+                 champCrownFloat 3s ease-in-out 1100ms infinite;
+      filter: drop-shadow(0 8px 24px rgba(212,162,76,0.5));
+    }
+    @keyframes champCrownDrop {
+      from { transform: translateY(-200px) scale(0.3) rotate(-20deg); opacity: 0; }
+      to { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+    }
+    @keyframes champCrownFloat {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      50% { transform: translateY(-8px) rotate(2deg); }
+    }
+
+    .champ-name {
+      background: linear-gradient(90deg, #FFD700 0%, #FFA500 25%, #FFD700 50%, #FFA500 75%, #FFD700 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: champShimmer 3s linear infinite, champFadeUp 700ms ease 500ms both;
+    }
+    @keyframes champShimmer { to { background-position: 200% center; } }
+    @keyframes champFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    .champ-card {
+      animation: champFadeUp 700ms ease 700ms both;
+      background: linear-gradient(135deg, rgba(212,162,76,0.12) 0%, rgba(255,255,255,0.04) 100%);
+      border: 1px solid rgba(212,162,76,0.35);
+      backdrop-filter: blur(10px);
+    }
+    .champ-podium-row { animation: champFadeUp 600ms ease both; }
+    .champ-podium-row:nth-child(1) { animation-delay: 900ms; }
+    .champ-podium-row:nth-child(2) { animation-delay: 1050ms; }
+    .champ-podium-row:nth-child(3) { animation-delay: 1200ms; }
+
+    .champ-mystats { animation: champFadeUp 700ms ease 1400ms both; }
+    .champ-actions { animation: champFadeUp 700ms ease 1600ms both; }
+
+    /* Confetti */
+    .confetti-piece {
+      position: absolute;
+      width: 10px;
+      height: 14px;
+      top: -20px;
+      opacity: 0.9;
+      will-change: transform;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(0) rotate(0); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0.7; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .champ-crown, .champ-name, .champ-card, .champ-podium-row, .champ-mystats, .champ-actions, .confetti-piece {
+        animation: none !important;
+      }
+      .champ-name { -webkit-text-fill-color: #FFD700; }
+    }
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -1503,6 +1571,76 @@
 
   <!-- TOAST -->
   <div id="toast-container" class="fixed bottom-24 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none items-center"></div>
+
+  <!-- Champion Celebration Overlay (fires once when the Final is scored) -->
+  <div id="champion-overlay" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+    <!-- Confetti container — populated by JS -->
+    <div id="confetti-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+    <div class="relative max-w-lg mx-auto w-full px-5 pt-12 pb-10 safe-top">
+      <!-- Crown + headline -->
+      <div class="text-center mb-6">
+        <div class="champ-crown text-8xl mb-2">👑</div>
+        <p class="text-xs uppercase tracking-[0.3em] text-amber-300/80 font-semibold mb-2">Tournament Complete</p>
+        <h1 class="text-3xl font-black tracking-tight text-white">The Champion is Crowned</h1>
+      </div>
+
+      <!-- Champion card -->
+      <div class="champ-card rounded-3xl p-6 mb-6 text-center">
+        <div class="text-[11px] uppercase tracking-widest text-amber-200/80 font-bold mb-2">🏆 World Cup Predictions Champion 🏆</div>
+        <div id="champ-name" class="champ-name text-4xl font-black tracking-tight mb-1">—</div>
+        <div id="champ-dept" class="text-sm text-white/60 mb-4">—</div>
+        <div class="flex items-center justify-center gap-6 pt-4 border-t border-white/10">
+          <div>
+            <div id="champ-points" class="text-3xl font-black text-amber-300">0</div>
+            <div class="text-[10px] uppercase tracking-wider text-white/50 font-semibold mt-0.5">Final Points</div>
+          </div>
+          <div class="w-px h-10 bg-white/10"></div>
+          <div>
+            <div id="champ-exact" class="text-3xl font-black text-amber-300">0</div>
+            <div class="text-[10px] uppercase tracking-wider text-white/50 font-semibold mt-0.5">Exact Scores</div>
+          </div>
+          <div class="w-px h-10 bg-white/10"></div>
+          <div>
+            <div id="champ-streak" class="text-3xl font-black text-amber-300">0</div>
+            <div class="text-[10px] uppercase tracking-wider text-white/50 font-semibold mt-0.5">Best Streak</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 3 podium with prize amounts -->
+      <div class="mb-6">
+        <div class="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-3 text-center">Final Podium &amp; Prize Pool</div>
+        <div id="champ-podium" class="space-y-2"></div>
+      </div>
+
+      <!-- My personal result card -->
+      <div id="champ-mystats" class="champ-mystats rounded-3xl p-5 mb-6 bg-white/5 border border-white/10 hidden">
+        <div class="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-2">Your Tournament</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-2xl font-bold text-white" id="champ-my-rank">—</div>
+            <div class="text-xs text-white/60">out of <span id="champ-total-players">—</span> players</div>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-bold text-amber-300" id="champ-my-points">0 pts</div>
+            <div class="text-xs text-white/60"><span id="champ-my-exact">0</span> exact · <span id="champ-my-best-streak">0</span> best streak</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="champ-actions flex gap-3">
+        <button onclick="shareChampionOnWhatsApp()" class="flex-1 bg-gradient-to-r from-amber-400 to-amber-500 text-ink-900 font-bold py-4 rounded-2xl tap shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+          Share Champion
+        </button>
+        <button onclick="closeChampionCelebration()" class="px-6 bg-white/10 border border-white/20 text-white font-bold py-4 rounded-2xl tap hover:bg-white/15 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- BOTTOM SHEET MODAL -->
   <div id="modal-overlay" class="fixed inset-0 sheet-backdrop z-50 hidden flex items-end sm:items-center justify-center">

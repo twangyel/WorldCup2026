@@ -2069,6 +2069,14 @@ async function loadLeaderboard() {
       await loadFixtures()
       loadLeaderboard()
       loadHome()
+      // If admin just scored the Final (or the last unscored match),
+      // celebrate. Slight delay so leaderboard / prediction_results have
+      // a moment to settle before we read them.
+      if (payload.eventType === 'UPDATE' && payload.new?.home_score !== null && payload.new?.away_score !== null) {
+        setTimeout(() => {
+          try { checkAndCelebrateTournamentEnd({ trigger: 'realtime' }) } catch (e) { console.error('[champion] realtime check failed:', e) }
+        }, 1500)
+      }
     })
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') console.log('FX channel status:', status)
@@ -3184,6 +3192,211 @@ function subscribeToOwnDeletion() {
 }
 
 
+// ============== CHAMPION CELEBRATION ==============
+// Runs when the tournament ends (Final scored AND no other unscored matches).
+// Shows a one-time fullscreen celebration with confetti, crowned champion,
+// podium with prize amounts, and the user's personal tournament result.
+// Idempotent: uses localStorage to avoid re-firing automatically.
+
+const CHAMPION_SEEN_KEY = 'wc_champion_celebrated_v1'
+
+async function checkAndCelebrateTournamentEnd({ trigger = 'manual', force = false } = {}) {
+  // Don't re-fire automatically once seen (user can re-open via a button)
+  if (!force && localStorage.getItem(CHAMPION_SEEN_KEY) === '1') return
+
+  // Don't fire while the overlay is already showing
+  if (!document.getElementById('champion-overlay')?.classList.contains('hidden') && !force) return
+
+  // 1. Confirm tournament is actually complete
+  const { data: fixtures, error: fxErr } = await supabaseClient
+    .from('fixtures')
+    .select('id, stage, kickoff, home_score, away_score')
+  if (fxErr || !fixtures?.length) return
+
+  const totalCount = fixtures.length
+  const scoredCount = fixtures.filter(f => f.home_score !== null && f.away_score !== null).length
+  if (scoredCount < totalCount) return // Still matches to play
+
+  // Sanity: a fixture flagged 'Final' must exist and be scored
+  const finalFixture = fixtures.find(f =>
+    /^final$/i.test((f.stage || '').trim()) ||
+    /3rd place|third place/i.test((f.stage || '').trim()) === false && /final/i.test((f.stage || '').trim())
+  )
+  // If no clear "Final" stage label exists, we still proceed because all matches are scored.
+
+  // 2. Pull the final leaderboard
+  let stats = []
+  try {
+    const lb = await getLeaderboardFromResults()
+    stats = lb?.data || []
+  } catch (e) {
+    console.error('[champion] leaderboard load failed:', e)
+    return
+  }
+  if (!stats.length) return
+
+  // Sort by points desc (defensive; getLeaderboardFromResults already does this in most paths)
+  stats.sort((a, b) => (b.points || 0) - (a.points || 0))
+
+  // Need an actual scorer to crown
+  const top = stats[0]
+  if (!top || (top.points || 0) <= 0) return
+
+  // 3. Build prize amounts from current prize settings
+  let prizeBreakdown = null
+  try {
+    const { data: settings } = await supabaseClient.from('prize_settings').select('*').eq('id', 1).single()
+    const paidCount = stats.length
+    if (settings) prizeBreakdown = computePrizeBreakdownForChampion(settings, paidCount)
+  } catch (e) {
+    console.warn('[champion] prize settings fetch failed:', e)
+  }
+
+  // 4. Render overlay
+  renderChampionCelebration(stats, prizeBreakdown)
+  showChampionOverlay()
+  // Remember we showed it so it doesn't re-fire on every page open
+  localStorage.setItem(CHAMPION_SEEN_KEY, '1')
+  console.log('[champion] celebration shown, trigger:', trigger)
+}
+
+// Lightweight clone of the admin's prize math, so the celebration can show
+// money figures without depending on admin.html
+function computePrizeBreakdownForChampion(s, paidCount) {
+  const fee = Number(s.entry_fee) || 0
+  const gross = s.manual_override ? (Number(s.manual_amount) || 0) : paidCount * fee
+  const housePct = Math.max(0, Math.min(100, Number(s.house_fee_pct) || 0))
+  const houseFee = gross * (housePct / 100)
+  const net = Math.max(0, gross - houseFee)
+  const s1 = Number(s.split_1st) || 50
+  const s2 = Number(s.split_2nd) || 30
+  const s3 = Number(s.split_3rd) || 20
+  const totalSplit = (s1 + s2 + s3) || 100
+  return {
+    currency: s.currency || 'Nu.',
+    splits: [
+      { place: '1st', emoji: '🥇', amount: net * s1 / totalSplit },
+      { place: '2nd', emoji: '🥈', amount: net * s2 / totalSplit },
+      { place: '3rd', emoji: '🥉', amount: net * s3 / totalSplit }
+    ]
+  }
+}
+
+function renderChampionCelebration(stats, prizeBreakdown) {
+  const champion = stats[0]
+  const champName = champion.full_name || champion.name || 'Champion'
+  const champDept = champion.department || ''
+
+  document.getElementById('champ-name').textContent = champName
+  document.getElementById('champ-dept').textContent = champDept || ' '
+  document.getElementById('champ-points').textContent = Math.round(champion.points || 0)
+  document.getElementById('champ-exact').textContent = champion.exact || 0
+  document.getElementById('champ-streak').textContent = champion.best_streak || champion.current_streak || 0
+
+  // Podium top 3 with prizes
+  const podiumEl = document.getElementById('champ-podium')
+  const top3 = stats.slice(0, 3)
+  const emojis = ['🥇', '🥈', '🥉']
+  podiumEl.innerHTML = top3.map((s, i) => {
+    const prize = prizeBreakdown?.splits?.[i]
+    const prizeAmt = prize ? `${prizeBreakdown.currency} ${Math.round(prize.amount).toLocaleString()}` : ''
+    const name = s.full_name || s.name || 'Player'
+    const dept = s.department || ''
+    return `
+      <div class="champ-podium-row flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
+        <div class="text-2xl shrink-0">${emojis[i]}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-white truncate">${escapeHtml(name)}</div>
+          ${dept ? `<div class="text-[11px] text-white/50 truncate">${escapeHtml(dept)}</div>` : ''}
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-base font-bold text-amber-300">${Math.round(s.points || 0)} pts</div>
+          ${prizeAmt ? `<div class="text-[11px] font-bold text-emerald-300/90">${prizeAmt}</div>` : ''}
+        </div>
+      </div>
+    `
+  }).join('')
+
+  // User's personal stats
+  const myId = (typeof getUser === 'function') ? getUser()?.id : null
+  if (myId) {
+    const meIdx = stats.findIndex(s => s.user_id === myId || s.id === myId)
+    if (meIdx >= 0) {
+      const me = stats[meIdx]
+      document.getElementById('champ-mystats').classList.remove('hidden')
+      document.getElementById('champ-my-rank').textContent = `#${meIdx + 1}`
+      document.getElementById('champ-total-players').textContent = stats.length
+      document.getElementById('champ-my-points').textContent = `${Math.round(me.points || 0)} pts`
+      document.getElementById('champ-my-exact').textContent = me.exact || 0
+      document.getElementById('champ-my-best-streak').textContent = me.best_streak || 0
+    }
+  }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+
+function showChampionOverlay() {
+  const overlay = document.getElementById('champion-overlay')
+  if (!overlay) return
+  overlay.classList.remove('hidden')
+  overlay.classList.add('show')
+  document.body.style.overflow = 'hidden'
+  fireConfetti()
+  // Second burst for sustained effect
+  setTimeout(() => fireConfetti(), 800)
+  setTimeout(() => fireConfetti(), 1800)
+}
+
+function closeChampionCelebration() {
+  const overlay = document.getElementById('champion-overlay')
+  if (!overlay) return
+  overlay.classList.add('hidden')
+  overlay.classList.remove('show')
+  document.body.style.overflow = ''
+  // Clear confetti
+  const container = document.getElementById('confetti-container')
+  if (container) container.innerHTML = ''
+}
+
+function fireConfetti() {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const container = document.getElementById('confetti-container')
+  if (!container) return
+  const colors = ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3']
+  const count = 60
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div')
+    piece.className = 'confetti-piece'
+    piece.style.left = Math.random() * 100 + '%'
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)]
+    piece.style.animationDuration = (2.5 + Math.random() * 2) + 's'
+    piece.style.animationDelay = Math.random() * 0.5 + 's'
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`
+    piece.style.borderRadius = Math.random() > 0.5 ? '2px' : '50%'
+    container.appendChild(piece)
+    // Clean up after fall
+    setTimeout(() => piece.remove(), 5000)
+  }
+}
+
+async function shareChampionOnWhatsApp() {
+  const champName = document.getElementById('champ-name')?.textContent?.trim() || 'the Champion'
+  const champPts = document.getElementById('champ-points')?.textContent?.trim() || '0'
+  const appUrl = window.location.origin
+  const msg = `🏆 *WC 2026 Predictions — CHAMPION CROWNED!* 🏆\n\n👑 *${champName}* takes the crown with *${champPts} points*!\n\nThanks to everyone who played. See you next tournament!\n\n${appUrl}`
+  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
+  window.open(url, '_blank')
+}
+
+// Expose to admin/debug — let an admin re-trigger the celebration manually
+window.replayChampionCelebration = function() {
+  localStorage.removeItem(CHAMPION_SEEN_KEY)
+  checkAndCelebrateTournamentEnd({ trigger: 'manual', force: true })
+}
+
+
 async function showApp() {
   try {
     document.getElementById('auth-screen').classList.add('hidden')
@@ -3199,6 +3412,9 @@ async function showApp() {
     }
 
     await showNormalApp()
+    // After the app is up, check whether the tournament has ended.
+    // Fires the champion celebration if so (once per user, on this device).
+    try { checkAndCelebrateTournamentEnd({ trigger: 'app-load' }) } catch (e) { console.error('[champion] check on load failed:', e) }
   } catch (err) {
     console.error('showApp error:', err)
     showToast('Something went wrong loading the app. Please refresh.', 'error')

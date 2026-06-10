@@ -2144,7 +2144,30 @@ async function executeSaveScore(id) {
   }
   pendingScores[id] = {}
   renderResults(); renderFixturesManage()
-  showToast('Score saved', 'success')
+
+  // ---- Award points to every prediction on this fixture ----
+  // Without this call, prediction_results stays empty and the leaderboard
+  // shows 0 for everyone. Engine handles streaks/combos/multipliers and
+  // heals downstream chains for out-of-order scoring.
+  const finalHome = (s.home !== undefined) ? s.home : f?.home_score
+  const finalAway = (s.away !== undefined) ? s.away : f?.away_score
+  const bothSet = finalHome !== null && finalHome !== undefined
+                  && finalAway !== null && finalAway !== undefined
+
+  if (bothSet) {
+    showToast('Score saved — awarding points…', 'success')
+    try {
+      await awardPointsForFixture(id, Number(finalHome), Number(finalAway))
+      showToast('Points awarded to all players', 'success')
+      // Refresh local views that depend on points
+      if (typeof loadLeaderboard === 'function') loadLeaderboard()
+    } catch (err) {
+      console.error('[score-save] awardPointsForFixture failed:', err)
+      showToast('Score saved, but points award failed. Try Recalculate All.', 'error')
+    }
+  } else {
+    showToast('Score saved (incomplete — enter both scores to award points)', 'info')
+  }
 }
 
     // ============== PRIZE POOL DASHBOARD ==============
