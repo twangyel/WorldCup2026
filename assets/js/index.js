@@ -2093,7 +2093,8 @@ async function loadLeaderboard() {
 
       // Show toast — fire whenever local cache disagreed with the new value
       // (Supabase doesn't always send accurate payload.old; we trust our own cache)
-      if (oldVal !== newVal) {
+      // FIX: Only toast after initial load is complete, not on login/realtime connect
+      if (_systemSettingsInitialized && oldVal !== newVal) {
         showToast(newVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
       }
     })
@@ -2113,7 +2114,10 @@ async function loadLeaderboard() {
         const oldVal = privateLeaguesEnabled
         privateLeaguesEnabled = dbVal
         console.log('[Poll] Private leagues drift detected:', oldVal, '→', dbVal)
-        showToast(dbVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
+        // FIX: Only toast after initial load is complete
+        if (_systemSettingsInitialized) {
+          showToast(dbVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
+        }
         if (dbVal === false && typeof enforceLeagueAccessLockout === 'function') {
           enforceLeagueAccessLockout('disabled')
         }
@@ -3476,6 +3480,7 @@ async function leaveLeague(leagueId) {
 let myLeagues = []
 let activeLeagueId = null
 let privateLeaguesEnabled = false
+let _systemSettingsInitialized = false  // prevents toast on first load / login
 
 async function checkPrivateLeaguesEnabled() {
     const { data } = await getSystemSettings()
@@ -4186,6 +4191,7 @@ const _originalInitApp = initApp
 initApp = async function() {
     // Pre-check system settings
     await checkPrivateLeaguesEnabled()
+    _systemSettingsInitialized = true  // mark baseline as set; toasts may now fire on actual changes
     await _originalInitApp()
 }
 
