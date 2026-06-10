@@ -2072,16 +2072,19 @@ async function loadLeaderboard() {
       // Detect admin revoking this user's paid status while they're in the app.
       // The 'payment-status-' channel only runs while on the gate, so paid users
       // already inside the app rely on this listener to catch the revoke.
+      // NOTE: We don't trust payload.old.fee_paid — Supabase only sends the full
+      // old row when REPLICA IDENTITY FULL is set on the table; otherwise old
+      // only contains the primary key. Instead we compare against the cached profile.
       const myId = (typeof getUser === 'function') ? getUser()?.id : null
+      const cached = (typeof getProfile === 'function') ? getProfile() : null
       if (
         myId &&
         payload.eventType === 'UPDATE' &&
         payload.new?.id === myId &&
         payload.new?.fee_paid === false &&
-        payload.old?.fee_paid === true
+        cached?.fee_paid === true
       ) {
-        const cached = (typeof getProfile === 'function') ? getProfile() : null
-        if (cached) cached.fee_paid = false
+        cached.fee_paid = false
         showModal({
           icon: '🔒',
           title: 'Payment status revoked',
