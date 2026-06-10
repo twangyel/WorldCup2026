@@ -857,6 +857,9 @@ function showPaymentGate() {
           filter: `id=eq.${user.id}`
         }, async (payload) => {
           if (payload.new?.fee_paid === true && payload.old?.fee_paid !== true) {
+            // Keep cached profile in sync so later revoke detection works
+            const cachedV = (typeof getProfile === 'function') ? getProfile() : null
+            if (cachedV) cachedV.fee_paid = true
             showToast('Payment verified! Welcome aboard.', 'success')
             showNormalApp().then(() => switchTab('home'))
           }
@@ -2079,19 +2082,21 @@ async function loadLeaderboard() {
       // Detect admin revoking this user's paid status while they're in the app.
       // The 'payment-status-' channel only runs while on the gate, so paid users
       // already inside the app rely on this listener to catch the revoke.
-      // NOTE: We don't trust payload.old.fee_paid — Supabase only sends the full
-      // old row when REPLICA IDENTITY FULL is set on the table; otherwise old
-      // only contains the primary key. Instead we compare against the cached profile.
+      // We don't trust payload.old (Supabase needs REPLICA IDENTITY FULL for it)
+      // and we don't fully trust the cached profile either (it can lag). The
+      // most reliable signal: is the user actually in the normal app right now?
       const myId = (typeof getUser === 'function') ? getUser()?.id : null
-      const cached = (typeof getProfile === 'function') ? getProfile() : null
+      const gateEl = document.getElementById('payment-gate')
+      const userIsInApp = gateEl && gateEl.classList.contains('hidden')
       if (
         myId &&
         payload.eventType === 'UPDATE' &&
         payload.new?.id === myId &&
         payload.new?.fee_paid === false &&
-        cached?.fee_paid === true
+        userIsInApp
       ) {
-        cached.fee_paid = false
+        const cached = (typeof getProfile === 'function') ? getProfile() : null
+        if (cached) cached.fee_paid = false
         showModal({
           icon: '🔒',
           title: 'Payment status revoked',
