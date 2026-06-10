@@ -1232,7 +1232,7 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
   : ''
 
     return `
-    <div class="glass-fixture relative" data-fixture="${f.id}">
+    <div class="glass-fixture relative" id="fixture-${f.id}" data-fixture="${f.id}">
       ${ptsBadge}
 
       <div class="fixture-stage-label">
@@ -1536,7 +1536,7 @@ async function loadHome() {
                 ? `<div class="text-lg font-bold text-brand-700">${pred.home_prediction} – ${pred.away_prediction}</div>`
                 : `<div class="flex items-center gap-2 text-sm text-ink-500"><span class="w-2 h-2 rounded-full border-2 border-dashed border-ink-300"></span>Not predicted yet</div>`}
             </div>
-            <button onclick="switchTab('predictions')" class="bg-brand-900 text-white text-xs font-semibold px-3 py-2 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
+            <button onclick="switchToFixture('${f.id}')" class="bg-brand-900 text-white text-xs font-semibold px-3 py-2 rounded-xl tap">${pred ? 'Change' : 'Predict'}</button>
           </div>
         </div>
       </div>`
@@ -3473,6 +3473,23 @@ window.signOut = async function smoothSignOut() {
     console.error('smoothSignOut error:', err)
   }
 }
+    
+// Switch to predictions tab and scroll to a specific fixture
+function switchToFixture(fixtureId) {
+  switchTab('predictions')
+  // After tab switch and render, scroll to the fixture
+  setTimeout(() => {
+    const el = document.getElementById(`fixture-${fixtureId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Brief highlight to draw attention
+      el.style.transition = 'box-shadow 300ms ease'
+      el.style.boxShadow = '0 0 0 3px rgba(212,162,76,0.4), 0 8px 24px rgba(10,15,13,0.08)'
+      setTimeout(() => { el.style.boxShadow = '' }, 1500)
+    }
+  }, 150)
+}
+
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
       const target = document.getElementById(`tab-${tab}`)
@@ -3482,7 +3499,20 @@ window.signOut = async function smoothSignOut() {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
       if (tab === 'home') loadHome()
       if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
-      if (tab === 'predictions') previewMode ? renderFixtures() : loadFixtures()
+      if (tab === 'predictions') {
+        previewMode ? renderFixtures() : loadFixtures()
+        // Auto-scroll to the next open fixture after a short delay for render
+        setTimeout(() => {
+          const now = new Date()
+          const nextFixture = fixtures
+            .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+            .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0]
+          if (nextFixture) {
+            const el = document.getElementById(`fixture-${nextFixture.id}`)
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
       if (tab === 'extras' && !previewMode) {
         if (typeof loadMyLeagues === 'function') loadMyLeagues()
       }
@@ -3490,7 +3520,9 @@ window.signOut = async function smoothSignOut() {
     renderBadges()
     updateProfileCards()
   }
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      if (tab !== 'predictions') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
 
     // ============== COPY TO CLIPBOARD ==============
