@@ -930,6 +930,11 @@ function showPaymentGate() {
   // Update profile cards
   await updateProfileCards()
 
+  // Seed the prediction_results cache before loading home/fixtures so that
+  // the "+N pts" badges and recent-results pills render correct values on
+  // first paint instead of zeros. (Bug 3 expanded)
+  await refreshMyResultsCache().catch(e => console.error('refreshMyResultsCache', e))
+
   // Load all home-screen data IN PARALLEL so the user doesn't wait for
   // sequential network round-trips. We wrap each call in catch() so one
   // slow/failing source can't block the rest of the home from rendering.
@@ -1187,7 +1192,7 @@ function msToCountdown(ms) {
     const locked = previewMode || !isNext || timeLocked
     const hP = pred ? pred.home_prediction : ''
     const aP = pred ? pred.away_prediction : ''
-    const pts = pred?.points_awarded || 0
+    const pts = getPointsForFixture(f.id)   // Bug 3: was pred?.points_awarded (never written)
 
     // Status badge
     let statusClass, statusText
@@ -1325,6 +1330,33 @@ return `
 }
 
     // ============== HOME ==============
+    // ============== POINTS LOOKUP HELPER (Bug 3 expanded) ==============
+    // Bridge cache: predictions.points_awarded is a legacy column the bonus engine
+    // doesn't write to. All "+N pts" UI must read final_points / base_points from
+    // prediction_results instead. Refreshed after sign-in and on realtime events.
+    let myResultsByFixture = {}
+
+    async function refreshMyResultsCache() {
+      const myId = getUser()?.id
+      if (!myId) { myResultsByFixture = {}; return }
+      try {
+        const { data } = await supabaseClient
+          .from('prediction_results')
+          .select('fixture_id, base_points, final_points')
+          .eq('user_id', myId)
+        const next = {}
+        ;(data || []).forEach(r => { next[r.fixture_id] = r })
+        myResultsByFixture = next
+      } catch (e) {
+        console.warn('[results-cache] refresh failed:', e)
+      }
+    }
+
+    // Returns final_points for the current user on a given fixture, or 0.
+    function getPointsForFixture(fixtureId) {
+      return myResultsByFixture[fixtureId]?.final_points || 0
+    }
+
     // ── Bonus Engine Helpers ──
 async function getLeaderboardFromResults() {
   // Fetch prediction_results and profiles separately (no FK relationship between them)
@@ -1413,7 +1445,14 @@ async function getLeaderboardFromResults() {
     }
   })
 
-  stats.sort((a, b) => b.points - a.points)
+  // Tiebreaker chain: points → exact → gd → result.
+  // Mirrors getLeagueLeaderboard so positions stay consistent across views. (Bug 5)
+  stats.sort((a, b) => {
+    if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0)
+    if ((b.exact  || 0) !== (a.exact  || 0)) return (b.exact  || 0) - (a.exact  || 0)
+    if ((b.gd     || 0) !== (a.gd     || 0)) return (b.gd     || 0) - (a.gd     || 0)
+    return (b.result || 0) - (a.result || 0)
+  })
   return { data: stats, error: null }
 }
 
@@ -1444,8 +1483,8 @@ async function loadHome() {
 
   const me = myIdx >= 0 ? stats[myIdx] : null
 
-  // Fallback: sum points from local predictions if leaderboard row is missing
-  const myPredPoints = predictions.reduce((sum, p) => sum + (p.points_awarded || 0), 0)
+  // Fallback: sum points from local prediction_results cache if leaderboard row is missing
+  const myPredPoints = Object.values(myResultsByFixture).reduce((sum, r) => sum + (r.final_points || 0), 0)
 
   // Helper: set text and pulse if value changed
   const setAnimated = (id, val, cls = 'pts-pulse') => {
@@ -1561,7 +1600,7 @@ if (minsToKick > 120) {
    // AFTER (glass-light)
 recentEl.innerHTML = finished.map(f => {
   const pred = getPrediction(f.id)
-  const pts = pred?.points_awarded || 0
+  const pts = getPointsForFixture(f.id)   // Bug 3: was pred?.points_awarded (never written)
   return `
   <div class="glass-light rounded-2xl p-3 flex items-center gap-3">
     <div class="flex items-center gap-2 shrink-0">
@@ -1625,9 +1664,11 @@ recentEl.innerHTML = finished.map(f => {
     async function getMatchdayLeaderboard(md) {
       if (!md || !md.fixtureIds.length) return []
       try {
+        // BUG 3 FIX: read from prediction_results (where the bonus engine writes)
+        // instead of predictions.points_awarded (a legacy column that's always 0).
         const { data } = await supabaseClient
-          .from('predictions')
-          .select('user_id, points_awarded, fixture_id')
+          .from('prediction_results')
+          .select('user_id, base_points, final_points, fixture_id')
           .in('fixture_id', md.fixtureIds)
         if (!data) return []
         // Need user names — pull from profiles (paid users only, to match Overall behavior)
@@ -1639,45 +1680,61 @@ recentEl.innerHTML = finished.map(f => {
           ;(profs || []).forEach(p => { profMap[p.id] = p })
         }
         const agg = {}
-        data.forEach(p => {
-          const uid = p.user_id
+        data.forEach(r => {
+          const uid = r.user_id
           // Skip unpaid users — they shouldn't appear on the global matchday leaderboard
           if (!profMap[uid]) return
-          if (!agg[uid]) agg[uid] = { user_id: uid, points: 0, exact: 0, gd: 0, result: 0, name: profMap[uid]?.name || 'Anonymous', department: profMap[uid]?.department || '' }
-          agg[uid].points += (p.points_awarded || 0)
-          // crude bucketing — exact = full match points, others lumped into "result"
-          // (real exact/gd/result split would need fixture-aware scoring rules; we don't need it here)
+          if (!agg[uid]) {
+            agg[uid] = {
+              user_id: uid, points: 0, exact: 0, gd: 0, result: 0,
+              name: profMap[uid]?.name || 'Anonymous',
+              department: profMap[uid]?.department || ''
+            }
+          }
+          agg[uid].points += (r.final_points || 0)
+          // Real exact/gd/result split now that we have base_points.
+          if (r.base_points === 5)      agg[uid].exact++
+          else if (r.base_points === 3) agg[uid].gd++
+          else if (r.base_points === 2) agg[uid].result++
         })
         return Object.values(agg)
           .filter(s => s.points > 0 || s.user_id === getUser()?.id) // keep self even with 0
-          .sort((a, b) => b.points - a.points)
+          .sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points
+            if (b.exact  !== a.exact)  return b.exact  - a.exact
+            if (b.gd     !== a.gd)     return b.gd     - a.gd
+            return b.result - a.result
+          })
       } catch (e) { return [] }
     }
 
     // Compute current scoring-streaks for everyone, in one query.
-    // A streak = consecutive most-recent finished predictions where points_awarded > 0.
+    // A streak = consecutive most-recent finished predictions where base_points > 0.
+    // BUG 2 FIX: must include 0-point rows in the query so the loop can break on them.
+    // Previously we filtered them out at the query level, which made the break unreachable
+    // and turned "consecutive wins" into "total wins" (W L W W W incorrectly counted as 4).
     async function computeStreaks() {
       try {
         const { data } = await supabaseClient
           .from('prediction_results')
-          .select('user_id, final_points, kickoff')
-          .gt('final_points', 0)
+          .select('user_id, base_points, kickoff, fixture_id')
         if (!data) return {}
-        // Keep only resolved fixtures
-        const resolved = data
-        // Group by user, sort each user's predictions by kickoff desc, then count consecutive >0 from start
         const byUser = {}
-        resolved.forEach(p => {
+        data.forEach(p => {
           if (!byUser[p.user_id]) byUser[p.user_id] = []
           byUser[p.user_id].push(p)
         })
         const streaks = {}
         Object.entries(byUser).forEach(([uid, preds]) => {
-          preds.sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
+          // Newest first; deterministic tiebreaker for simultaneous kickoffs (Bug 7).
+          preds.sort((a, b) => {
+            const dt = new Date(b.kickoff) - new Date(a.kickoff)
+            return dt !== 0 ? dt : String(b.fixture_id).localeCompare(String(a.fixture_id))
+          })
           let s = 0
           for (const p of preds) {
-            if ((p.final_points || 0) > 0) s++
-            else break
+            if ((p.base_points || 0) > 0) s++
+            else break   // now reachable
           }
           if (s >= 3) streaks[uid] = s
         })
@@ -2051,21 +2108,35 @@ async function loadLeaderboard() {
     let prizePollInterval = null
 
    function setupRealtime() {
-  // 1) Predictions: ALL events
+  // 1) Predictions: ALL events (kept for leaderboard refresh when someone submits)
   supabaseClient.channel('lb')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload) => {
-      // Notify current user when their points change
-      if (payload.eventType === 'UPDATE' && payload.new?.points_awarded > 0) {
-        const myId = getUser()?.id
-        const oldPts = payload.old?.points_awarded || 0
-        if (myId && payload.new.user_id === myId && payload.new.points_awarded !== oldPts) {
-          showToast(`You scored ${payload.new.points_awarded} points!`, 'success')
-        }
-      }
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => {
       loadLeaderboard(); loadFixtures(); loadHome()
     })
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') console.log('LB channel status:', status)
+    })
+
+  // 1b) Results: this is where the bonus engine actually writes points.
+  // Watching `predictions.points_awarded` (the old listener) was dead — that column
+  // is never updated. The engine writes to prediction_results.final_points. (Bug 4)
+  // REQUIRES: ALTER PUBLICATION supabase_realtime ADD TABLE prediction_results;
+  //           ALTER TABLE prediction_results REPLICA IDENTITY FULL;
+  supabaseClient.channel('results')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'prediction_results' }, (payload) => {
+      const myId = getUser()?.id
+      const newPts = payload.new?.final_points || 0
+      const oldPts = payload.old?.final_points || 0
+      if (myId && payload.new?.user_id === myId && newPts > 0 && newPts !== oldPts) {
+        showToast(`You scored ${newPts} points!`, 'success')
+      }
+      // Refresh the local cache so badges, fixture cards, recent-results all update.
+      refreshMyResultsCache().then(() => {
+        loadLeaderboard(); loadHome()
+      })
+    })
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') console.log('Results channel status:', status)
     })
 
   // 2) Fixtures: ALL events
@@ -2626,11 +2697,19 @@ async function updateProfileCards() {
       if (ptsEl) ptsEl.textContent = me?.points || 0
       if (exactEl) exactEl.textContent = me?.exact || 0
       if (streakEl) {
-        const finished = (myPreds || []).filter(p => {
-          const f = fixtures.find(x => x.id === p.fixture_id)
-          return f && f.home_score !== null && (p.points_awarded || 0) > 0
-        }).length
-        streakEl.textContent = finished > 0 ? finished : 0
+        // Bug 3 + true streak: consecutive most-recent finished predictions with points > 0.
+        // Was: filter on legacy points_awarded (always 0) and count without break-on-miss.
+        const myFinished = (myPreds || [])
+          .map(p => ({ p, f: fixtures.find(x => x.id === p.fixture_id) }))
+          .filter(x => x.f && x.f.home_score !== null)
+          .sort((a, b) => new Date(b.f.kickoff) - new Date(a.f.kickoff))   // newest first
+        let streak = 0
+        for (const { f } of myFinished) {
+          const r = myResultsByFixture[f.id]
+          if (r && (r.base_points || 0) > 0) streak++
+          else break
+        }
+        streakEl.textContent = streak
       }
       if (subtitle) subtitle.textContent = myIdx >= 0 ? 'of ' + stats.length + ' players' : 'Make predictions to rank'
     }

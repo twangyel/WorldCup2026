@@ -151,10 +151,11 @@ function calculateStreak(userHistory, currentMatch = null) {
   // Build full history including current match if provided
   const allMatches = currentMatch ? [...userHistory, currentMatch] : [...userHistory];
 
-  // Sort by kickoff to ensure chronological order
-  const sorted = allMatches.sort((a, b) => 
-    new Date(a.kickoff) - new Date(b.kickoff)
-  );
+  // Sort by kickoff to ensure chronological order (deterministic for simultaneous kickoffs — Bug 7)
+  const sorted = allMatches.sort((a, b) => {
+    const dt = new Date(a.kickoff) - new Date(b.kickoff);
+    return dt !== 0 ? dt : String(a.fixture_id).localeCompare(String(b.fixture_id));
+  });
 
   // Count consecutive matches with base_points > 0 from the END
   let currentStreak = 0;
@@ -245,9 +246,10 @@ function applyStreakBonus(matchResult, userHistory) {
 function checkExactCombo(userHistory, currentMatch) {
   if (!BONUS_CONFIG.combo.exactCombo.enabled) return null;
 
-  const sorted = [...userHistory, currentMatch].sort((a, b) => 
-    new Date(a.kickoff) - new Date(b.kickoff)
-  );
+  const sorted = [...userHistory, currentMatch].sort((a, b) => {
+    const dt = new Date(a.kickoff) - new Date(b.kickoff);
+    return dt !== 0 ? dt : String(a.fixture_id).localeCompare(String(b.fixture_id));
+  });
 
   // Look at last N matches (where N = trigger)
   const trigger = BONUS_CONFIG.combo.exactCombo.trigger;
@@ -274,9 +276,10 @@ function checkExactCombo(userHistory, currentMatch) {
 function checkGDCombo(userHistory, currentMatch) {
   if (!BONUS_CONFIG.combo.gdCombo.enabled) return null;
 
-  const sorted = [...userHistory, currentMatch].sort((a, b) => 
-    new Date(a.kickoff) - new Date(b.kickoff)
-  );
+  const sorted = [...userHistory, currentMatch].sort((a, b) => {
+    const dt = new Date(a.kickoff) - new Date(b.kickoff);
+    return dt !== 0 ? dt : String(a.fixture_id).localeCompare(String(b.fixture_id));
+  });
 
   const trigger = BONUS_CONFIG.combo.gdCombo.trigger;
   const recent = sorted.slice(-trigger);
@@ -497,10 +500,11 @@ function aggregateUserStats(userId, allMatchResults) {
   let currentStreak = 0;
   let bestStreak = 0;
 
-  // Sort by kickoff for streak calculation
-  const sorted = [...userMatches].sort((a, b) => 
-    new Date(a.kickoff) - new Date(b.kickoff)
-  );
+  // Sort by kickoff for streak calculation (deterministic for simultaneous kickoffs — Bug 7)
+  const sorted = [...userMatches].sort((a, b) => {
+    const dt = new Date(a.kickoff) - new Date(b.kickoff);
+    return dt !== 0 ? dt : String(a.fixture_id).localeCompare(String(b.fixture_id));
+  });
 
   for (const m of sorted) {
     // Base tier counts
@@ -684,6 +688,7 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           fixture_id: fixtureId,
           home_prediction: pred.home_prediction,
           away_prediction: pred.away_prediction,
+          stage: fixture.stage,                    // FIX (Bug 1): persist stage so recalc preserves multiplier
           base_points: fullResult.base_points,
           stage_multiplier: fullResult.stage_multiplier,
           multiplied_base: fullResult.multiplied_base,
@@ -704,11 +709,19 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
       if (upsertError) {
         console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
       } else {
-        // FIX (out-of-order scoring): if any LATER match was already scored,
-        // its streak/combo was computed without this match in history.
-        // Recalculate this user's downstream bonuses to heal the chain.
+        // Only recalc if this user has LATER resolved matches than the one we just scored.
+        // In the common case (admin scores fixtures in order), there are none → skip the
+        // O(n) chain rewrite. Heals the out-of-order case without the quadratic hit. (Bug 6)
         try {
-          await recalculateUserBonuses(pred.user_id);
+          const { count: laterCount } = await supabaseClient
+            .from('prediction_results')
+            .select('prediction_id', { count: 'exact', head: true })
+            .eq('user_id', pred.user_id)
+            .gt('kickoff', fixture.kickoff);
+
+          if ((laterCount || 0) > 0) {
+            await recalculateUserBonuses(pred.user_id);
+          }
         } catch (recalcErr) {
           console.error(`[recalc] downstream heal failed for ${pred.user_id}:`, recalcErr);
         }
@@ -736,12 +749,16 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
  * @returns {Promise<{updated: number, errors: number}>}
  */
 async function recalculateUserBonuses(userId) {
-  // 1. Load all of this user's resolved results, oldest first
+  // 1. Load all of this user's resolved results, oldest first.
+  //    Join fixtures so we always have `stage` available, even if legacy rows
+  //    were saved before `stage` was persisted on prediction_results (Bug 1).
+  //    Secondary sort on fixture_id keeps simultaneous kickoffs deterministic (Bug 7).
   const { data: results, error } = await supabaseClient
     .from('prediction_results')
-    .select('*')
+    .select('*, fixtures(stage)')
     .eq('user_id', userId)
-    .order('kickoff', { ascending: true });
+    .order('kickoff', { ascending: true })
+    .order('fixture_id', { ascending: true });
 
   if (error) {
     console.error(`[recalc] Failed to load results for ${userId}:`, error);
@@ -758,7 +775,7 @@ async function recalculateUserBonuses(userId) {
       const fresh = calculateFullPoints({
         fixtureId: r.fixture_id,
         userId: r.user_id,
-        stage: r.stage || '',
+        stage: r.stage || r.fixtures?.stage || '',   // fall back to joined fixture (Bug 1)
         kickoff: r.kickoff,
         matchdayKey: r.matchday_key || getMatchdayKey(r.kickoff),
         predHome: r.home_prediction,
