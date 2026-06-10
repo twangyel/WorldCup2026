@@ -1204,7 +1204,7 @@ function msToCountdown(ms) {
     // Date/time formatting
     const ko = new Date(f.kickoff)
     const dateStr = ko.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
-    const timeStr = ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    const timeStr = ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })
 
     // Score boxes (readonly or input)
     const scoreSection = locked
@@ -1231,13 +1231,17 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
   ? `<div class="px-5 pb-3"><span class="submitted-stamp">Locked in ${relativeTimeAgo(pred.submitted_at)}</span></div>`
   : ''
 
-    return `
-    <div class="glass-fixture relative" id="fixture-${f.id}" data-fixture="${f.id}">
+    const isNextFixture = f.id === nextMatchId
+const nextBadge = isNextFixture ? `<div class="fixture-next-badge">Next Match</div>` : ''
+
+return `
+    <div class="glass-fixture relative ${isNextFixture ? 'fixture-next-highlight' : ''}" id="fixture-${f.id}" data-fixture="${f.id}">
+      ${nextBadge}
       ${ptsBadge}
 
       <div class="fixture-stage-label">
         <span>${f.stage}</span>
-        <span class="fixture-status-badge ${statusClass}">${statusText}</span>
+        ${isNextFixture ? '' : `<span class="fixture-status-badge ${statusClass}">${statusText}</span>`}
       </div>
 
       <div class="fixture-match-row">
@@ -1536,7 +1540,7 @@ if (minsToKick > 120) {
             </div>
           </div>
           <div class="text-center text-xs text-ink-500 font-medium">
-            ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            ${ko.toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
           </div>
         </div>
         <div class="px-4 py-2 border-t border-white/30" style="background:rgba(250,250,247,0.45);">
