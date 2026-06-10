@@ -853,6 +853,20 @@ function showPaymentGate() {
             showToast('Payment verified! Welcome aboard.', 'success')
             showNormalApp().then(() => switchTab('home'))
           }
+          if (payload.new?.fee_paid === false && payload.old?.fee_paid === true) {
+            // Admin revoked this user's paid status — keep cached profile in sync,
+            // show a blocking modal, and sign them out so they can't keep playing.
+            const cached = (typeof getProfile === 'function') ? getProfile() : null
+            if (cached) cached.fee_paid = false
+            showModal({
+              icon: '🔒',
+              title: 'Payment status revoked',
+              message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
+              actions: [
+                { text: 'OK', onclick: 'hideModal(); if (typeof signOut === "function") signOut()', class: 'bg-red-600 text-white' }
+              ]
+            })
+          }
           if (payload.new?.private_leagues_access === true && payload.old?.private_leagues_access !== true) {
             // Update cached profile so hasLeagueAccess() returns true on next render
             const cached = (typeof getProfile === 'function') ? getProfile() : null
