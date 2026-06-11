@@ -1155,31 +1155,60 @@ function msToCountdown(ms) {
   const c = document.getElementById('fixtures-list')
   const now = new Date()
 
-  // Identify the single next match that should be open
+  // BATCH PREDICTION WINDOW: keep multiple upcoming matches open
+  // so users can predict night games in advance and not forget.
+  // Strategy: next 3 matches OR all matches within 48h, whichever covers more.
   const upcoming = fixtures
     .filter(f => new Date(f.kickoff) > now && f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+
+  // Build the set of open match IDs
+  const openMatchIds = new Set()
+  const BATCH_SIZE = 3           // minimum number of open matches
+  const BATCH_HOURS = 48         // hours ahead to keep open
+  const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
+
+  upcoming.forEach((f, i) => {
+    // Always include the first BATCH_SIZE matches
+    if (i < BATCH_SIZE) openMatchIds.add(f.id)
+    // Also include any match within BATCH_HOURS
+    if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
+  })
+
+  // The "next" match is the earliest one (for warning banner focus)
   const nextMatchId = upcoming[0]?.id || null
 
   // ===== Lock warning banner (Feature 3) =====
+  // Warn about the EARLIEST closing match among ALL open matches
   const warnHost = document.getElementById('fixtures-lock-warn')
   if (warnHost) {
-    const next = upcoming[0]
-    if (next) {
-      const ms = new Date(next.kickoff) - now
+    const openMatches = upcoming.filter(f => openMatchIds.has(f.id))
+    if (openMatches.length > 0) {
+      const mostUrgent = openMatches[0]
+      const ms = new Date(mostUrgent.kickoff) - now
       const mins = ms / 6e4
-      if (mins <= 60) {
-        const urgent = mins <= 10
+      const urgent = mins <= 10
+      const closingSoon = openMatches.filter(f => (new Date(f.kickoff) - now) <= 60 * 60 * 1000)
+      if (closingSoon.length > 0) {
+        const multi = closingSoon.length > 1
         warnHost.innerHTML = `
           <div class="lock-warn ${urgent ? 'urgent' : ''} rounded-2xl px-4 py-3 flex items-center gap-3">
             <span class="text-lg">${urgent ? '🚨' : '⚠️'}</span>
             <div class="flex-1 min-w-0">
-              <div class="text-[13px] font-bold leading-tight">${next.home_team} vs ${next.away_team}</div>
-              <div class="text-[11px] opacity-80">Predictions lock in <span class="lock-warn-time" data-lockwarn="${next.id}">${msToCountdown(ms)}</span></div>
+              <div class="text-[13px] font-bold leading-tight">${mostUrgent.home_team} vs ${mostUrgent.away_team}${multi ? ' <span class="opacity-70">(+' + (closingSoon.length - 1) + ' more)</span>' : ''}</div>
+              <div class="text-[11px] opacity-80">Predictions lock in <span class="lock-warn-time" data-lockwarn="${mostUrgent.id}">${msToCountdown(ms)}</span></div>
             </div>
           </div>`
       } else {
-        warnHost.innerHTML = ''
+        // Gentle reminder: X matches are open
+        warnHost.innerHTML = `
+          <div class="lock-warn rounded-2xl px-4 py-3 flex items-center gap-3" style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); border-color: #86EFAC; color: #15803D;">
+            <span class="text-lg">🔓</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-bold leading-tight">${openMatches.length} match${openMatches.length !== 1 ? 'es' : ''} open for prediction</div>
+              <div class="text-[11px] opacity-80">Next lock: ${mostUrgent.home_team} vs ${mostUrgent.away_team} · <span class="lock-warn-time" data-lockwarn="${mostUrgent.id}">${msToCountdown(ms)}</span></div>
+            </div>
+          </div>`
       }
     } else {
       warnHost.innerHTML = ''
@@ -1198,9 +1227,10 @@ function msToCountdown(ms) {
   c.innerHTML = fixtures.map(f => {
     const pred = getPrediction(f.id)
     const hasScore = f.home_score !== null && f.away_score !== null
-    const isNext = f.id === nextMatchId
+    const isOpen = openMatchIds.has(f.id)
+    const isNextFixture = f.id === nextMatchId
     const timeLocked = isLocked(f.kickoff)
-    const locked = previewMode || !isNext || timeLocked
+    const locked = previewMode || !isOpen || timeLocked
     const hP = pred ? pred.home_prediction : ''
     const aP = pred ? pred.away_prediction : ''
     const pts = getPointsForFixture(f.id)   // Bug 3: was pred?.points_awarded (never written)
@@ -1210,7 +1240,7 @@ function msToCountdown(ms) {
     if (hasScore) { statusClass = 'fixture-status-ft'; statusText = `FT ${f.home_score}–${f.away_score}`; }
     else if (locked && !previewMode) { statusClass = 'fixture-status-locked'; statusText = '🔒 Locked'; }
     else if (previewMode && !hasScore) { statusClass = 'fixture-status-preview'; statusText = 'Preview'; }
-    else { statusClass = 'fixture-status-open'; statusText = 'Open'; }
+    else { statusClass = 'fixture-status-open'; statusText = isNextFixture ? 'Open — Next' : 'Open'; }
 
     const ptsBadge = pts > 0 ? `<div class="absolute -top-2 -right-2 px-3 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-lifted">+${pts} pts</div>` : ''
 
@@ -1244,8 +1274,7 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
   ? `<div class="px-5 pb-3"><span class="submitted-stamp">Locked in ${relativeTimeAgo(pred.submitted_at)}</span></div>`
   : ''
 
-    const isNextFixture = f.id === nextMatchId
-const nextBadge = isNextFixture ? `<div class="fixture-next-badge">Next Match</div>` : ''
+    const nextBadge = isNextFixture ? `<div class="fixture-next-badge">Next Match</div>` : isOpen ? `<div class="fixture-next-badge" style="background: linear-gradient(135deg, #10B981, #059669);">Open</div>` : ''
 
     // Hot Takes: once kickoff has passed, anyone (paid) can see everyone's picks.
     // Hidden by default; expands inline on tap. Only shown for locked fixtures.
@@ -1344,14 +1373,26 @@ return `
   const upcoming = fixtures
     .filter(f => new Date(f.kickoff) > now && f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-  const next = upcoming[0]
+
+  // Same batch window logic as renderFixtures
+  const BATCH_SIZE = 3
+  const BATCH_HOURS = 48
+  const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
+  const openMatchIds = new Set()
+  upcoming.forEach((f, i) => {
+    if (i < BATCH_SIZE) openMatchIds.add(f.id)
+    if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
+  })
+
+  const openMatches = upcoming.filter(f => openMatchIds.has(f.id))
+  const predictedCount = openMatches.filter(f => getPrediction(f.id)).length
   const el = document.getElementById('prediction-count')
-  if (!next) {
+
+  if (!openMatches.length) {
     el.textContent = `${predictions.length}/${fixtures.length}`
     return
   }
-  const pred = getPrediction(next.id)
-  el.textContent = pred ? `Next: ✓ Predicted` : `Next: Predict now`
+  el.textContent = `${predictedCount}/${openMatches.length} predicted`
 }
 
     // ============== HOME ==============
@@ -4558,14 +4599,23 @@ function switchToFixture(fixtureId) {
       if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
       if (tab === 'predictions') {
         previewMode ? renderFixtures() : loadFixtures()
-        // Auto-scroll to the next open fixture after a short delay for render
+        // Auto-scroll to the first OPEN (predictable) fixture after render
         setTimeout(() => {
           const now = new Date()
-          const nextFixture = fixtures
+          const upcoming = fixtures
             .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-            .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0]
-          if (nextFixture) {
-            const el = document.getElementById(`fixture-${nextFixture.id}`)
+            .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+          const BATCH_SIZE = 3
+          const BATCH_HOURS = 48
+          const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
+          const openMatchIds = new Set()
+          upcoming.forEach((f, i) => {
+            if (i < BATCH_SIZE) openMatchIds.add(f.id)
+            if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
+          })
+          const firstOpen = upcoming.find(f => openMatchIds.has(f.id))
+          if (firstOpen) {
+            const el = document.getElementById(`fixture-${firstOpen.id}`)
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
         }, 100)
