@@ -935,6 +935,9 @@ function showPaymentGate() {
   // first paint instead of zeros. (Bug 3 expanded)
   await refreshMyResultsCache().catch(e => console.error('refreshMyResultsCache', e))
 
+  // Social caches: needs `fixtures` to be loaded, so do this AFTER loadFixtures
+  // resolves below. We just kick off the first refresh in the background here.
+
   // Load all home-screen data IN PARALLEL so the user doesn't wait for
   // sequential network round-trips. We wrap each call in catch() so one
   // slow/failing source can't block the rest of the home from rendering.
@@ -943,6 +946,11 @@ function showPaymentGate() {
     Promise.resolve().then(() => loadLeaderboard()).catch(e => console.error('loadLeaderboard', e)),
     Promise.resolve().then(() => loadHome()).catch(e => console.error('loadHome', e)),
   ])
+
+  // Social caches (Hot Takes + Match Preview) — `fixtures` must be populated first.
+  // We refresh, then re-render the parts that depend on them.
+  await refreshSocialCaches().catch(e => console.error('refreshSocialCaches', e))
+  try { loadFixtures(); loadHome() } catch (e) { /* re-render to surface the new data */ }
 
   renderBadges()
   startCountdownTicker()
@@ -1236,6 +1244,19 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
     const isNextFixture = f.id === nextMatchId
 const nextBadge = isNextFixture ? `<div class="fixture-next-badge">Next Match</div>` : ''
 
+    // Hot Takes: once kickoff has passed, anyone (paid) can see everyone's picks.
+    // Hidden by default; expands inline on tap. Only shown for locked fixtures.
+    const showHotTakes = locked && !previewMode && (hotTakesByFixture[f.id]?.length > 0)
+    const hotTakesBlock = showHotTakes
+      ? `<div class="px-5 pb-3">
+          <button id="hot-takes-btn-${f.id}" onclick="toggleHotTakes('${f.id}')"
+                  class="w-full text-xs font-semibold text-ink-600 hover:text-ink-900 tap py-2 border-t border-paper-border/60">
+            See all picks (${hotTakesByFixture[f.id].length})
+          </button>
+          <div id="hot-takes-${f.id}" class="hidden mt-1"></div>
+        </div>`
+      : ''
+
 return `
     <div class="glass-fixture relative ${isNextFixture ? 'fixture-next-highlight' : ''}" id="fixture-${f.id}" data-fixture="${f.id}">
       ${nextBadge}
@@ -1263,6 +1284,7 @@ return `
         ${scoreSection}
       ${saveBtn}
       ${submittedStamp}
+      ${hotTakesBlock}
     </div>`
   }).join('')
 }
@@ -1355,6 +1377,361 @@ return `
     // Returns final_points for the current user on a given fixture, or 0.
     function getPointsForFixture(fixtureId) {
       return myResultsByFixture[fixtureId]?.final_points || 0
+    }
+
+    // ============== SOCIAL FEATURES (Hot Takes / H2H / Match Preview) ==============
+    // Three shared concerns:
+    //   1. All three only show paid users (fee_paid = true). Mirrors the leaderboard.
+    //   2. Refreshed on boot + after score events, NOT on every render — they're caches.
+    //   3. Visibility tied to per-fixture lock: a match's picks become public once its
+    //      kickoff has passed, not once the WHOLE matchday locks. Independent per match.
+
+    let hotTakesByFixture = {}   // { fixtureId: [{ user_id, name, home, away, base_points, final_points, streak_bonus, combo_bonus, submitted_at }] }
+    let matchPreviewCache = null // { fixtureId, submittedCount, totalPaid, topScore, topCount, homeWin, draw, awayWin }
+
+    async function refreshSocialCaches() {
+      // Single fetch for paid profiles — shared by both refreshes.
+      let paidMap = {}
+      try {
+        const { data: paidProfiles } = await supabaseClient
+          .from('profiles').select('id, name').eq('fee_paid', true)
+        ;(paidProfiles || []).forEach(p => { paidMap[p.id] = p })
+      } catch (e) {
+        console.warn('[social] paid profiles fetch failed:', e)
+        return
+      }
+      await Promise.all([
+        refreshHotTakes(paidMap),
+        refreshMatchPreview(paidMap)
+      ])
+    }
+
+    async function refreshHotTakes(paidMap) {
+      if (!fixtures.length) { hotTakesByFixture = {}; return }
+      const now = Date.now()
+      // A fixture is "locked" once its kickoff has passed — at that point its predictions
+      // become public regardless of whether the result is in yet.
+      const lockedIds = fixtures.filter(f => new Date(f.kickoff).getTime() <= now).map(f => f.id)
+      if (!lockedIds.length) { hotTakesByFixture = {}; return }
+
+      try {
+        const [{ data: preds }, { data: results }] = await Promise.all([
+          supabaseClient.from('predictions')
+            .select('user_id, fixture_id, home_prediction, away_prediction, submitted_at')
+            .in('fixture_id', lockedIds),
+          supabaseClient.from('prediction_results')
+            .select('user_id, fixture_id, base_points, final_points, streak_bonus, combo_bonus')
+            .in('fixture_id', lockedIds)
+        ])
+
+        // Index results by "userId|fixtureId" for O(1) merge
+        const resultMap = {}
+        ;(results || []).forEach(r => { resultMap[r.user_id + '|' + r.fixture_id] = r })
+
+        const grouped = {}
+        ;(preds || []).forEach(p => {
+          if (!paidMap[p.user_id]) return                                      // unpaid users excluded
+          if (p.home_prediction === null || p.away_prediction === null) return // blank predictions excluded
+          const fid = p.fixture_id
+          if (!grouped[fid]) grouped[fid] = []
+          const r = resultMap[p.user_id + '|' + fid] || {}
+          grouped[fid].push({
+            user_id: p.user_id,
+            name: paidMap[p.user_id].name || 'Anonymous',
+            home: p.home_prediction,
+            away: p.away_prediction,
+            submitted_at: p.submitted_at,
+            base_points: r.base_points ?? null,
+            final_points: r.final_points ?? null,
+            streak_bonus: r.streak_bonus || 0,
+            combo_bonus: r.combo_bonus || 0
+          })
+        })
+
+        // Sort each fixture's picks: finished -> by final_points desc; locked-not-finished -> by submitted_at asc
+        Object.keys(grouped).forEach(fid => {
+          const fixture = fixtures.find(f => f.id === fid)
+          const finished = fixture && fixture.home_score !== null && fixture.away_score !== null
+          if (finished) {
+            grouped[fid].sort((a, b) => (b.final_points || 0) - (a.final_points || 0))
+          } else {
+            grouped[fid].sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at))
+          }
+        })
+
+        hotTakesByFixture = grouped
+      } catch (e) {
+        console.warn('[hot-takes] refresh failed:', e)
+      }
+    }
+
+    function renderHotTakes(fixtureId) {
+      const picks = hotTakesByFixture[fixtureId] || []
+      if (!picks.length) {
+        return '<div class="text-center text-sm text-ink-500 py-3">No predictions to show</div>'
+      }
+      const fixture = fixtures.find(f => f.id === fixtureId)
+      const finished = fixture && fixture.home_score !== null && fixture.away_score !== null
+      const myId = getUser()?.id
+
+      return picks.map(p => {
+        const isMe = p.user_id === myId
+        const ptsBadge = finished
+          ? `<span class="text-xs font-bold ${(p.final_points || 0) > 0 ? 'text-brand-700' : 'text-ink-400'}" style="font-variant-numeric:tabular-nums;">+${p.final_points || 0}</span>`
+          : ''
+        const bonusEmoji = (p.streak_bonus > 0 ? '🔥' : '') + (p.combo_bonus > 0 ? '⚡' : '')
+        return `
+          <div class="flex items-center gap-2 py-1.5 px-2 ${isMe ? 'rounded-lg' : ''}" ${isMe ? 'style="background:rgba(212,162,76,0.10);"' : ''}>
+            <div class="flex-1 min-w-0 text-sm truncate ${isMe ? 'font-bold text-brand-700' : 'text-ink-700'}">
+              ${isMe ? 'You' : (p.name || 'Anonymous')}
+            </div>
+            <div class="text-sm font-bold text-ink-900" style="font-variant-numeric:tabular-nums;">
+              ${p.home}–${p.away}
+            </div>
+            ${bonusEmoji ? `<div class="text-xs">${bonusEmoji}</div>` : ''}
+            ${ptsBadge}
+          </div>`
+      }).join('')
+    }
+
+    function toggleHotTakes(fixtureId) {
+      const el = document.getElementById('hot-takes-' + fixtureId)
+      const btn = document.getElementById('hot-takes-btn-' + fixtureId)
+      if (!el) return
+      if (el.classList.contains('hidden')) {
+        el.innerHTML = renderHotTakes(fixtureId)
+        el.classList.remove('hidden')
+        if (btn) btn.textContent = 'Hide picks'
+      } else {
+        el.classList.add('hidden')
+        if (btn) btn.textContent = 'See all picks'
+      }
+    }
+
+    async function refreshMatchPreview(paidMap) {
+      // Preview = the next OPEN (unlocked) match for the current user.
+      const now = Date.now()
+      const upcoming = fixtures
+        .filter(f => new Date(f.kickoff).getTime() > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0]
+      if (!upcoming) { matchPreviewCache = null; return }
+
+      try {
+        const { data: preds } = await supabaseClient
+          .from('predictions')
+          .select('user_id, home_prediction, away_prediction')
+          .eq('fixture_id', upcoming.id)
+        if (!preds) { matchPreviewCache = null; return }
+
+        const valid = preds.filter(p =>
+          paidMap[p.user_id] && p.home_prediction !== null && p.away_prediction !== null
+        )
+        const totalPaid = Object.keys(paidMap).length
+        const submittedCount = valid.length
+
+        const scoreCounts = {}
+        let homeWin = 0, draw = 0, awayWin = 0
+        valid.forEach(p => {
+          const key = p.home_prediction + '-' + p.away_prediction
+          scoreCounts[key] = (scoreCounts[key] || 0) + 1
+          if (p.home_prediction > p.away_prediction) homeWin++
+          else if (p.home_prediction < p.away_prediction) awayWin++
+          else draw++
+        })
+
+        let topScore = null, topCount = 0
+        Object.entries(scoreCounts).forEach(([k, c]) => {
+          if (c > topCount) { topScore = k; topCount = c }
+        })
+
+        matchPreviewCache = {
+          fixtureId: upcoming.id,
+          submittedCount, totalPaid,
+          topScore, topCount,
+          homeWin, draw, awayWin
+        }
+      } catch (e) {
+        console.warn('[preview] refresh failed:', e)
+        matchPreviewCache = null
+      }
+    }
+
+    function renderMatchPreviewCard() {
+      if (!matchPreviewCache) return ''
+      const p = matchPreviewCache
+      if (p.submittedCount === 0 || !p.totalPaid) return ''   // nothing interesting to show yet
+
+      const pct = Math.round((p.submittedCount / p.totalPaid) * 100)
+      const fixture = fixtures.find(f => f.id === p.fixtureId)
+      if (!fixture) return ''
+
+      // Below the minimum, just show the lock-in count without the lean/popular stats —
+      // a 1-player "100% on Brazil" reads pathetic for a small league. (Polish 1)
+      const MIN_FOR_STATS = 3
+      const showStats = p.submittedCount >= MIN_FOR_STATS
+
+      let statsBlock = ''
+      if (showStats) {
+        const total = p.homeWin + p.draw + p.awayWin
+        const homePct = total ? Math.round((p.homeWin / total) * 100) : 0
+        const drawPct = total ? Math.round((p.draw / total) * 100) : 0
+        const awayPct = total ? Math.round((p.awayWin / total) * 100) : 0
+
+        let leanText
+        if (homePct >= drawPct && homePct >= awayPct) leanText = homePct + '% on ' + fixture.home_team
+        else if (awayPct >= drawPct)                   leanText = awayPct + '% on ' + fixture.away_team
+        else                                           leanText = drawPct + '% backing a draw'
+
+        const popularScore = p.topScore
+          ? 'Most picked: <b class="text-ink-900" style="font-variant-numeric:tabular-nums;">' + p.topScore.split('-').join('–') + '</b> (' + p.topCount + ' ' + (p.topCount === 1 ? 'player' : 'players') + ')'
+          : ''
+
+        statsBlock = `
+          <div class="text-xs text-ink-600 leading-relaxed">
+            ${popularScore ? '<div>' + popularScore + '</div>' : ''}
+            <div>Crowd leans: <b class="text-ink-900">${leanText}</b></div>
+          </div>`
+      }
+
+      return `
+        <div class="glass-light rounded-2xl p-3 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">Crowd Preview</div>
+            <div class="text-xs font-bold text-ink-700">${p.submittedCount}/${p.totalPaid} locked in</div>
+          </div>
+          <div class="w-full h-1.5 bg-paper rounded-full overflow-hidden mb-2">
+            <div class="h-full bg-brand-500 transition-all" style="width:${pct}%"></div>
+          </div>
+          ${statsBlock}
+        </div>`
+    }
+
+    // ============== HEAD-TO-HEAD ==============
+    async function openH2H(opponentId) {
+      const myId = getUser()?.id
+      if (!myId || opponentId === myId) return  // no self-H2H
+
+      showH2HModal({ loading: true })
+
+      try {
+        const [{ data: myResults }, { data: theirResults }, { data: opp }] = await Promise.all([
+          supabaseClient.from('prediction_results')
+            .select('fixture_id, final_points').eq('user_id', myId),
+          supabaseClient.from('prediction_results')
+            .select('fixture_id, final_points').eq('user_id', opponentId),
+          supabaseClient.from('profiles').select('name').eq('id', opponentId).maybeSingle()
+        ])
+
+        // Only compare matches BOTH predicted AND that are now resolved
+        // (presence of a prediction_results row guarantees the match was scored)
+        const myMap = {}
+        ;(myResults || []).forEach(r => { myMap[r.fixture_id] = r })
+
+        const matches = []
+        let myTotal = 0, theirTotal = 0, myWins = 0, theirWins = 0, ties = 0
+        ;(theirResults || []).forEach(r => {
+          const mine = myMap[r.fixture_id]
+          if (!mine) return
+          const fixture = fixtures.find(f => f.id === r.fixture_id)
+          if (!fixture) return
+          const myPts = mine.final_points || 0
+          const theirPts = r.final_points || 0
+          myTotal += myPts
+          theirTotal += theirPts
+          let outcome
+          if      (myPts > theirPts) { myWins++;    outcome = 'win'  }
+          else if (theirPts > myPts) { theirWins++; outcome = 'loss' }
+          else                       { ties++;      outcome = 'tie'  }
+          matches.push({ fixture, myPts, theirPts, outcome })
+        })
+        matches.sort((a, b) => new Date(b.fixture.kickoff) - new Date(a.fixture.kickoff))
+
+        showH2HModal({
+          opponentName: opp?.name || 'Player',
+          myTotal, theirTotal, myWins, theirWins, ties, matches
+        })
+      } catch (e) {
+        console.error('[h2h] load failed:', e)
+        showToast('Could not load head-to-head', 'error')
+        hideH2HModal()
+      }
+    }
+
+    function showH2HModal(data) {
+      let modal = document.getElementById('h2h-modal')
+      if (!modal) {
+        modal = document.createElement('div')
+        modal.id = 'h2h-modal'
+        modal.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4'
+        modal.style.background = 'rgba(10, 15, 13, 0.45)'
+        modal.style.backdropFilter = 'blur(4px)'
+        modal.onclick = (e) => { if (e.target === modal) hideH2HModal() }
+        document.body.appendChild(modal)
+      }
+
+      if (data.loading) {
+        modal.innerHTML = '<div class="bg-white rounded-t-3xl sm:rounded-3xl p-8 w-full max-w-lg text-center"><span class="auth-spinner" style="width:24px;height:24px;border-width:2px;border-color:rgba(10,15,13,0.15);border-top-color:#D4A24C;"></span></div>'
+        return
+      }
+
+      const { opponentName, myTotal, theirTotal, myWins, theirWins, ties, matches } = data
+      const diff = myTotal - theirTotal
+      const summary = diff > 0
+        ? '<span class="text-brand-700 font-bold">+' + diff + '</span> ahead'
+        : diff < 0
+          ? '<span class="text-red-600 font-bold">' + diff + '</span> behind'
+          : 'Dead even'
+
+      modal.innerHTML = `
+        <div class="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg flex flex-col" style="max-height:85vh;">
+          <div class="p-5 border-b border-paper-border flex items-center justify-between shrink-0">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">Head to head</div>
+              <div class="text-lg font-bold text-ink-900 truncate">You vs ${opponentName}</div>
+            </div>
+            <button onclick="hideH2HModal()" class="w-9 h-9 rounded-full bg-paper border border-paper-border flex items-center justify-center text-ink-500 tap shrink-0">✕</button>
+          </div>
+
+          <div class="px-5 py-4 border-b border-paper-border shrink-0">
+            <div class="flex items-center justify-around text-center">
+              <div>
+                <div class="text-2xl font-bold text-brand-700" style="font-variant-numeric:tabular-nums;">${myTotal}</div>
+                <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5">You</div>
+              </div>
+              <div class="text-sm text-ink-300 font-semibold">vs</div>
+              <div class="min-w-0">
+                <div class="text-2xl font-bold text-ink-700" style="font-variant-numeric:tabular-nums;">${theirTotal}</div>
+                <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5 truncate max-w-[100px]">${opponentName}</div>
+              </div>
+            </div>
+            <div class="text-center mt-3 text-sm text-ink-600">${summary} · ${myWins}W ${ties}T ${theirWins}L · ${matches.length} match${matches.length === 1 ? '' : 'es'}</div>
+          </div>
+
+          ${matches.length === 0
+            ? '<div class="p-8 text-center text-sm text-ink-500">No completed matches you have both predicted yet.</div>'
+            : '<div class="flex-1 overflow-y-auto px-3 py-2">' + matches.map(m => {
+                const f = m.fixture
+                const dot = m.outcome === 'win' ? '🟢' : m.outcome === 'loss' ? '🔴' : '⚪'
+                const dateStr = new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                return `
+                  <div class="flex items-center gap-2 py-2 px-2 border-b border-paper-border/40 last:border-0">
+                    <div class="text-base shrink-0">${dot}</div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-semibold text-ink-900 truncate">${f.home_team} vs ${f.away_team}</div>
+                      <div class="text-[10px] text-ink-500">${dateStr} · ${f.stage}</div>
+                    </div>
+                    <div class="text-right shrink-0 text-xs" style="font-variant-numeric:tabular-nums;">
+                      <b class="text-brand-700">${m.myPts}</b> <span class="text-ink-300">·</span> <span class="text-ink-700">${m.theirPts}</span>
+                    </div>
+                  </div>`
+              }).join('') + '</div>'
+          }
+        </div>`
+    }
+
+    function hideH2HModal() {
+      const modal = document.getElementById('h2h-modal')
+      if (modal) modal.remove()
     }
 
     // ── Bonus Engine Helpers ──
@@ -1547,6 +1924,10 @@ async function loadHome() {
     const ko = new Date(f.kickoff)
     const diff = ko - now
     cdEl.dataset.cdHome = ko.toISOString()
+
+    // Crowd Preview card injected ABOVE the next-match card.
+    // Hidden if nobody has predicted yet (renderMatchPreviewCard returns '' in that case).
+    const previewHtml = renderMatchPreviewCard()
     
     cdEl.textContent = `in ${msToCountdown(diff)}`
 // Initial color class based on time remaining
@@ -1560,7 +1941,7 @@ if (minsToKick > 120) {
   cdEl.classList.add('next-match-countdown', 'countdown-red')
 }
 
-   nextEl.innerHTML = `
+   nextEl.innerHTML = previewHtml + `
   <div class="glass-light rounded-3xl overflow-hidden">
         <div class="px-4 pt-3 pb-2">
           <div class="text-[11px] font-bold text-ink-400 uppercase tracking-[0.15em] mb-1.5">${f.stage}</div>
@@ -2028,6 +2409,30 @@ async function loadLeaderboard() {
         </div>`
       }).join('')
 
+      // ===== H2H tap-to-open: attach click handler to every leaderboard row =====
+      // Tapping a row opens a head-to-head modal comparing you against that player.
+      // Tapping your own row is a no-op (handled inside openH2H).
+      // Uses addEventListener + dedup guard so realtime re-renders don't stack listeners. (Polish 3)
+      c.querySelectorAll('[data-uid]').forEach(el => {
+        const uid = el.dataset.uid
+        if (uid === myId) return  // skip self — no rivalry with yourself
+        if (el.dataset.h2hBound) return  // don't double-bind on re-renders
+        el.style.cursor = 'pointer'
+        el.addEventListener('click', () => openH2H(uid))
+        el.dataset.h2hBound = '1'
+
+        // Tiny chevron in the right edge to signal tappability. (Polish 2)
+        if (!el.querySelector('.h2h-chevron')) {
+          // Ensure parent is positioned so the absolute child anchors correctly
+          if (getComputedStyle(el).position === 'static') el.style.position = 'relative'
+          const chev = document.createElement('div')
+          chev.className = 'h2h-chevron'
+          chev.textContent = '›'
+          chev.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);color:rgba(10,15,13,0.25);font-size:18px;font-weight:bold;pointer-events:none;'
+          el.appendChild(chev)
+        }
+      })
+
       // ===== FLIP: apply animations on the next frame =====
       if (!hadAnyRows) return // first paint — let the natural fade happen
       requestAnimationFrame(() => {
@@ -2109,9 +2514,12 @@ async function loadLeaderboard() {
 
    function setupRealtime() {
   // 1) Predictions: ALL events (kept for leaderboard refresh when someone submits)
+  // Also refreshes Match Preview so the "X/Y locked in" counter stays live.
   supabaseClient.channel('lb')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => {
-      loadLeaderboard(); loadFixtures(); loadHome()
+      refreshSocialCaches().then(() => {
+        loadLeaderboard(); loadFixtures(); loadHome()
+      })
     })
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') console.log('LB channel status:', status)
@@ -2131,8 +2539,9 @@ async function loadLeaderboard() {
         showToast(`You scored ${newPts} points!`, 'success')
       }
       // Refresh the local cache so badges, fixture cards, recent-results all update.
-      refreshMyResultsCache().then(() => {
-        loadLeaderboard(); loadHome()
+      // Also refresh social caches so Hot Takes pick up the new points.
+      Promise.all([refreshMyResultsCache(), refreshSocialCaches()]).then(() => {
+        loadLeaderboard(); loadHome(); loadFixtures()
       })
     })
     .subscribe((status) => {
