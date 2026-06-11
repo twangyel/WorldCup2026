@@ -5785,3 +5785,61 @@ async function testPushToSelf() {
 // Expose for the admin test button
 window.enablePushNotifications = enablePushNotifications
 window.testPushToSelf = testPushToSelf
+
+/* ========== AUTO-HIDE BOTTOM NAV (X-style) ========== */
+(function initAutoHideNav() {
+  const nav = document.getElementById('app-nav')
+  if (!nav) return
+
+  let lastScrollY = window.scrollY || 0
+  let ticking = false
+
+  // Tunables
+  const SCROLL_THRESHOLD = 24   // px of movement before toggling (prevents jitter)
+  const TOP_THRESHOLD = 80      // always show within this many px of top
+
+  function showNav() { nav.classList.remove('nav-hidden') }
+  function hideNav() { nav.classList.add('nav-hidden') }
+
+  function updateNav() {
+    const y = window.scrollY || 0
+    const delta = y - lastScrollY
+
+    if (y <= TOP_THRESHOLD) {
+      showNav()
+    } else if (delta > SCROLL_THRESHOLD) {
+      hideNav()
+      lastScrollY = y
+    } else if (delta < -SCROLL_THRESHOLD) {
+      showNav()
+      lastScrollY = y
+    }
+    ticking = false
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(updateNav)
+      ticking = true
+    }
+  }, { passive: true })
+
+  // Force nav visible on tab switch
+  // (switchTab is a function declaration, not on window — hook nav buttons directly)
+  document.querySelectorAll('#app-nav .nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showNav()
+      lastScrollY = window.scrollY || 0
+    })
+  })
+
+  // Force nav visible whenever a modal/sheet opens
+  const overlayIds = ['modal-overlay', 'rules-overlay', 'league-modal-overlay', 'ask-admin-overlay']
+  overlayIds.forEach(id => {
+    const el = document.getElementById(id)
+    if (!el) return
+    new MutationObserver(() => {
+      if (!el.classList.contains('hidden')) showNav()
+    }).observe(el, { attributes: true, attributeFilter: ['class'] })
+  })
+})()
