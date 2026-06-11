@@ -1603,6 +1603,14 @@
     @media (prefers-reduced-motion: reduce) {
       .h2h-backdrop, .h2h-content, .h2h-content-fade { transition: none !important; }
       .h2h-skel-title, .h2h-skel-close, .h2h-skel-stat, .h2h-skel-row { animation: none !important; }
+      /* ========== AUTO-HIDE BOTTOM NAV (X-style) ========== */
+    #app-nav {
+      transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+      will-change: transform;
+    }
+    #app-nav.nav-hidden {
+      transform: translateY(110%);
+    }
     }
 </style>
 <base target="_blank">
