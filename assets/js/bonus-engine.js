@@ -708,16 +708,20 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
 
       if (upsertError) {
         console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
-      } else {
+     } else {
         // Only recalc if this user has LATER resolved matches than the one we just scored.
         // In the common case (admin scores fixtures in order), there are none → skip the
         // O(n) chain rewrite. Heals the out-of-order case without the quadratic hit. (Bug 6)
+        //
+        // gte + neq catches simultaneous-kickoff fixtures too (Bug 7b). Slightly over-triggers
+        // on same-kickoff fixtures scored in order, but recalc is idempotent so it's harmless.
         try {
           const { count: laterCount } = await supabaseClient
             .from('prediction_results')
             .select('prediction_id', { count: 'exact', head: true })
             .eq('user_id', pred.user_id)
-            .gt('kickoff', fixture.kickoff);
+            .gte('kickoff', fixture.kickoff)
+            .neq('fixture_id', fixtureId);
 
           if ((laterCount || 0) > 0) {
             await recalculateUserBonuses(pred.user_id);
