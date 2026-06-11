@@ -5752,8 +5752,6 @@ async function testPushToSelf() {
       return
     }
 
-    
-
     const SUPABASE_FUNCTIONS_URL = supabaseClient.supabaseUrl + '/functions/v1/' + SEND_PUSH_SLUG
 
     const res = await fetch(SUPABASE_FUNCTIONS_URL, {
@@ -5787,4 +5785,3 @@ async function testPushToSelf() {
 // Expose for the admin test button
 window.enablePushNotifications = enablePushNotifications
 window.testPushToSelf = testPushToSelf
-
