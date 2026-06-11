@@ -1228,13 +1228,14 @@ async function executeRecalcAll() {
         const cutoff = new Date(now.getTime() - 6 * 60 * 60 * 1000)  // include matches locked in last 6h
 
         // 1. Get the relevant fixtures
-        const { data: fix } = await supabase
+        const { data: fix, error: fixErr } = await supabaseClient
           .from('fixtures')
           .select('id, home_team, away_team, kickoff, stage')
           .gte('kickoff', cutoff.toISOString())
           .is('home_score', null)
           .order('kickoff', { ascending: true })
           .limit(5)
+        if (fixErr) { console.error('[pending] fixtures error:', fixErr); throw fixErr }
         const fixtures = fix || []
 
         if (!fixtures.length) {
@@ -1242,24 +1243,48 @@ async function executeRecalcAll() {
           return
         }
 
-        // 2. Get all paid users in one query
-        const { data: paid } = await supabase
-          .from('profiles')
-          .select('id, name, whatsapp')
-          .eq('fee_paid', true)
-        const paidUsers = paid || []
+        // 2. Reuse the already-loaded allUsers array (admin's user list) if available —
+        //    it's already filtered by RLS-friendly admin access. WhatsApp number can live
+        //    in either `whatsapp` or `phone` (synth email is the last fallback).
+        let paidUsers = []
+        if (typeof allUsers !== 'undefined' && Array.isArray(allUsers) && allUsers.length) {
+          paidUsers = allUsers
+            .filter(u => u.fee_paid === true)
+            .map(u => ({
+              id: u.id,
+              name: u.name || 'Unnamed',
+              whatsapp: u.whatsapp || u.phone || (u.email ? u.email.replace('@wa.predict.local', '') : '')
+            }))
+        } else {
+          // Fallback: try direct query if allUsers isn't loaded yet
+          const { data: paid, error: paidErr } = await supabaseClient
+            .from('profiles')
+            .select('id, name, whatsapp, phone, email, fee_paid')
+            .eq('fee_paid', true)
+          if (paidErr) { console.error('[pending] profiles error:', paidErr); throw paidErr }
+          paidUsers = (paid || []).map(u => ({
+            id: u.id,
+            name: u.name || 'Unnamed',
+            whatsapp: u.whatsapp || u.phone || (u.email ? u.email.replace('@wa.predict.local', '') : '')
+          }))
+        }
 
         if (!paidUsers.length) {
-          listEl.innerHTML = '<div class="text-center text-sm text-ink-400 py-4">No paid users yet.</div>'
+          listEl.innerHTML = `
+            <div class="text-center text-sm text-ink-400 py-4">
+              No paid users found.<br>
+              <span class="text-[11px]">Check the Users tab — make sure at least one user has "Paid" toggled on.</span>
+            </div>`
           return
         }
 
         // 3. Get all predictions for these fixtures in one query
         const fixtureIds = fixtures.map(f => f.id)
-        const { data: preds } = await supabase
+        const { data: preds, error: predsErr } = await supabaseClient
           .from('predictions')
           .select('user_id, fixture_id, home_prediction, away_prediction')
           .in('fixture_id', fixtureIds)
+        if (predsErr) { console.error('[pending] predictions error:', predsErr); throw predsErr }
         const predictionSet = new Set()
         ;(preds || []).forEach(p => {
           if (p.home_prediction !== null && p.away_prediction !== null) {
