@@ -1889,9 +1889,9 @@ async function getLeaderboardFromResults() {
 
   // Only include user_ids that belong to a paid profile.
   // This drops unpaid users (and unpaid admins) even if they have rows in prediction_results.
-  const userIds = [...new Set((results || []).map(r => r.user_id))].filter(uid => profileMap[uid])
-  const stats = userIds.map(uid => {
-    const userResults = results.filter(r => r.user_id === uid)
+ const stats = profiles.map(profile => {
+    const uid = profile.id
+    const userResults = (results || []).filter(r => r.user_id === uid)
     let engineStats
     try {
       if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
@@ -1915,8 +1915,7 @@ async function getLeaderboardFromResults() {
       console.warn('[Leaderboard] BonusEngine failed for user', uid, e)
       engineStats = { points: 0, exact: 0, gd: 0, result: 0, total_predictions: userResults.length }
     }
-    const profile = profileMap[uid] || {}
-    return {
+     return {
       user_id: uid,
       name: profile.full_name || profile.name || 'Unknown',
       full_name: profile.full_name || profile.name || 'Unknown',
