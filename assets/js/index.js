@@ -1107,7 +1107,7 @@ const BADGES = [
   { id: 'champion',    icon: '👑', name: 'Champion',      desc: '#1 on the board' },
   { id: 'nostradamus', icon: '🔮', name: 'Nostradamus',   desc: '3+ exact scores' },
   { id: 'sharpshoot',  icon: '🎯', name: 'Sharpshooter',  desc: '5+ exact scores' },
-  { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 24h+ early' },
+  { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 72h+ early' },
   { id: 'underdog',    icon: '🐴', name: 'Underdog King', desc: '3+ correct draws' },
   { id: 'streak',      icon: '🔥', name: 'On Fire',       desc: '3+ in a row' },
   { id: 'centurion',   icon: '💯', name: 'Centurion',     desc: '100+ points' },
@@ -3875,12 +3875,12 @@ window.promptShareScore = promptShareScore
       ).length
       if (correctDraws >= 3) earned.add('underdog')
 
-      // Early Bird: any prediction submitted 24h+ before kickoff
+      // Early Bird: any prediction submitted 72h+ before kickoff
       const earlyBird = predictions.some(p => {
         if (!p.submitted_at) return false
         const f = fixtures.find(x => x.id === p.fixture_id)
         if (!f) return false
-        return new Date(f.kickoff) - new Date(p.submitted_at) >= 24 * 3600 * 1000
+        return new Date(f.kickoff) - new Date(p.submitted_at) >= 72 * 3600 * 1000
       })
       if (earlyBird) earned.add('earlybird')
 
@@ -5695,3 +5695,47 @@ async function regenerateLeagueCode(leagueId) {
     showToast(`New invite code: ${newCode}`, 'success')
 }
 loadRememberedEmail()
+// ─────────────────────────────────────────────────────────────
+// Auto-hide bottom nav on scroll (X / Twitter style)
+//   - scroll down  → hide
+//   - scroll up    → show
+//   - near top     → always show
+//   - small jitters ignored via threshold
+// ─────────────────────────────────────────────────────────────
+;(function setupAutoHideNav() {
+  const nav = document.getElementById('app-nav')
+  if (!nav) return
+
+  nav.style.transition = 'transform 220ms ease-in-out'
+  nav.style.willChange = 'transform'
+
+  let lastY = window.scrollY || 0
+  let hidden = false
+  let ticking = false
+  const THRESHOLD = 8       // ignore tiny scrolls
+  const TOP_BUFFER = 40     // always show near the top
+
+  function update() {
+    const y = window.scrollY || 0
+    const delta = y - lastY
+
+    if (Math.abs(delta) < THRESHOLD) { ticking = false; return }
+
+    if (y < TOP_BUFFER) {
+      if (hidden) { nav.style.transform = 'translateY(0)'; hidden = false }
+    } else if (delta > 0 && !hidden) {
+      nav.style.transform = 'translateY(110%)'
+      hidden = true
+    } else if (delta < 0 && hidden) {
+      nav.style.transform = 'translateY(0)'
+      hidden = false
+    }
+
+    lastY = y
+    ticking = false
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) { requestAnimationFrame(update); ticking = true }
+  }, { passive: true })
+})()
