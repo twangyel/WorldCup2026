@@ -1296,7 +1296,7 @@ return `
 
       <div class="fixture-stage-label">
         <span>${f.stage}</span>
-        ${isNextFixture ? '' : `<span class="fixture-status-badge ${statusClass}">${statusText}</span>`}
+        ${(isNextFixture || isOpen) ? '' : `<span class="fixture-status-badge ${statusClass}">${statusText}</span>`}
       </div>
 
       <div class="fixture-match-row">
