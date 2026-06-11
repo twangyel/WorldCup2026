@@ -2475,15 +2475,26 @@ async function loadLeaderboard() {
         // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
 
         // Matchday tab uses simpler stats
-        const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0 || (s.wrong || 0) > 0
+       const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0 || (s.wrong || 0) > 0
+
+        // Tournament state — drives the empty-row copy on both tabs
+        const now = Date.now()
+        const anyKickedOff = (fixtures || []).some(f => new Date(f.kickoff).getTime() <= now)
+        const anyScored    = (fixtures || []).some(f => f.home_score !== null && f.away_score !== null)
+        const emptyLabel = !anyKickedOff
+          ? 'Awaiting kickoff…'
+          : !anyScored
+            ? 'Match in progress…'
+            : 'No points yet'
+
         const statsLineOverall = hasAnyStats
           ? `<span><b class="text-ink-900">${correct}</b> correct</span>
              <span class="text-ink-300">·</span>
              <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>`
-          : `<span class="text-ink-400 italic">Awaiting kickoff…</span>`
+          : `<span class="text-ink-400 italic">${emptyLabel}</span>`
         const statsLineMatchday = (s.points || 0) > 0
           ? `<span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>`
-          : `<span class="text-ink-400 italic">No points yet</span>`
+          : `<span class="text-ink-400 italic">${emptyLabel}</span>`
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
