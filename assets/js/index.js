@@ -1843,7 +1843,7 @@ async function getLeaderboardFromResults() {
   // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
   const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
     supabaseClient.from('prediction_results').select('*'),
-    supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid').eq('fee_paid', true)
+   supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true)
   ])
 
   // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
@@ -1864,12 +1864,13 @@ async function getLeaderboardFromResults() {
 
     // Ultimate fallback: build from profiles with zero points
     if (profiles && profiles.length > 0) {
-      const stats = profiles.map(p => ({
+ const stats = profiles.map(p => ({
         user_id: p.id,
         id: p.id,
         name: p.full_name || p.name || 'Unknown',
         full_name: p.full_name || p.name || 'Unknown',
         department: p.department || '',
+        avatar_url: p.avatar_url || null,
         points: 0,
         exact: 0,
         gd: 0,
@@ -1915,11 +1916,12 @@ async function getLeaderboardFromResults() {
       console.warn('[Leaderboard] BonusEngine failed for user', uid, e)
       engineStats = { points: 0, exact: 0, gd: 0, result: 0, total_predictions: userResults.length }
     }
-     return {
+return {
       user_id: uid,
       name: profile.full_name || profile.name || 'Unknown',
       full_name: profile.full_name || profile.name || 'Unknown',
       department: profile.department || '',
+      avatar_url: profile.avatar_url || null,
       ...engineStats
     }
   })
@@ -2315,6 +2317,42 @@ recentEl.innerHTML = finished.map(f => {
   document.getElementById('lb-next-countdown').textContent = cd
   document.getElementById('lb-next-countdown').dataset.cdCard = next.id
 }
+
+
+function buildLeaderboardShareText(stats, subtab) {
+  const top = stats.slice(0, 21)
+  const medals = ['🥇', '🥈', '🥉']
+  const title = subtab === 'matchday'
+    ? '🏆 WC Predictions — Matchday Standings'
+    : '🏆 WC Predictions League — Overall'
+
+  const lines = top.map((s, i) => {
+    const rank = i < 3 ? medals[i] : `${i + 1}.`
+    return `${rank} ${s.name || 'Anonymous'} — ${s.points || 0} pts`
+  })
+
+  const url = window.location.origin
+  return `${title}\n\n${lines.join('\n')}\n\nPredict next match: ${url}`
+}
+
+async function shareLeaderboard() {
+  const stats = window.__lbCachedStats || []
+  const subtab = window.__lbSubtab || 'overall'
+  const text = buildLeaderboardShareText(stats, subtab)
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'WC Predictions League', text })
+      return
+    } catch (e) {
+      if (e.name === 'AbortError') return
+      console.warn('Native share failed, falling back:', e)
+    }
+  }
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
+  window.open(waUrl, '_blank')
+}
+
 async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
@@ -2354,6 +2392,10 @@ async function loadLeaderboard() {
         }
       }
       document.getElementById('lb-subtab-meta').textContent = metaText
+
+      // Cache for shareLeaderboard()
+      window.__lbCachedStats = stats
+      window.__lbSubtab = lbSubtab
 
       // Render CTA card + prize strip (use overall rank for "projected winning")
       renderLbCta()
