@@ -333,8 +333,7 @@ function getAvatarHtml(name, avatarUrl, rank, size = 32) {
       deferredPrompt = null
     }
     function dismissInstall() { document.getElementById('install-banner').classList.add('hidden'); localStorage.setItem('install-dismissed', 'true') }
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
-
+  
     // ============== TOAST ==============
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container')
