@@ -78,7 +78,7 @@ const BONUS_CONFIG = {
       'Third Place': 1.5,
       '3rd Place': 1.5
     },
-    roundToNearest: 0.5 // 7.5 stays 7.5, or set to 1 to round to whole numbers
+    roundToNearest: 1  // 7.5 stays 7.5, or set to 1 to round to whole numbers
   }
 };
 
@@ -530,11 +530,13 @@ function aggregateUserStats(userId, allMatchResults) {
     stats.final_points_total += m.final_points;
 
     // Collect unique combos
-    m.combos_earned?.forEach(c => {
-      if (!stats.combos_earned.find(ec => ec.type === c.type && ec.description === c.description)) {
-        stats.combos_earned.push(c);
-      }
-    });
+    stats.combo_count = 0;
+   m.combos_earned?.forEach(c => {
+  stats.combo_count++;   // count every instance
+  if (!stats.combos_earned.find(ec => ec.type === c.type && ec.description === c.description)) {
+    stats.combos_earned.push(c);
+  }
+});
 
     // Best multiplier match
     if (!stats.best_multiplier_match || m.stage_multiplier > stats.best_multiplier_match.stage_multiplier) {

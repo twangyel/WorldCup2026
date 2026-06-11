@@ -127,6 +127,7 @@
 function flagHtml(name, size = 24) {
     const f = getFlag(name);
     const flagClass = size >= 32 ? 'team-flag-lg' : size >= 24 ? 'team-flag-sm' : 'team-flag-xs';
+    const safeName = escapeHtml(name || 'Unknown');
 
     if (f.isTbd) {
         return `
@@ -146,21 +147,21 @@ function flagHtml(name, size = 24) {
         return `
             <img
                 src="${hiResImg}"
-                alt="${name}"
+                alt="${safeName}"
                 class="${flagClass} shrink-0"
                 onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"
             >
             <span
                 class="${flagClass} flag-fallback shrink-0"
                 style="display:none;font-size:${Math.max(10, size * 0.35)}px;"
-                title="${name || 'Unknown'}"
+                title="${safeName}"
             >
                 ${f.emoji}
             </span>
         `;
     }
 
-    return `<span class="text-xl" title="${name || 'Unknown'}">${f.emoji}</span>`;
+    return `<span class="text-xl" title="${safeName}">${f.emoji}</span>`;
 }
 
 
@@ -305,12 +306,17 @@ function updateAvatarDisplay(url, name) {
 
 // Update leaderboard avatar to show profile picture if available
 function getAvatarHtml(name, avatarUrl, rank, size = 32) {
-  const initials = getInitials(name);
+  const initials = escapeHtml(getInitials(name));
+  const safeName = escapeHtml(name || '');
   const medalClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
 
   if (avatarUrl) {
-    return `<div class="lb-avatar ${medalClass}" style="width:${size}px;height:${size}px;padding:0;overflow:hidden;">
-      <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.textContent='${initials}'">
+    // Render initials as the base layer; layer the <img> on top. If the image
+    // fails to load, onerror just removes it and the initials show through —
+    // no user-controlled data is interpolated into the onerror handler.
+    return `<div class="lb-avatar ${medalClass}" style="width:${size}px;height:${size}px;padding:0;overflow:hidden;position:relative;">
+      <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">${initials}</span>
+      <img src="${escapeHtml(avatarUrl)}" alt="${safeName}" class="w-full h-full object-cover" style="position:relative;z-index:1;" onerror="this.remove()">
     </div>`;
   }
   return `<div class="lb-avatar ${medalClass}">${initials}</div>`;
@@ -349,7 +355,15 @@ function getAvatarHtml(name, avatarUrl, rank, size = 32) {
       const icon = icons[type] || icons.general
       const color = colors[type] || colors.general
       toast.className = `toast-enter ${color} text-white px-5 py-3.5 rounded-2xl shadow-lifted flex items-center gap-3 text-sm font-medium pointer-events-auto max-w-sm w-full`
-      toast.innerHTML = `<span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0">${icon}</span><span class="flex-1">${message}</span>`
+      // Build with safe DOM APIs so caller-supplied `message` can never inject HTML
+      const iconSpan = document.createElement('span')
+      iconSpan.className = 'w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold shrink-0'
+      iconSpan.textContent = icon
+      const msgSpan = document.createElement('span')
+      msgSpan.className = 'flex-1'
+      msgSpan.textContent = String(message ?? '')
+      toast.appendChild(iconSpan)
+      toast.appendChild(msgSpan)
       container.appendChild(toast)
       requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
       setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
@@ -1527,7 +1541,7 @@ return `
         return `
           <div class="flex items-center gap-2 py-1.5 px-2 ${isMe ? 'rounded-lg' : ''}" ${isMe ? 'style="background:rgba(212,162,76,0.10);"' : ''}>
             <div class="flex-1 min-w-0 text-sm truncate ${isMe ? 'font-bold text-brand-700' : 'text-ink-700'}">
-              ${isMe ? 'You' : (p.name || 'Anonymous')}
+              ${isMe ? 'You' : escapeHtml(p.name || 'Anonymous')}
             </div>
             <div class="text-sm font-bold text-ink-900" style="font-variant-numeric:tabular-nums;">
               ${p.home}–${p.away}
@@ -1762,7 +1776,7 @@ return `
         <div class="p-5 border-b border-paper-border flex items-center justify-between shrink-0">
           <div class="min-w-0">
             <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">Head to head</div>
-            <div class="text-lg font-bold text-ink-900 truncate">You vs ${opponentName}</div>
+            <div class="text-lg font-bold text-ink-900 truncate">You vs ${escapeHtml(opponentName)}</div>
           </div>
           <button onclick="hideH2HModal()" class="w-9 h-9 rounded-full bg-paper border border-paper-border flex items-center justify-center text-ink-500 tap shrink-0">✕</button>
         </div>
@@ -1776,7 +1790,7 @@ return `
             <div class="text-sm text-ink-300 font-semibold">vs</div>
             <div class="min-w-0">
               <div class="text-2xl font-bold text-ink-700" style="font-variant-numeric:tabular-nums;">${theirTotal}</div>
-              <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5 truncate max-w-[100px]">${opponentName}</div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5 truncate max-w-[100px]">${escapeHtml(opponentName)}</div>
             </div>
           </div>
           <div class="text-center mt-3 text-sm text-ink-600">${summary} · ${myWins}W ${ties}T ${theirWins}L · ${matches.length} match${matches.length === 1 ? '' : 'es'}</div>
@@ -2419,7 +2433,7 @@ async function loadLeaderboard() {
             <div class="shrink-0">${getAvatarHtml(mvp.name, mvp.avatar_url, 1, 36)}</div>
             <div class="flex-1 min-w-0">
               <div class="text-[10px] font-bold uppercase tracking-wider text-amber-900/70">Matchday MVP</div>
-              <div class="text-sm font-bold text-ink-900 truncate">${mvp.name || 'Anonymous'}${(mvp.user_id === myId || mvp.id === myId) ? ' <span class="text-[9px] font-bold text-brand-700 bg-white/60 px-1.5 py-0.5 rounded ml-1">YOU</span>' : ''}</div>
+              <div class="text-sm font-bold text-ink-900 truncate">${escapeHtml(mvp.name || 'Anonymous')}${(mvp.user_id === myId || mvp.id === myId) ? ' <span class="text-[9px] font-bold text-brand-700 bg-white/60 px-1.5 py-0.5 rounded ml-1">YOU</span>' : ''}</div>
             </div>
             <div class="text-right shrink-0">
               <div class="text-xl font-bold text-amber-900" style="font-variant-numeric: tabular-nums;">${mvp.points || 0}</div>
@@ -2481,7 +2495,7 @@ async function loadLeaderboard() {
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="player-name truncate">${s.name || 'Anonymous'}</span>
+              <span class="player-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
               ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
               ${trendHtml}
               ${streakHtml}
@@ -5227,13 +5241,13 @@ async function loadMyLeagues() {
 
     container.innerHTML = myLeagues.map(l => `
         <div class="flex items-center gap-3 p-3 rounded-2xl border ${activeLeagueId === l.id ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" onclick="selectLeague('${l.id}')">
-            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${(l.name || 'L').substring(0, 2).toUpperCase()}</div>
+            <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${escapeHtml((l.name || 'L').substring(0, 2).toUpperCase())}</div>
             <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate">${l.name}</div>
-                <div class="text-[11px] text-ink-500 font-mono tracking-wider">${l.invite_code}</div>
+                <div class="font-semibold text-sm truncate">${escapeHtml(l.name || '')}</div>
+                <div class="text-[11px] text-ink-500 font-mono tracking-wider">${escapeHtml(l.invite_code || '')}</div>
             </div>
             ${activeLeagueId === l.id ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">ACTIVE</span>' : ''}
-            <button onclick="event.stopPropagation(); shareLeagueCode('${l.id}', '${l.invite_code}', '${l.name.replace(/'/g, "\'")}')" class="text-ink-400 p-1.5 tap">
+            <button onclick="event.stopPropagation(); shareLeagueById('${l.id}')" class="text-ink-400 p-1.5 tap">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
             </button>
         </div>
@@ -5306,12 +5320,12 @@ async function loadAdminLeagueBrowser() {
         <div class="flex items-center gap-3 p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" 
              onclick="adminViewLeague('${l.id}')">
             <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                ${(l.name || 'L').substring(0, 2).toUpperCase()}
+                ${escapeHtml((l.name || 'L').substring(0, 2).toUpperCase())}
             </div>
             <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate">${l.name}</div>
+                <div class="font-semibold text-sm truncate">${escapeHtml(l.name || '')}</div>
                 <div class="text-[11px] text-ink-500">
-                    ${memberCount} member${memberCount !== 1 ? 's' : ''} · Code: ${l.invite_code} · by ${creatorName}
+                    ${memberCount} member${memberCount !== 1 ? 's' : ''} · Code: ${escapeHtml(l.invite_code || '')} · by ${escapeHtml(creatorName)}
                 </div>
             </div>
             ${isActive ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">VIEWING</span>' : ''}
@@ -5348,6 +5362,15 @@ function shareLeagueCode(leagueId, code, name) {
     const encoded = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encoded}`, '_blank')
 }
+
+// Safer share entry point: looks up the league from in-memory `myLeagues` by id.
+// This avoids interpolating user-controlled `name` into an HTML attribute or JS string.
+function shareLeagueById(leagueId) {
+    const l = (typeof myLeagues !== 'undefined' && myLeagues || []).find(x => x.id === leagueId)
+    if (!l) { showToast('League not found', 'error'); return }
+    shareLeagueCode(l.id, l.invite_code, l.name || 'Untitled League')
+}
+window.shareLeagueById = shareLeagueById
 
 
 async function getLeagueMembers(leagueId) {
@@ -5548,7 +5571,7 @@ async function loadLeagueLeaderboardView(leagueId) {
         c.innerHTML = `<div class="bg-white rounded-2xl border border-paper-border p-8 text-center mx-0">
             <div class="text-4xl mb-2">👥</div>
             <div class="font-semibold">No members yet</div>
-            <p class="text-sm text-ink-500 mt-1">Invite friends with code: ${league?.invite_code || '---'}</p>
+            <p class="text-sm text-ink-500 mt-1">Invite friends with code: ${escapeHtml(league?.invite_code || '---')}</p>
         </div>`
         return
     }
@@ -5573,7 +5596,7 @@ async function loadLeagueLeaderboardView(leagueId) {
             </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="player-name truncate">${s.name || 'Anonymous'}</span>
+                    <span class="player-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
                     ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
                 </div>
                 <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
