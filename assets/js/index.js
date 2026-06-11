@@ -5696,7 +5696,7 @@ async function regenerateLeagueCode(leagueId) {
 }
 loadRememberedEmail()
 // ─────────────────────────────────────────────────────────────
-// Auto-hide bottom nav on scroll (X / Twitter style)
+// Auto-hide bottom nav AND top header on scroll (X / Twitter style)
 //   - scroll down  → hide
 //   - scroll up    → show
 //   - near top     → always show
@@ -5704,10 +5704,17 @@ loadRememberedEmail()
 // ─────────────────────────────────────────────────────────────
 ;(function setupAutoHideNav() {
   const nav = document.getElementById('app-nav')
-  if (!nav) return
+  const headers = document.querySelectorAll('.app-header')
+  if (!nav && !headers.length) return
 
-  nav.style.transition = 'transform 220ms ease-in-out'
-  nav.style.willChange = 'transform'
+  if (nav) {
+    nav.style.transition = 'transform 220ms ease-in-out'
+    nav.style.willChange = 'transform'
+  }
+  headers.forEach(h => {
+    h.style.transition = 'transform 220ms ease-in-out'
+    h.style.willChange = 'transform'
+  })
 
   let lastY = window.scrollY || 0
   let hidden = false
@@ -5715,21 +5722,27 @@ loadRememberedEmail()
   const THRESHOLD = 8       // ignore tiny scrolls
   const TOP_BUFFER = 40     // always show near the top
 
+  function setHidden(shouldHide) {
+    if (shouldHide === hidden) return
+    if (shouldHide) {
+      if (nav) nav.style.transform = 'translateY(110%)'
+      headers.forEach(h => { h.style.transform = 'translateY(-110%)' })
+    } else {
+      if (nav) nav.style.transform = 'translateY(0)'
+      headers.forEach(h => { h.style.transform = 'translateY(0)' })
+    }
+    hidden = shouldHide
+  }
+
   function update() {
     const y = window.scrollY || 0
     const delta = y - lastY
 
     if (Math.abs(delta) < THRESHOLD) { ticking = false; return }
 
-    if (y < TOP_BUFFER) {
-      if (hidden) { nav.style.transform = 'translateY(0)'; hidden = false }
-    } else if (delta > 0 && !hidden) {
-      nav.style.transform = 'translateY(110%)'
-      hidden = true
-    } else if (delta < 0 && hidden) {
-      nav.style.transform = 'translateY(0)'
-      hidden = false
-    }
+    if (y < TOP_BUFFER)         setHidden(false)
+    else if (delta > 0)         setHidden(true)
+    else if (delta < 0)         setHidden(false)
 
     lastY = y
     ticking = false
