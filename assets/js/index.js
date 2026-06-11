@@ -1659,18 +1659,47 @@ return `
 
     function showH2HModal(data) {
       let modal = document.getElementById('h2h-modal')
+      let isFirstOpen = false
+
+      // Build the modal shell ONCE (backdrop + content frame + body slot).
+      // On subsequent loading→content transitions, we only swap the body slot,
+      // not the whole modal — that's what kept making it jerky.
       if (!modal) {
+        isFirstOpen = true
         modal = document.createElement('div')
         modal.id = 'h2h-modal'
-        modal.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4'
-        modal.style.background = 'rgba(10, 15, 13, 0.45)'
-        modal.style.backdropFilter = 'blur(4px)'
-        modal.onclick = (e) => { if (e.target === modal) hideH2HModal() }
+        modal.className = 'h2h-modal'
+        modal.innerHTML = `
+          <div class="h2h-backdrop"></div>
+          <div class="h2h-content">
+            <div class="h2h-body" id="h2h-body"></div>
+          </div>`
+        modal.querySelector('.h2h-backdrop').addEventListener('click', hideH2HModal)
         document.body.appendChild(modal)
+        // Trigger reflow so the initial closed state is committed before we
+        // add the is-open class — otherwise the transition skips.
+        void modal.offsetWidth
+        requestAnimationFrame(() => modal.classList.add('is-open'))
       }
 
+      const bodyEl = modal.querySelector('#h2h-body')
+
+      // Loading skeleton: keep height stable so the content swap doesn't jump.
       if (data.loading) {
-        modal.innerHTML = '<div class="bg-white rounded-t-3xl sm:rounded-3xl p-8 w-full max-w-lg text-center"><span class="auth-spinner" style="width:24px;height:24px;border-width:2px;border-color:rgba(10,15,13,0.15);border-top-color:#D4A24C;"></span></div>'
+        bodyEl.innerHTML = `
+          <div class="h2h-loading">
+            <div class="h2h-skel-header">
+              <div class="h2h-skel-title"></div>
+              <div class="h2h-skel-close"></div>
+            </div>
+            <div class="h2h-skel-summary">
+              <div class="h2h-skel-stat"></div>
+              <div class="h2h-skel-stat"></div>
+            </div>
+            <div class="h2h-skel-row"></div>
+            <div class="h2h-skel-row"></div>
+            <div class="h2h-skel-row"></div>
+          </div>`
         return
       }
 
@@ -1682,56 +1711,72 @@ return `
           ? '<span class="text-red-600 font-bold">' + diff + '</span> behind'
           : 'Dead even'
 
-      modal.innerHTML = `
-        <div class="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg flex flex-col" style="max-height:85vh;">
-          <div class="p-5 border-b border-paper-border flex items-center justify-between shrink-0">
+      // Crossfade: build new content invisible, swap in, then fade up.
+      const newBody = document.createElement('div')
+      newBody.className = 'h2h-content-fade'
+      newBody.innerHTML = `
+        <div class="p-5 border-b border-paper-border flex items-center justify-between shrink-0">
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">Head to head</div>
+            <div class="text-lg font-bold text-ink-900 truncate">You vs ${opponentName}</div>
+          </div>
+          <button onclick="hideH2HModal()" class="w-9 h-9 rounded-full bg-paper border border-paper-border flex items-center justify-center text-ink-500 tap shrink-0">✕</button>
+        </div>
+
+        <div class="px-5 py-4 border-b border-paper-border shrink-0">
+          <div class="flex items-center justify-around text-center">
+            <div>
+              <div class="text-2xl font-bold text-brand-700" style="font-variant-numeric:tabular-nums;">${myTotal}</div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5">You</div>
+            </div>
+            <div class="text-sm text-ink-300 font-semibold">vs</div>
             <div class="min-w-0">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">Head to head</div>
-              <div class="text-lg font-bold text-ink-900 truncate">You vs ${opponentName}</div>
+              <div class="text-2xl font-bold text-ink-700" style="font-variant-numeric:tabular-nums;">${theirTotal}</div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5 truncate max-w-[100px]">${opponentName}</div>
             </div>
-            <button onclick="hideH2HModal()" class="w-9 h-9 rounded-full bg-paper border border-paper-border flex items-center justify-center text-ink-500 tap shrink-0">✕</button>
           </div>
+          <div class="text-center mt-3 text-sm text-ink-600">${summary} · ${myWins}W ${ties}T ${theirWins}L · ${matches.length} match${matches.length === 1 ? '' : 'es'}</div>
+        </div>
 
-          <div class="px-5 py-4 border-b border-paper-border shrink-0">
-            <div class="flex items-center justify-around text-center">
-              <div>
-                <div class="text-2xl font-bold text-brand-700" style="font-variant-numeric:tabular-nums;">${myTotal}</div>
-                <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5">You</div>
-              </div>
-              <div class="text-sm text-ink-300 font-semibold">vs</div>
-              <div class="min-w-0">
-                <div class="text-2xl font-bold text-ink-700" style="font-variant-numeric:tabular-nums;">${theirTotal}</div>
-                <div class="text-[10px] uppercase tracking-wider text-ink-500 mt-0.5 truncate max-w-[100px]">${opponentName}</div>
-              </div>
-            </div>
-            <div class="text-center mt-3 text-sm text-ink-600">${summary} · ${myWins}W ${ties}T ${theirWins}L · ${matches.length} match${matches.length === 1 ? '' : 'es'}</div>
-          </div>
+        ${matches.length === 0
+          ? '<div class="p-8 text-center text-sm text-ink-500">No completed matches you have both predicted yet.</div>'
+          : '<div class="flex-1 overflow-y-auto px-3 py-2">' + matches.map(m => {
+              const f = m.fixture
+              const dot = m.outcome === 'win' ? '🟢' : m.outcome === 'loss' ? '🔴' : '⚪'
+              const dateStr = new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+              return `
+                <div class="flex items-center gap-2 py-2 px-2 border-b border-paper-border/40 last:border-0">
+                  <div class="text-base shrink-0">${dot}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-ink-900 truncate">${f.home_team} vs ${f.away_team}</div>
+                    <div class="text-[10px] text-ink-500">${dateStr} · ${f.stage}</div>
+                  </div>
+                  <div class="text-right shrink-0 text-xs" style="font-variant-numeric:tabular-nums;">
+                    <b class="text-brand-700">${m.myPts}</b> <span class="text-ink-300">·</span> <span class="text-ink-700">${m.theirPts}</span>
+                  </div>
+                </div>`
+            }).join('') + '</div>'
+        }`
 
-          ${matches.length === 0
-            ? '<div class="p-8 text-center text-sm text-ink-500">No completed matches you have both predicted yet.</div>'
-            : '<div class="flex-1 overflow-y-auto px-3 py-2">' + matches.map(m => {
-                const f = m.fixture
-                const dot = m.outcome === 'win' ? '🟢' : m.outcome === 'loss' ? '🔴' : '⚪'
-                const dateStr = new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                return `
-                  <div class="flex items-center gap-2 py-2 px-2 border-b border-paper-border/40 last:border-0">
-                    <div class="text-base shrink-0">${dot}</div>
-                    <div class="flex-1 min-w-0">
-                      <div class="text-sm font-semibold text-ink-900 truncate">${f.home_team} vs ${f.away_team}</div>
-                      <div class="text-[10px] text-ink-500">${dateStr} · ${f.stage}</div>
-                    </div>
-                    <div class="text-right shrink-0 text-xs" style="font-variant-numeric:tabular-nums;">
-                      <b class="text-brand-700">${m.myPts}</b> <span class="text-ink-300">·</span> <span class="text-ink-700">${m.theirPts}</span>
-                    </div>
-                  </div>`
-              }).join('') + '</div>'
-          }
-        </div>`
+      bodyEl.innerHTML = ''
+      bodyEl.appendChild(newBody)
+      // Next frame: trigger the crossfade-in
+      requestAnimationFrame(() => newBody.classList.add('is-visible'))
     }
 
     function hideH2HModal() {
       const modal = document.getElementById('h2h-modal')
-      if (modal) modal.remove()
+      if (!modal) return
+      modal.classList.add('is-closing')
+      modal.classList.remove('is-open')
+      // Wait for the transition to finish before removing from DOM.
+      const cleanup = () => {
+        modal.removeEventListener('transitionend', cleanup)
+        modal.remove()
+      }
+      modal.addEventListener('transitionend', cleanup)
+      // Safety net: if for some reason transitionend never fires, force-remove.
+      setTimeout(() => { if (modal.parentNode) modal.remove() }, 400)
     }
 
     // ── Bonus Engine Helpers ──
@@ -2535,8 +2580,21 @@ async function loadLeaderboard() {
       const myId = getUser()?.id
       const newPts = payload.new?.final_points || 0
       const oldPts = payload.old?.final_points || 0
+      const basePts = payload.new?.base_points || 0
       if (myId && payload.new?.user_id === myId && newPts > 0 && newPts !== oldPts) {
         showToast(`You scored ${newPts} points!`, 'success')
+        // Surface a share prompt for noteworthy scores. Big points = "I want to flex".
+        // Trigger on exact (base_points === 5) OR final_points >= 7 (multiplier/bonus territory).
+        if (basePts === 5 || newPts >= 7) {
+          const fixtureId = payload.new?.fixture_id
+          const fixture = fixtures.find(f => f.id === fixtureId)
+          if (fixture) {
+            const matchLabel = `${fixture.home_team} vs ${fixture.away_team}`
+            const score = `${payload.new?.home_prediction ?? '?'}–${payload.new?.away_prediction ?? '?'}`
+            // Show a small inline prompt — non-intrusive
+            setTimeout(() => promptShareScore(newPts, matchLabel, score, basePts === 5), 800)
+          }
+        }
       }
       // Refresh the local cache so badges, fixture cards, recent-results all update.
       // Also refresh social caches so Hot Takes pick up the new points.
@@ -3310,26 +3368,440 @@ const me = myIdx >= 0 ? stats[myIdx] : null
 const rank = myIdx >= 0 ? myIdx + 1 : '?'
 const points = me?.points ?? 0
 const total = stats.length
+const myName = (getUser()?.user_metadata?.name) || me?.name || 'Player'
 
-const appUrl = window.location.origin // cleaner than /index.html
-
-const message = `🏆 WC 2026 Prediction League
-
-I'm ranked *#${rank}* of ${total} with *${points} points!*
-
-Think you can beat me? Join the league 👇
-${appUrl}`
-
-const encoded = encodeURIComponent(message)
-
-window.open(`https://wa.me/?text=${encoded}`, '_blank')
-
-showToast('Opening WhatsApp...', 'success')
+// Try image share first (native Web Share API on mobile); fall back to text.
+await shareAchievementCard({
+  type: 'rank',
+  name: myName,
+  rank, total, points
+}).catch(e => {
+  console.warn('[share] card share failed, falling back to text:', e)
+  const appUrl = window.location.origin
+  const message = `🏆 WC 2026 Prediction League\n\nI'm ranked *#${rank}* of ${total} with *${points} points!*\n\nThink you can beat me? Join the league 👇\n${appUrl}`
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
+  showToast('Opening WhatsApp...', 'success')
+})
   } catch (e) {
     console.error('Error sharing rank:', e)
     showToast('Failed to share rank', 'error')
   }
 }
+
+// ============== SHAREABLE ACHIEVEMENT CARDS ==============
+// Canvas-rendered, 1080x1080 PNG. Designed for WhatsApp status / Instagram / Twitter.
+// Multiple card types: 'rank', 'points', 'streak', 'badge', 'exact'.
+//
+// Distribution strategy:
+//  1. Try navigator.share with image file (works on mobile Chrome/Safari)
+//  2. Fall back to downloading PNG + opening WhatsApp text on desktop
+//  3. Final fallback: pure text share
+async function shareAchievementCard(opts) {
+  // opts: { type, name, ...typeSpecificFields }
+  // Returns Promise that resolves when share dialog opens
+  const blob = await generateAchievementCardBlob(opts)
+  if (!blob) throw new Error('Card generation returned no blob')
+
+  const appUrl = window.location.origin
+  const caption = buildShareCaption(opts, appUrl)
+  const filename = `wcpl-${opts.type}-${Date.now()}.png`
+  const file = new File([blob], filename, { type: 'image/png' })
+
+  // Path 1: native share with files (best UX, mobile)
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'WC 2026 Prediction League',
+        text: caption
+      })
+      showToast('Shared!', 'success')
+      return
+    } catch (e) {
+      // User cancelled or share failed — fall through to download path
+      if (e.name === 'AbortError') return  // user cancelled, don't fall back
+      console.warn('[share] native share failed:', e)
+    }
+  }
+
+  // Path 2: download the image + open WhatsApp web with caption
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+
+  // Then offer WhatsApp text share
+  setTimeout(() => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')
+  }, 200)
+  showToast('Image saved · attach it in WhatsApp', 'success')
+}
+
+function buildShareCaption(opts, appUrl) {
+  switch (opts.type) {
+    case 'rank':
+      return `🏆 I'm ranked #${opts.rank} of ${opts.total} on WC 2026 Predictions with ${opts.points} pts!\n\nThink you can beat me? 👇\n${appUrl}`
+    case 'points':
+      return `⚽ Just scored ${opts.points} points on ${opts.match} 🔥\n\nJoin the league 👇\n${appUrl}`
+    case 'streak':
+      return `🔥 ${opts.streak}-match prediction streak on WC 2026 Predictions!\n\nThink you can do better? 👇\n${appUrl}`
+    case 'badge':
+      return `🎯 Just earned the "${opts.badge}" badge on WC 2026 Predictions!\n\nJoin the league 👇\n${appUrl}`
+    case 'exact':
+      return `🎯 Predicted ${opts.match} exactly — ${opts.score}! +${opts.points} pts 🔥\n\nJoin the league 👇\n${appUrl}`
+    default:
+      return `🏆 WC 2026 Prediction League\n\nJoin 👇\n${appUrl}`
+  }
+}
+
+// Renders the achievement card to a 1080x1080 canvas and returns a PNG Blob.
+async function generateAchievementCardBlob(opts) {
+  const SIZE = 1080
+  const canvas = document.createElement('canvas')
+  canvas.width = SIZE
+  canvas.height = SIZE
+  const ctx = canvas.getContext('2d')
+
+  // ===== Background: deep navy gradient with subtle pattern =====
+  const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE)
+  bgGrad.addColorStop(0, '#0B1221')
+  bgGrad.addColorStop(0.5, '#152849')
+  bgGrad.addColorStop(1, '#1E3A5F')
+  ctx.fillStyle = bgGrad
+  ctx.fillRect(0, 0, SIZE, SIZE)
+
+  // Subtle dot pattern overlay
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
+  for (let y = 0; y < SIZE; y += 32) {
+    for (let x = 0; x < SIZE; x += 32) {
+      ctx.beginPath()
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  // Gold accent corner glow (top-right)
+  const glow = ctx.createRadialGradient(SIZE - 100, 100, 0, SIZE - 100, 100, 500)
+  glow.addColorStop(0, 'rgba(212, 162, 76, 0.35)')
+  glow.addColorStop(1, 'rgba(212, 162, 76, 0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, SIZE, SIZE)
+
+  // ===== Header: League brand =====
+  ctx.fillStyle = '#D4A24C'
+  ctx.font = 'bold 32px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('🏆  WC 2026 PREDICTION LEAGUE', SIZE / 2, 90)
+
+  // Decorative line under header
+  ctx.strokeStyle = 'rgba(212, 162, 76, 0.4)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(SIZE / 2 - 200, 115)
+  ctx.lineTo(SIZE / 2 + 200, 115)
+  ctx.stroke()
+
+  // ===== Main card content (varies by type) =====
+  await drawCardContent(ctx, opts, SIZE)
+
+  // ===== Footer: URL =====
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+  ctx.font = '24px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('wcpredictionleague.vercel.app', SIZE / 2, SIZE - 50)
+
+  // Convert to blob
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob)
+      else reject(new Error('toBlob returned null'))
+    }, 'image/png', 0.95)
+  })
+}
+
+async function drawCardContent(ctx, opts, SIZE) {
+  const cx = SIZE / 2
+  ctx.textAlign = 'center'
+
+  switch (opts.type) {
+    case 'rank': {
+      // Big rank number
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 88px system-ui, -apple-system, sans-serif'
+      ctx.fillText('#' + opts.rank, cx, 280)
+
+      // "OF N PLAYERS" caption
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+      ctx.font = '32px system-ui, -apple-system, sans-serif'
+      ctx.fillText(`OF ${opts.total} PLAYERS`, cx, 340)
+
+      // Trophy emoji panel
+      ctx.font = '180px system-ui, -apple-system, sans-serif'
+      const trophyEmoji = opts.rank === 1 ? '🥇' : opts.rank === 2 ? '🥈' : opts.rank === 3 ? '🥉' : '🏆'
+      ctx.fillText(trophyEmoji, cx, 540)
+
+      // Name
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 52px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.name, cx, 660)
+
+      // Points panel
+      drawStatPanel(ctx, cx, 760, opts.points + ' pts', 'TOTAL SCORE')
+      break
+    }
+    case 'points': {
+      // "+N POINTS" big
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 220px system-ui, -apple-system, sans-serif'
+      ctx.fillText('+' + opts.points, cx, 380)
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
+      ctx.font = '40px system-ui, -apple-system, sans-serif'
+      ctx.fillText('POINTS', cx, 440)
+
+      // Match label
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 44px system-ui, -apple-system, sans-serif'
+      wrapText(ctx, opts.match || '', cx, 600, SIZE - 200, 56)
+
+      // Score
+      if (opts.score) {
+        ctx.fillStyle = '#D4A24C'
+        ctx.font = 'bold 80px system-ui, -apple-system, sans-serif'
+        ctx.fillText(opts.score, cx, 760)
+      }
+
+      // Name
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+      ctx.font = '32px system-ui, -apple-system, sans-serif'
+      ctx.fillText('— ' + opts.name, cx, 880)
+      break
+    }
+    case 'streak': {
+      // Fire emoji row scales with streak
+      const fireCount = Math.min(opts.streak, 5)
+      const fires = '🔥'.repeat(fireCount)
+      ctx.font = '120px system-ui, -apple-system, sans-serif'
+      ctx.fillText(fires, cx, 320)
+
+      // Big streak number
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 260px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.streak, cx, 560)
+
+      // Label
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 50px system-ui, -apple-system, sans-serif'
+      ctx.fillText('MATCH WIN STREAK', cx, 660)
+
+      // Tier label (e.g., "On Fire", "Legendary")
+      if (opts.tier) {
+        ctx.fillStyle = '#D4A24C'
+        ctx.font = 'italic 38px system-ui, -apple-system, sans-serif'
+        ctx.fillText('· ' + opts.tier + ' ·', cx, 720)
+      }
+
+      // Name
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 48px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.name, cx, 860)
+      break
+    }
+    case 'badge': {
+      // Badge emoji huge
+      ctx.font = '260px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.emoji || '🎯', cx, 430)
+
+      // "UNLOCKED" label
+      ctx.fillStyle = 'rgba(212, 162, 76, 0.7)'
+      ctx.font = 'bold 32px system-ui, -apple-system, sans-serif'
+      ctx.fillText('BADGE UNLOCKED', cx, 540)
+
+      // Badge name
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 72px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.badge, cx, 640)
+
+      // Badge description
+      if (opts.description) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+        ctx.font = '32px system-ui, -apple-system, sans-serif'
+        wrapText(ctx, opts.description, cx, 720, SIZE - 200, 42)
+      }
+
+      // Name
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 48px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.name, cx, 880)
+      break
+    }
+    case 'exact': {
+      // 🎯 EXACT! big
+      ctx.font = '160px system-ui, -apple-system, sans-serif'
+      ctx.fillText('🎯', cx, 320)
+
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 88px system-ui, -apple-system, sans-serif'
+      ctx.fillText('EXACT SCORE!', cx, 430)
+
+      // Match
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 44px system-ui, -apple-system, sans-serif'
+      wrapText(ctx, opts.match || '', cx, 540, SIZE - 200, 56)
+
+      // Predicted score
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 96px system-ui, -apple-system, sans-serif'
+      ctx.fillText(opts.score, cx, 700)
+
+      // Points earned
+      drawStatPanel(ctx, cx, 800, '+' + opts.points + ' pts', 'EARNED')
+      break
+    }
+  }
+}
+
+// Rounded stat panel with big number + small label underneath
+function drawStatPanel(ctx, cx, y, bigText, label) {
+  const w = 360, h = 110
+  const x = cx - w / 2
+  ctx.fillStyle = 'rgba(212, 162, 76, 0.15)'
+  ctx.strokeStyle = 'rgba(212, 162, 76, 0.5)'
+  ctx.lineWidth = 2
+  roundRect(ctx, x, y, w, h, 16)
+  ctx.fill()
+  ctx.stroke()
+
+  ctx.fillStyle = '#D4A24C'
+  ctx.font = 'bold 50px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(bigText, cx, y + 60)
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+  ctx.font = '20px system-ui, -apple-system, sans-serif'
+  ctx.fillText(label, cx, y + 92)
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = (text || '').split(' ')
+  let line = ''
+  let curY = y
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + ' '
+    if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+      ctx.fillText(line, x, curY)
+      line = words[n] + ' '
+      curY += lineHeight
+    } else {
+      line = testLine
+    }
+  }
+  ctx.fillText(line.trim(), x, curY)
+}
+
+// Convenience wrappers — call these from feature code to fire share flows.
+async function sharePointsAchievement(points, matchLabel, score) {
+  const myName = (getUser()?.user_metadata?.name) || 'Player'
+  return shareAchievementCard({ type: 'points', name: myName, points, match: matchLabel, score })
+}
+
+async function shareStreakAchievement(streak, tier) {
+  const myName = (getUser()?.user_metadata?.name) || 'Player'
+  return shareAchievementCard({ type: 'streak', name: myName, streak, tier })
+}
+
+async function shareBadgeAchievement(badge, emoji, description) {
+  const myName = (getUser()?.user_metadata?.name) || 'Player'
+  return shareAchievementCard({ type: 'badge', name: myName, badge, emoji, description })
+}
+
+async function shareExactAchievement(matchLabel, score, points) {
+  const myName = (getUser()?.user_metadata?.name) || 'Player'
+  return shareAchievementCard({ type: 'exact', name: myName, match: matchLabel, score, points })
+}
+
+// Expose globally so onclick="..." handlers work
+window.sharePointsAchievement = sharePointsAchievement
+window.shareStreakAchievement = shareStreakAchievement
+window.shareBadgeAchievement = shareBadgeAchievement
+window.shareExactAchievement = shareExactAchievement
+window.shareAchievementCard = shareAchievementCard
+
+// Non-intrusive floating prompt that appears after a noteworthy score.
+// "You scored N pts — share?" with a dismiss × button. Auto-dismisses after 12s.
+function promptShareScore(points, matchLabel, score, isExact) {
+  // Remove any existing prompt
+  const existing = document.getElementById('share-prompt')
+  if (existing) existing.remove()
+
+  const banner = document.createElement('div')
+  banner.id = 'share-prompt'
+  banner.style.cssText = `
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(135deg, #1E3A5F, #0B1221);
+    color: #fff; padding: 14px 18px; border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,162,76,0.4);
+    z-index: 60; max-width: calc(100vw - 24px); width: 360px;
+    display: flex; align-items: center; gap: 12px;
+    opacity: 0; transition: opacity 240ms ease-out, transform 240ms ease-out;
+    font-family: system-ui, -apple-system, sans-serif;
+  `
+  banner.innerHTML = `
+    <div style="font-size: 32px; flex-shrink: 0;">${isExact ? '🎯' : '🔥'}</div>
+    <div style="flex: 1; min-width: 0;">
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 2px;">+${points} pts ${isExact ? '— exact score!' : 'scored!'}</div>
+      <div style="font-size: 11px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${matchLabel}</div>
+    </div>
+    <button id="share-prompt-btn" style="background: #D4A24C; color: #0B1221; border: 0; padding: 9px 14px; border-radius: 12px; font-weight: 700; font-size: 12px; cursor: pointer; flex-shrink: 0;">Share 🚀</button>
+    <button id="share-prompt-close" style="background: rgba(255,255,255,0.1); color: #fff; border: 0; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex-shrink: 0; font-size: 14px;">✕</button>
+  `
+  document.body.appendChild(banner)
+
+  // Slide up
+  requestAnimationFrame(() => {
+    banner.style.opacity = '1'
+    banner.style.transform = 'translateX(-50%) translateY(0)'
+  })
+
+  const close = () => {
+    banner.style.opacity = '0'
+    banner.style.transform = 'translateX(-50%) translateY(20px)'
+    setTimeout(() => banner.remove(), 250)
+  }
+
+  banner.querySelector('#share-prompt-btn').onclick = () => {
+    if (isExact) {
+      shareExactAchievement(matchLabel, score, points).catch(e => console.warn('[share]', e))
+    } else {
+      sharePointsAchievement(points, matchLabel, score).catch(e => console.warn('[share]', e))
+    }
+    close()
+  }
+  banner.querySelector('#share-prompt-close').onclick = close
+
+  // Auto-dismiss after 12s
+  setTimeout(close, 12000)
+}
+
+window.promptShareScore = promptShareScore
 
 // ============== BADGES (Feature 2) ==============
     // resultsByFixture (optional): { [fixture_id]: prediction_results row }
@@ -3432,9 +3904,13 @@ showToast('Opening WhatsApp...', 'success')
 
       host.innerHTML = BADGES.map(b => {
         const got = earned.has(b.id)
+        const shareAttr = got
+          ? ` onclick="shareBadgeAchievement('${b.name.replace(/'/g, "\\'")}', '${b.icon.replace(/'/g, "\\'")}', '${b.desc.replace(/'/g, "\\'")}').catch(e => console.warn(e))" style="cursor:pointer;" title="Tap to share"`
+          : ''
         return `
-          <div class="badge-card ${got ? 'earned' : 'locked'}">
+          <div class="badge-card ${got ? 'earned' : 'locked'}"${shareAttr}>
             ${got ? '<div class="badge-earned-tick">✓</div>' : ''}
+            ${got ? '<div class="badge-share-hint" style="position:absolute;top:6px;left:6px;font-size:11px;background:rgba(212,162,76,0.9);color:#0B1221;padding:2px 6px;border-radius:8px;font-weight:bold;">SHARE</div>' : ''}
             <div class="badge-icon">${b.icon}</div>
             <div class="badge-name">${b.name}</div>
             <div class="badge-desc">${b.desc}</div>
@@ -3443,7 +3919,17 @@ showToast('Opening WhatsApp...', 'success')
 
       if (streak >= 2) {
         streakEl.className = 'streak-chip'
-        streakEl.innerHTML = `🔥 <span>${streak} in a row</span>`
+        // Make streak chip tappable to share for streaks ≥ 3 (real achievement)
+        if (streak >= 3) {
+          const tier = streak >= 8 ? 'Legendary' : streak >= 5 ? 'On Fire' : 'Hot Streak'
+          streakEl.innerHTML = `🔥 <span>${streak} in a row</span> <span style="margin-left:6px;background:rgba(212,162,76,0.9);color:#0B1221;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold;">SHARE</span>`
+          streakEl.style.cursor = 'pointer'
+          streakEl.onclick = () => shareStreakAchievement(streak, tier).catch(e => console.warn(e))
+        } else {
+          streakEl.innerHTML = `🔥 <span>${streak} in a row</span>`
+          streakEl.style.cursor = ''
+          streakEl.onclick = null
+        }
       } else {
         streakEl.className = 'hidden'
       }
