@@ -1603,6 +1603,23 @@
     @media (prefers-reduced-motion: reduce) {
       .h2h-backdrop, .h2h-content, .h2h-content-fade { transition: none !important; }
       .h2h-skel-title, .h2h-skel-close, .h2h-skel-stat, .h2h-skel-row { animation: none !important; }
+
+      /* ========== AUTO-HIDE BOTTOM NAV (Twitter/X style) ========== */
+#app-nav {
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+#app-nav.nav-hidden {
+  transform: translateY(100%);
+}
+/* When nav is hidden, remove bottom padding from main content */
+body.nav-hidden #app-main {
+  padding-bottom: 1rem;
+}
+/* Smooth padding transition on main content */
+#app-main {
+  transition: padding-bottom 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
     }
 </style>
 <base target="_blank">
@@ -2680,7 +2697,23 @@
             </div>
           </div>
         </div>
-
+        
+        <!-- Admin push test card (hidden unless admin) -->
+<div id="admin-push-test-card" class="hidden glass-light rounded-3xl p-4 space-y-3 border-2 border-dashed border-amber-400">
+  <div class="flex items-center gap-2">
+    <span class="text-lg">🔔</span>
+    <span class="text-sm font-semibold text-ink-900">Push test (admin only)</span>
+  </div>
+  <p class="text-xs text-ink-500">Subscribe this device, then send yourself a test notification.</p>
+  <div class="flex gap-2">
+    <button onclick="enablePushNotifications()" class="flex-1 bg-brand-900 text-white text-xs font-semibold py-2.5 rounded-xl tap">
+      1. Enable
+    </button>
+    <button onclick="testPushToSelf()" class="flex-1 bg-amber-500 text-white text-xs font-semibold py-2.5 rounded-xl tap">
+      2. Send test
+    </button>
+  </div>
+</div>
       </div>
 
       <!-- PROFILE --><div id="tab-profile" class="tab-content hidden space-y-5">
