@@ -62,22 +62,6 @@ self.addEventListener('fetch', event => {
   )
 })
 
-/* ========== PUSH NOTIFICATIONS ========== */
-self.addEventListener('push', event => {
-  let data = { title: 'WC Predictions', body: 'New update', tag: 'general', url: '/admin.html' }
-  try { data = event.data.json() } catch (e) {}
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/image/logo-maskable.svg',
-      badge: '/image/logo-maskable.svg',
-      tag: data.tag,
-      requireInteraction: true,
-      data: { url: data.url || '/admin.html' }
-    })
-  )
-})
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
