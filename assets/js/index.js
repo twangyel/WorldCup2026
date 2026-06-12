@@ -1119,11 +1119,12 @@ let countdownTickerId = null             // live countdown interval id
 let prizeDashExpanded = false            // prize dashboard breakdown open/closed
 const BADGES = [
   { id: 'champion',    icon: '👑', name: 'Champion',      desc: '#1 on the board' },
-  { id: 'nostradamus', icon: '🔮', name: 'Nostradamus',   desc: '3+ exact scores' },
+  { id: 'nostradamus', icon: '🔮', name: 'Nostradamus',   desc: '2+ exact scores total' },
   { id: 'sharpshoot',  icon: '🎯', name: 'Sharpshooter',  desc: '5+ exact scores' },
+  { id: 'combo',       icon: '⚡', name: 'Combo King',     desc: '3+ exact combos' },
   { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 72h+ early' },
   { id: 'underdog',    icon: '🐴', name: 'Underdog King', desc: '3+ correct draws' },
-  { id: 'streak',      icon: '🔥', name: 'On Fire',       desc: '3+ in a row' },
+  { id: 'streak',      icon: '🔥', name: 'Hot Streak',     desc: '3+ scoring in a row' },
   { id: 'centurion',   icon: '💯', name: 'Centurion',     desc: '100+ points' },
   { id: 'allin',       icon: '🎲', name: 'All In',        desc: 'Predict every match' }
 ]
@@ -1875,6 +1876,7 @@ async function getLeaderboardFromResults() {
         exact: 0,
         gd: 0,
         result: 0,
+        combo_count: 0,
         total_predictions: 0
       }))
       return { data: stats, error: null }
@@ -1893,6 +1895,9 @@ async function getLeaderboardFromResults() {
  const stats = profiles.map(profile => {
     const uid = profile.id
     const userResults = (results || []).filter(r => r.user_id === uid)
+    // Count combo bonuses earned (2 exact scores in a row → combo_bonus > 0).
+    // Cheap because we're already iterating these rows below.
+    const comboCount = userResults.filter(r => (r.combo_bonus || 0) > 0).length
     let engineStats
     try {
       if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
@@ -1922,6 +1927,7 @@ return {
       full_name: profile.full_name || profile.name || 'Unknown',
       department: profile.department || '',
       avatar_url: profile.avatar_url || null,
+      combo_count: comboCount,
       ...engineStats
     }
   })
@@ -2512,6 +2518,12 @@ async function loadLeaderboard() {
         const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
         const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row">🔥${streakN}</span>` : ''
 
+        // Combo bolt (overall tab only) — fires from the first combo so the rules
+        // sheet's "+3 Exact Combo" promise is visibly delivered, even before the
+        // 3+ Combo King badge threshold. Mirrors the streak chip pattern.
+        const comboN = (lbSubtab === 'overall') ? (s.combo_count || 0) : 0
+        const comboHtml = comboN >= 1 ? `<span class="lb-combo" title="${comboN} exact combo${comboN > 1 ? 's' : ''}">⚡${comboN}</span>` : ''
+
         // (Projected winnings used to render here per row — moved to the Prize Pool
         // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
 
@@ -2551,6 +2563,7 @@ async function loadLeaderboard() {
               ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
               ${trendHtml}
               ${streakHtml}
+              ${comboHtml}
               ${leaderboardBadgeIcons(s, rank)}
             </div>
             <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
@@ -3932,8 +3945,15 @@ window.promptShareScore = promptShareScore
         p.home_prediction === f.home_score && p.away_prediction === f.away_score
       ).length
 
-      if (exactCount >= 3) earned.add('nostradamus')
+      if (exactCount >= 2) earned.add('nostradamus')
       if (exactCount >= 5) earned.add('sharpshoot')
+
+      // Combo King: combo_bonus fires when a player lands 2 exact scores in a row.
+      // 3+ combos = at least 4 exact scores arranged into back-to-back pairs,
+      // which is a distinct skill (timing/consistency) from Sharpshooter's lifetime count.
+      const comboCount = Object.values(resultsByFixture)
+        .filter(r => (r.combo_bonus || 0) > 0).length
+      if (comboCount >= 3) earned.add('combo')
 
       // Underdog King: 3+ correctly predicted draws
       const correctDraws = finishedPreds.filter(({ p, f }) =>
@@ -4045,14 +4065,48 @@ window.promptShareScore = promptShareScore
       }
     }
 
-    // Compute small badge icons to show next to a user's name in the leaderboard
+    // Compute small badge icons to show next to a user's name in the leaderboard.
+    // Aligned with the BADGES array (single source of truth for icons/thresholds).
+    // Skipped on the row:
+    //   • On Fire 🔥 — already shown as the separate lb-streak chip
+    //   • Combo King ⚡ — already shown as the separate lb-combo chip (which fires
+    //     from 1 combo, vs. badge at 3+; chip is the active indicator, badge is
+    //     the profile-wall achievement)
+    //   • Early Bird / Underdog / All In — require per-prediction data not in `s`;
+    //     they still show on the profile badge wall.
+    // The 🥇 medal in the rank tile and the 👑 Champion badge here are intentionally
+    // separate signals: medal = current standing, crown = reigning champion.
+    // Capped at 2 visible icons + "+N" overflow chip so rows stay readable on mobile.
     function leaderboardBadgeIcons(s, rank) {
-      const icons = []
-      if (rank === 1 && (s.points || 0) > 0) icons.push('👑')
-      if ((s.exact || 0) >= 5) icons.push('🎯')
-      else if ((s.exact || 0) >= 3) icons.push('🔮')
-      if ((s.points || 0) >= 100) icons.push('💯')
-      return icons.map(i => `<span class="lb-badge" title="badge">${i}</span>`).join('')
+      const earned = []
+      const exact = s.exact || 0
+      const points = s.points || 0
+      const combos = s.combo_count || 0
+
+      // Priority order: rarest / most prestigious first.
+      if (rank === 1 && points > 0) earned.push({ id: 'champion',   icon: '👑' })
+      if (exact >= 5)               earned.push({ id: 'sharpshoot', icon: '🎯' })
+      if (points >= 100)            earned.push({ id: 'centurion',  icon: '💯' })
+      // Nostradamus is the entry tier of the exact-score axis — suppress it
+      // whenever a higher exact-score achievement (Sharpshooter or Combo King-
+      // level combo activity) is already shown via badge or chip, so we don't
+      // double-represent the same skill on the row.
+      const hasHigherExactSignal = exact >= 5 || combos >= 3
+      if (exact >= 2 && !hasHigherExactSignal) earned.push({ id: 'nostradamus', icon: '🔮' })
+
+      if (earned.length === 0) return ''
+
+      const MAX = 2
+      const visible = earned.slice(0, MAX)
+      const overflow = earned.length - visible.length
+
+      const iconsHtml = visible
+        .map(b => `<span class="lb-badge" title="${b.id}">${b.icon}</span>`)
+        .join('')
+      const overflowHtml = overflow > 0
+        ? `<span class="lb-badge lb-badge-more" title="${overflow} more badge${overflow > 1 ? 's' : ''}">+${overflow}</span>`
+        : ''
+      return iconsHtml + overflowHtml
     }
 
     // ============== PREVIEW MODE (Feature 4) ==============
@@ -4188,26 +4242,37 @@ function exitPreviewMode() {
     }
 
     // Load Matches / Teams counts from Supabase for the login screen.
-    // The real table is `fixtures` (not `matches`), and there is no `teams`
-    // table — teams are stored as home_team/away_team strings on fixture
-    // rows, so we derive the team count by collecting distinct names.
+    // Semantics:
+    //   • Matches = REMAINING fixtures (kickoff in the future or no score yet).
+    //     Total − finished. So "102" means there are 102 games left to predict.
+    //   • Teams = ACTIVE teams = teams that still appear in at least one
+    //     unfinished fixture. In group stage all 48 will be active; after groups
+    //     conclude and the admin assigns knockout brackets, eliminated teams
+    //     naturally drop out because they're no longer in any future fixture.
+    // The `fixtures` table holds matches; teams are home_team/away_team strings.
     async function loadAuthStats() {
       const mEl = document.getElementById('auth-stat-matches')
       const tEl = document.getElementById('auth-stat-teams')
       if (!mEl || !tEl) return
       try {
-        // Pull team names so we can both count matches and derive teams.
-        const { data, count, error } = await supabaseClient
+        // Pull team names + scores so we can compute remaining + active sets.
+        const { data, error } = await supabaseClient
           .from('fixtures')
-          .select('home_team, away_team', { count: 'exact' })
+          .select('home_team, away_team, home_score, away_score')
 
         if (error) {
           console.warn('[loadAuthStats] fixtures query error:', error)
           throw error
         }
 
-        const matchCount = (typeof count === 'number') ? count : (data?.length || 0)
-        mEl.textContent = matchCount
+        const rows = data || []
+
+        // A fixture is "finished" only when BOTH scores are recorded.
+        // (Either null = not played yet; covers in-progress / postponed too.)
+        const isFinished = (f) => f.home_score !== null && f.away_score !== null
+        const remainingFixtures = rows.filter(f => !isFinished(f))
+        const remainingCount = remainingFixtures.length
+        mEl.textContent = remainingCount
 
         // Normalize team names to prevent duplicates like "USA" vs "United States"
         // and filter out all placeholder/TBD variants
@@ -4267,41 +4332,31 @@ function exitPreviewMode() {
           return aliases[n] || n
         }
 
-        const teamSet = new Set()
-        ;(data || []).forEach(f => {
+        // Active teams = teams appearing in any UNFINISHED fixture.
+        const activeTeams = new Set()
+        remainingFixtures.forEach(f => {
           const home = normalizeTeam(f.home_team)
           const away = normalizeTeam(f.away_team)
-          if (home) teamSet.add(home)
-          if (away) teamSet.add(away)
+          if (home) activeTeams.add(home)
+          if (away) activeTeams.add(away)
         })
 
-        const teamCount = teamSet.size
-        // Sanity check: WC 2026 has 48 teams maximum.
-        // If we exceed that, the database has polluted/duplicate data.
+        let teamCount = activeTeams.size
+        // Sanity cap: WC 2026 has 48 teams maximum. If normalization yields
+        // more, data is polluted — cap visually but log the issue.
         if (teamCount > 48) {
-          console.warn(`[loadAuthStats] Found ${teamCount} teams after normalization — database has duplicate/polluted data. Capping display at 48.`)
-          tEl.textContent = 48
-        } else {
-          tEl.textContent = teamCount
+          console.warn(`[loadAuthStats] ${teamCount} active teams after normalization — data may be polluted. Capping display at 48.`)
+          teamCount = 48
         }
+        tEl.textContent = teamCount
 
-        console.log('[loadAuthStats] matches:', matchCount, 'teams:', teamCount, 'capped:', teamCount > 48)
+        console.log('[loadAuthStats] remaining matches:', remainingCount, '/ total:', rows.length, '| active teams:', activeTeams.size)
       } catch (e) {
-        // Last-ditch: try a head-only count so we at least show matches.
-        try {
-          const { count } = await supabaseClient
-            .from('fixtures')
-            .select('*', { count: 'exact', head: true })
-          if (typeof count === 'number') {
-            mEl.textContent = count
-            tEl.textContent = 48
-            return
-          }
-        } catch (e2) { /* fall through */ }
-        // Final fallback to official WC 2026 numbers.
-        console.warn('[loadAuthStats] using static fallback:', e)
-        mEl.textContent = 64
-        tEl.textContent = 48
+        // Honest fallback: leave whatever was there (typically "—") rather than
+        // showing static WC 2026 totals that look dynamic but aren't.
+        console.warn('[loadAuthStats] could not compute stats, leaving placeholders:', e)
+        if (mEl.textContent === '' || mEl.textContent == null) mEl.textContent = '—'
+        if (tEl.textContent === '' || tEl.textContent == null) tEl.textContent = '—'
       }
     }
 

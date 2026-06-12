@@ -888,6 +888,18 @@
       border: 1px solid rgba(255,255,255,0.5);
       box-shadow: 0 1px 4px rgba(180, 83, 9, 0.1);
     }
+    /* ===== Combo bolt — parallel to streak chip, violet to distinguish ===== */
+    .lb-combo {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 11px; font-weight: 800; color: #6D28D9;
+      background: linear-gradient(135deg, rgba(237, 233, 254, 0.9), rgba(221, 214, 254, 0.85));
+      border-radius: 999px; padding: 3px 8px 3px 6px;
+      margin-left: 4px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 1px 4px rgba(109, 40, 217, 0.1);
+    }
     /* ===== Projected winnings inline on row ===== */
     .lb-projected {
       font-size: 10px; font-weight: 700; color: #15803D;
@@ -1281,6 +1293,10 @@
       font-size: 10px !important;
     }
     .lb-row-compact .lb-streak {
+      font-size: 10px !important;
+      padding: 2px 6px !important;
+    }
+    .lb-row-compact .lb-combo {
       font-size: 10px !important;
       padding: 2px 6px !important;
     }
@@ -2022,10 +2038,100 @@
         </div>
       </div>
 
+      <!-- Bonuses vs. Badges framing callout -->
+      <div class="flex gap-3 bg-brand/5 border border-brand/20 rounded-xl p-3">
+        <div class="text-xl shrink-0 leading-none">💡</div>
+        <div class="min-w-0">
+          <div class="text-xs font-bold text-ink-900 mb-0.5">Bonuses vs. Badges</div>
+          <div class="text-xs text-ink-600 leading-relaxed">
+            <span class="font-semibold">Bonuses</span> add points to your score for in-the-moment plays (streaks, combos).
+            <span class="font-semibold">Badges</span> recognize milestones you collect over the tournament.
+            You can earn both for the same play.
+          </div>
+        </div>
+      </div>
+
+      <!-- Badges & Achievements -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-pink-50 text-pink-700 flex items-center justify-center text-sm font-bold">4</div>
+          <h4 class="font-bold text-sm">Badges & Achievements</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-3">
+          Earn badges as you play. Tap any earned badge on your profile to share it. Top achievements also appear next to your name on the leaderboard.
+        </p>
+
+        <div class="ml-10 grid grid-cols-2 gap-2">
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-lg shrink-0">👑</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Champion</div>
+              <div class="text-[10px] text-ink-500 leading-tight">#1 on the board</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-lg shrink-0">🔮</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Nostradamus</div>
+              <div class="text-[10px] text-ink-500 leading-tight">2+ exact scores total</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center text-lg shrink-0">🎯</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Sharpshooter</div>
+              <div class="text-[10px] text-ink-500 leading-tight">5+ exact scores</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center text-lg shrink-0">⚡</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Combo King</div>
+              <div class="text-[10px] text-ink-500 leading-tight">3+ exact combos</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-sky-50 flex items-center justify-center text-lg shrink-0">🐦</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Early Bird</div>
+              <div class="text-[10px] text-ink-500 leading-tight">Predict 72h+ early</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-lg shrink-0">🐴</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Underdog King</div>
+              <div class="text-[10px] text-ink-500 leading-tight">3+ correct draws</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center text-lg shrink-0">🔥</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Hot Streak</div>
+              <div class="text-[10px] text-ink-500 leading-tight">3+ scoring in a row</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
+            <div class="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center text-lg shrink-0">💯</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">Centurion</div>
+              <div class="text-[10px] text-ink-500 leading-tight">100+ total points</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border col-span-2">
+            <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-lg shrink-0">🎲</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-ink-900">All In</div>
+              <div class="text-[10px] text-ink-500 leading-tight">Predict every finished match</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Prize Pool -->
       <div id="rules-prize-section">
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">4</div>
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">5</div>
           <h4 class="font-bold text-sm">Prize Distribution</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2" id="rules-prize-intro">
@@ -2060,7 +2166,7 @@
       <!-- Private Leagues -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold">5</div>
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold">6</div>
           <h4 class="font-bold text-sm">Private Leagues</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -2071,7 +2177,7 @@
       <!-- Deadlines -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">6</div>
+          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">7</div>
           <h4 class="font-bold text-sm">Prediction Deadlines</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -2082,7 +2188,7 @@
       <!-- Fair Play -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">7</div>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">8</div>
           <h4 class="font-bold text-sm">Fair Play</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -2142,14 +2248,14 @@
             <svg class="w-5 h-5" style="color:#3B82F6;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3 6 6 1-4.5 4 1 6L12 16l-5.5 3 1-6L3 9l6-1 3-6z"/></svg>
           </div>
           <div class="auth-stat-num" style="color:#3B82F6;" id="auth-stat-matches">—</div>
-          <div class="auth-stat-lbl">Matches</div>
+          <div class="auth-stat-lbl">Matches Left</div>
         </div>
         <div class="text-center flex flex-col items-center border-l border-r border-gray-100">
           <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-1.5">
             <svg class="w-5 h-5" style="color:#10B981;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 5.87v-2a4 4 0 00-4-4H8a4 4 0 00-4 4M16 7a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
           <div class="auth-stat-num" style="color:#10B981;" id="auth-stat-teams">—</div>
-          <div class="auth-stat-lbl">Teams</div>
+          <div class="auth-stat-lbl">Teams Left</div>
         </div>
         <div class="text-center flex flex-col items-center">
           <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-1.5">
