@@ -2359,6 +2359,81 @@ async function shareLeaderboard() {
   window.open(waUrl, '_blank')
 }
 
+// ===== Tournament Progress Strip =====
+// Slim progress bar above the leaderboard sub-tabs showing how far through
+// the tournament we are. Pure derived data from the existing `fixtures`
+// array — no schema changes. Hides itself if data isn't ready.
+function renderTournamentProgress() {
+  const strip = document.getElementById('lb-tournament-progress')
+  const labelEl = document.getElementById('lb-progress-label')
+  const pctEl = document.getElementById('lb-progress-pct')
+  const fillEl = document.getElementById('lb-progress-fill')
+  if (!strip || !labelEl || !pctEl || !fillEl) return
+
+  const rows = fixtures || []
+  if (rows.length === 0) {
+    strip.classList.add('hidden')
+    return
+  }
+
+  const total = rows.length
+  const played = rows.filter(f => f.home_score !== null && f.away_score !== null).length
+  const pct = total > 0 ? Math.round((played / total) * 100) : 0
+
+  // Phase label — gives context based on where we are in the tournament arc.
+  // Thresholds are rough: ~46% (48/104) marks end of group stage in WC 2026.
+  let phase = 'Tournament'
+  if (pct === 0) phase = 'Kickoff incoming'
+  else if (pct < 46) phase = 'Group Stage'
+  else if (pct < 77) phase = 'Knockouts'
+  else if (pct < 96) phase = 'Quarter / Semi Final stage'
+  else if (pct < 100) phase = 'The Final'
+  else phase = 'Tournament complete'
+
+  labelEl.textContent = `${phase} · ${played} of ${total} matches played`
+  pctEl.textContent = `${pct}%`
+  // RAF so the transition runs from 0 to target on first render
+  requestAnimationFrame(() => {
+    fillEl.style.width = `${pct}%`
+  })
+  strip.classList.remove('hidden')
+}
+
+// ===== "Almost there" row hint =====
+// Computes one motivating caption for the user's own leaderboard row.
+// Priority: actionable badge nudge → close-rival overtake → prize-zone status.
+// Returns null when nothing meaningful applies, so the row stays clean.
+function computeRowHint(s, rank, prevPlayer) {
+  const exact = s.exact || 0
+  const points = s.points || 0
+  const combos = s.combo_count || 0
+
+  // Badge-close nudges (most actionable — the user can DO something about them next)
+  if (exact === 4) return '1 more exact for 🎯 Sharpshooter'
+  if (exact === 1) return '1 more exact for 🔮 Nostradamus'
+  if (combos === 2) return '1 more combo for ⚡ Combo King'
+  if (points >= 80 && points < 100) return `${100 - points} pt${(100 - points) > 1 ? 's' : ''} to 💯 Centurion`
+
+  // Close-rival overtake (only meaningful when someone's actually ahead by a little)
+  if (rank > 1 && prevPlayer) {
+    const gap = (prevPlayer.points || 0) - points
+    if (gap > 0 && gap <= 5) {
+      const name = (prevPlayer.full_name || prevPlayer.name || 'them').split(' ')[0]
+      return `${gap} pt${gap > 1 ? 's' : ''} to overtake ${name}`
+    }
+  }
+
+  // Prize-zone status — celebratory if in, motivational if just outside
+  if (rank === 1) return "Reigning champion 👑"
+  if (rank <= 3) return "You're in the prize zone 🏆"
+  if (rank === 4 && prevPlayer) {
+    const gap = (prevPlayer.points || 0) - points
+    if (gap > 0 && gap <= 10) return `${gap} pt${gap > 1 ? 's' : ''} to the prize zone`
+  }
+
+  return null
+}
+
 async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
@@ -2497,6 +2572,12 @@ async function loadLeaderboard() {
         const isMe = s.user_id === myId || s.id === myId
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
         const hasPoints = (s.points || 0) > 0
+        // The player directly above us (rank N-1) — used for the "almost there" hint
+        // on the user's own row to suggest who they could overtake next.
+        const prevPlayer = i > 0 ? stats[i - 1] : null
+        // Top-3 row tint class — extends the medal's color across the whole row
+        // for a subtle podium feel. Only applied to ranks 1/2/3 with actual points.
+        const rankClass = (rank <= 3 && hasPoints) ? `lb-row-rank-${rank}` : ''
         // Medals ONLY when there are actual points
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
         const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
@@ -2551,7 +2632,7 @@ async function loadLeaderboard() {
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
         return `
-        <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} flex items-center gap-3"
+        <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} ${rankClass} flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           <div class="shrink-0">${rankDisplay}</div>
           <div class="shrink-0">
@@ -2569,6 +2650,10 @@ async function loadLeaderboard() {
             <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
               ${statsLine}
             </div>
+            ${isMe && lbSubtab === 'overall' ? (() => {
+              const hint = computeRowHint(s, rank, prevPlayer)
+              return hint ? `<div class="lb-row-hint">${escapeHtml(hint)}</div>` : ''
+            })() : ''}
           </div>
           <div class="text-right shrink-0">
             <div class="points-num font-bold text-brand-700" data-points-el>${s.points || 0}</div>
@@ -2576,6 +2661,10 @@ async function loadLeaderboard() {
           </div>
         </div>`
       }).join('')
+
+      // Update tournament progress strip — derived from current fixtures state.
+      // Called on every leaderboard render so it stays in sync after realtime updates.
+      renderTournamentProgress()
 
       // ===== H2H tap-to-open: attach click handler to every leaderboard row =====
       // Tapping a row opens a head-to-head modal comparing you against that player.
@@ -4075,7 +4164,8 @@ window.promptShareScore = promptShareScore
     //   • Early Bird / Underdog / All In — require per-prediction data not in `s`;
     //     they still show on the profile badge wall.
     // The 🥇 medal in the rank tile and the 👑 Champion badge here are intentionally
-    // separate signals: medal = current standing, crown = reigning champion.
+    // separate signals: medal = current standing (live), crown = celebrating that
+    // they're the reigning champion of the league.
     // Capped at 2 visible icons + "+N" overflow chip so rows stay readable on mobile.
     function leaderboardBadgeIcons(s, rank) {
       const earned = []
