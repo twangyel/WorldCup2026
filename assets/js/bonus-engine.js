@@ -479,7 +479,7 @@ function aggregateUserStats(userId, allMatchResults) {
     };
   }
 
-  const stats = {
+const stats = {
     user_id: userId,
     points: 0,          // Total final points (for leaderboard ranking)
     exact: 0,
@@ -493,6 +493,7 @@ function aggregateUserStats(userId, allMatchResults) {
     final_points_total: 0,
     current_streak: 0,
     best_streak: 0,
+    combo_count: 0,
     combos_earned: [],
     best_multiplier_match: null
   };
@@ -530,13 +531,12 @@ function aggregateUserStats(userId, allMatchResults) {
     stats.final_points_total += m.final_points;
 
     // Collect unique combos
-    stats.combo_count = 0;
-   m.combos_earned?.forEach(c => {
-  stats.combo_count++;   // count every instance
-  if (!stats.combos_earned.find(ec => ec.type === c.type && ec.description === c.description)) {
-    stats.combos_earned.push(c);
-  }
-});
+    m.combos_earned?.forEach(c => {
+      stats.combo_count++;   // count every instance
+      if (!stats.combos_earned.find(ec => ec.type === c.type && ec.description === c.description)) {
+        stats.combos_earned.push(c);
+      }
+    });
 
     // Best multiplier match
     if (!stats.best_multiplier_match || m.stage_multiplier > stats.best_multiplier_match.stage_multiplier) {
