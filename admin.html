@@ -1038,6 +1038,19 @@ function flagHtml(name, size = 24) {
           playChime()
           showToast('New prediction submitted', 'general')
         }).subscribe()
+
+      // Auto-refresh when bonus rows land. awardPointsWithBonuses writes
+      // 20-50 rows in a burst per fixture, so debounce to one refresh.
+      let _prResultsRefreshTimer = null
+      supabaseClient.channel('admin-prediction-results')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'prediction_results' }, () => {
+          clearTimeout(_prResultsRefreshTimer)
+          _prResultsRefreshTimer = setTimeout(() => {
+            if (activeLeagueId && typeof adminViewLeague === 'function') {
+              adminViewLeague(activeLeagueId)
+            }
+          }, 500)
+        }).subscribe()
     }
 
     supabaseClient.channel('admin-system-settings')
@@ -2379,13 +2392,25 @@ async function executeSaveScore(id) {
   const bothSet = finalHome !== null && finalHome !== undefined
                   && finalAway !== null && finalAway !== undefined
 
-  if (bothSet) {
+if (bothSet) {
     showToast('Score saved — awarding points…', 'success')
     try {
       await awardPointsForFixture(id, Number(finalHome), Number(finalAway))
       showToast('Points awarded to all players', 'success')
-      // Refresh local views that depend on points
-      if (typeof loadLeaderboard === 'function') loadLeaderboard()
+
+      // Refresh whichever leaderboard surface is currently visible.
+      // `loadAll()` only refreshes fixtures/users/prize — it does NOT re-query
+      // prediction_results, so without these explicit calls the league
+      // leaderboard stays stale until the admin manually re-opens it.
+      try {
+        if (activeLeagueId && typeof adminViewLeague === 'function') {
+          await adminViewLeague(activeLeagueId)
+        }
+        // Defensive: refresh global leaderboard if a refresher exists.
+        if (typeof loadAdminLeagueBrowser === 'function') loadAdminLeagueBrowser()
+      } catch (refreshErr) {
+        console.warn('[score-save] post-award refresh failed:', refreshErr)
+      }
     } catch (err) {
       console.error('[score-save] awardPointsForFixture failed:', err)
       showToast('Score saved, but points award failed. Try Recalculate All.', 'error')
