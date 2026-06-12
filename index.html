@@ -1197,6 +1197,25 @@
       letter-spacing: 0.01em;
     }
 
+    /* ===== Achievements row — chips + badges on their own line, free to wrap ===== */
+    /* Sits below the stats line; only rendered when the player actually has chips
+       or badges to show, so empty/idle players keep the compact 2-line layout. */
+    .lb-achievements-row {
+      margin-top: 4px;
+      row-gap: 4px; /* tightens vertical spacing if chips wrap onto a second line */
+    }
+    /* Tweak: pull chip margin-left back to zero inside the achievements row
+       since we're already using flex `gap` for spacing (avoids double-margin) */
+    .lb-achievements-row .lb-streak,
+    .lb-achievements-row .lb-combo {
+      margin-left: 0;
+    }
+    /* Slightly tighter spacing between the name and the stats line below it,
+       since the achievements row adds vertical weight to the row overall */
+    .lb-row-compact .player-stats {
+      margin-top: 1px;
+    }
+
     /* ===== Tournament progress strip — slim context strip above the leaderboard tabs ===== */
     .lb-progress-strip {
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(248, 247, 240, 0.6));

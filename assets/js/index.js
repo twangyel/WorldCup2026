@@ -2631,6 +2631,12 @@ async function loadLeaderboard() {
           : `<span class="text-ink-400 italic">${emptyLabel}</span>`
         const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
 
+        // Compute chips+badges as a combined block. Built once so we can decide
+        // whether to render the achievements row at all (skip the empty extra line).
+        const badgesHtml = leaderboardBadgeIcons(s, rank)
+        const achievementsHtml = `${streakHtml}${comboHtml}${badgesHtml}`
+        const hasAchievements = achievementsHtml.trim().length > 0
+
         return `
         <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} ${rankClass} flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
@@ -2639,17 +2645,19 @@ async function loadLeaderboard() {
             ${getAvatarHtml(s.name, s.avatar_url, rank, 32)}
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5 flex-wrap">
+            <!-- Line 1: identity — name + YOU pill, nothing else competing here -->
+            <div class="flex items-center gap-1.5 min-w-0">
               <span class="player-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
-              ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">YOU</span>' : ''}
-              ${trendHtml}
-              ${streakHtml}
-              ${comboHtml}
-              ${leaderboardBadgeIcons(s, rank)}
+              ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded shrink-0">YOU</span>' : ''}
             </div>
+            <!-- Line 2: the actual ranking data — stats + trend movement -->
             <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
               ${statsLine}
+              ${trendHtml}
             </div>
+            <!-- Line 3: achievements row — chips + badges, free to wrap. Only rendered if there's something to show. -->
+            ${hasAchievements ? `<div class="lb-achievements-row flex items-center gap-1.5 flex-wrap">${achievementsHtml}</div>` : ''}
+            <!-- Line 4: motivational hint for self-row only (Overall tab only) -->
             ${isMe && lbSubtab === 'overall' ? (() => {
               const hint = computeRowHint(s, rank, prevPlayer)
               return hint ? `<div class="lb-row-hint">${escapeHtml(hint)}</div>` : ''
@@ -4186,7 +4194,10 @@ window.promptShareScore = promptShareScore
 
       if (earned.length === 0) return ''
 
-      const MAX = 2
+      // Cap visible badges. Now that achievements have their own row (line 3 of
+      // the leaderboard row), we can afford 3 visible before overflowing — keeps
+      // top performers' recognition intact without forcing chips onto a 2nd row.
+      const MAX = 3
       const visible = earned.slice(0, MAX)
       const overflow = earned.length - visible.length
 
