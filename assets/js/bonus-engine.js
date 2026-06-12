@@ -842,25 +842,153 @@ async function recalculateUserBonuses(userId) {
  * "nuclear option" admin button. Safe to run; just slow with many users.
  */
 async function recalculateAllBonuses() {
+  console.log('[recalc-all] Starting full recalculation…');
+
+  // Source from predictions (not prediction_results) so we catch users
+  // whose result rows are missing due to transient errors during awardPointsWithBonuses.
+  // .limit(10000) safeguards against PostgREST's default 1000-row cap.
   const { data: users, error } = await supabaseClient
-    .from('prediction_results')
-    .select('user_id');
+    .from('predictions')
+    .select('user_id')
+    .limit(10000);
 
   if (error || !users) {
     console.error('[recalc-all] Failed to load users:', error);
-    return { users: 0, updated: 0, errors: 1 };
+    return { users: 0, created: 0, updated: 0, errors: 1 };
   }
 
   const uniqueUserIds = [...new Set(users.map(u => u.user_id))];
-  let totalUpdated = 0, totalErrors = 0;
+  console.log(`[recalc-all] Processing ${uniqueUserIds.length} users`);
+
+  let totalCreated = 0, totalUpdated = 0, totalErrors = 0;
 
   for (const uid of uniqueUserIds) {
-    const { updated, errors } = await recalculateUserBonuses(uid);
-    totalUpdated += updated;
-    totalErrors += errors;
+    try {
+      // STEP 1 — Find this user's predictions on already-scored fixtures.
+      const { data: predsOnScored, error: predsErr } = await supabaseClient
+        .from('predictions')
+        .select(`
+          id,
+          user_id,
+          fixture_id,
+          home_prediction,
+          away_prediction,
+          fixtures!inner(home_score, away_score, stage, kickoff)
+        `)
+        .eq('user_id', uid)
+        .not('fixtures.home_score', 'is', null)
+        .not('fixtures.away_score', 'is', null)
+        .limit(10000);
+
+      if (predsErr) {
+        console.error(`[recalc-all] Failed to fetch predictions for ${uid}:`, predsErr);
+        totalErrors++;
+        continue;
+      }
+
+      if (!predsOnScored || predsOnScored.length === 0) continue;
+
+      // STEP 2 — Find which of those already have result rows.
+      const fixtureIds = predsOnScored.map(p => p.fixture_id);
+      const { data: existingResults, error: existingErr } = await supabaseClient
+        .from('prediction_results')
+        .select('fixture_id')
+        .eq('user_id', uid)
+        .in('fixture_id', fixtureIds);
+
+      if (existingErr) {
+        console.error(`[recalc-all] Failed to fetch existing results for ${uid}:`, existingErr);
+        totalErrors++;
+        continue;
+      }
+
+      const existingSet = new Set((existingResults || []).map(r => r.fixture_id));
+      const missingRows = predsOnScored.filter(p => !existingSet.has(p.fixture_id));
+
+      // STEP 3 — Create the missing rows with correct stage multiplier.
+      // Streak/combo bonuses come out as 0 here (history=[]) — recalculateUserBonuses
+      // replays full history in Step 4 and fills them in correctly.
+      for (const m of missingRows) {
+        try {
+          const f = m.fixtures;
+          const basePoints = calculatePoints(
+            m.home_prediction, m.away_prediction,
+            f.home_score, f.away_score
+          );
+          const matchdayKey = getMatchdayKey(f.kickoff);
+
+          const fullResult = calculateFullPoints({
+            fixtureId: m.fixture_id,
+            userId: uid,
+            stage: f.stage,
+            kickoff: f.kickoff,
+            matchdayKey,
+            predHome: m.home_prediction,
+            predAway: m.away_prediction,
+            actualHome: f.home_score,
+            actualAway: f.away_score,
+            basePoints
+          }, []);
+
+          // Match the engine's upsert pattern exactly (line 686-709).
+          const { error: upsertErr } = await supabaseClient
+            .from('prediction_results')
+            .upsert({
+              prediction_id: m.id,
+              user_id: uid,
+              fixture_id: m.fixture_id,
+              home_prediction: m.home_prediction,
+              away_prediction: m.away_prediction,
+              stage: f.stage,
+              base_points: fullResult.base_points,
+              stage_multiplier: fullResult.stage_multiplier,
+              multiplied_base: fullResult.multiplied_base,
+              streak_bonus: fullResult.streak_bonus,
+              combo_bonus: fullResult.combo_bonus,
+              total_bonus: fullResult.total_bonus,
+              final_points: fullResult.final_points,
+              streak_count: fullResult.streak_count,
+              streak_tier: fullResult.streak_tier,
+              combos_earned: fullResult.combos_earned,
+              bonus_breakdown: fullResult.bonus_breakdown,
+              kickoff: f.kickoff,
+              matchday_key: matchdayKey
+            }, {
+              onConflict: 'prediction_id'
+            });
+
+          if (upsertErr) {
+            console.error(`[recalc-all] Upsert failed for prediction ${m.id}:`, upsertErr);
+            totalErrors++;
+          } else {
+            totalCreated++;
+          }
+        } catch (createErr) {
+          console.error(`[recalc-all] Create-row exception for prediction ${m.id}:`, createErr);
+          totalErrors++;
+        }
+      }
+
+      // STEP 4 — Recalculate streaks, combos, and any multiplier corrections
+      // across this user's full history (now including any rows we just inserted).
+      const { updated, errors } = await recalculateUserBonuses(uid);
+      totalUpdated += updated;
+      totalErrors += errors;
+
+    } catch (userErr) {
+      console.error(`[recalc-all] Unexpected error for user ${uid}:`, userErr);
+      totalErrors++;
+    }
   }
 
-  return { users: uniqueUserIds.length, updated: totalUpdated, errors: totalErrors };
+  const summary = {
+    users: uniqueUserIds.length,
+    created: totalCreated,
+    updated: totalUpdated,
+    errors: totalErrors
+  };
+  console.log('[recalc-all] Complete:', summary);
+  return summary;
 }
 
 // ============== EXPORTS ==============
