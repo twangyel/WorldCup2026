@@ -1135,7 +1135,7 @@
 
     /* Compact leaderboard row - minimal vertical padding, full width */
     .lb-row-compact {
-      padding: 12px 16px !important;
+      padding: 10px 16px !important;
       margin: 0 !important;
       width: 100% !important;
       border-radius: 14px !important;
@@ -1197,7 +1197,156 @@
       letter-spacing: 0.01em;
     }
 
-    /* ===== Achievements row — chips + badges on their own line, free to wrap ===== */
+    /* ===== Player / Badge Info Popup =====
+       Shared bottom-sheet popup used when a leaderboard row's avatar or badge is
+       tapped. Visually parallel to the country-modal (slide-up on mobile, centered
+       card on desktop) but tighter — these popups are small, glanceable facts.    */
+    .info-popup {
+      position: fixed; inset: 0; z-index: 60;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 0; pointer-events: none;
+    }
+    @media (min-width: 640px) {
+      .info-popup { align-items: center; padding: 1rem; }
+    }
+    .info-popup-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(10, 15, 13, 0.5);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      opacity: 0; transition: opacity 220ms ease-out;
+      pointer-events: auto;
+    }
+    .info-popup-panel {
+      position: relative;
+      background: #fff;
+      border-radius: 1.5rem 1.5rem 0 0;
+      width: 100%; max-width: 26rem;
+      max-height: 85vh;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 280ms cubic-bezier(0.32, 0.72, 0.16, 1);
+      pointer-events: auto;
+      box-shadow: 0 -20px 60px -10px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    @media (min-width: 640px) {
+      .info-popup-panel {
+        border-radius: 1.5rem;
+        transform: translateY(20px) scale(0.96);
+        transition: transform 220ms cubic-bezier(0.32, 0.72, 0.16, 1), opacity 220ms ease-out;
+        opacity: 0;
+      }
+    }
+    .info-popup.is-open .info-popup-backdrop { opacity: 1; }
+    .info-popup.is-open .info-popup-panel    { transform: translateY(0); opacity: 1; }
+    .info-popup.is-closing .info-popup-backdrop { opacity: 0; }
+    .info-popup.is-closing .info-popup-panel    { transform: translateY(100%); }
+    @media (min-width: 640px) {
+      .info-popup.is-closing .info-popup-panel { transform: translateY(20px) scale(0.96); opacity: 0; }
+    }
+    .info-popup-header {
+      position: relative;
+      padding: 22px 20px 18px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .info-popup-header.variant-player {
+      background: linear-gradient(135deg, rgba(30,58,95,0.95) 0%, rgba(11,18,33,0.92) 100%);
+    }
+    .info-popup-header.variant-badge {
+      background: linear-gradient(135deg, rgba(109,40,217,0.92) 0%, rgba(67,20,150,0.95) 100%);
+    }
+    .info-popup-close {
+      position: absolute; top: 12px; right: 12px;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 10;
+      transition: background 150ms ease;
+    }
+    .info-popup-close:hover { background: rgba(255,255,255,0.22); }
+    .info-popup-close svg { width: 14px; height: 14px; }
+    .info-popup-body {
+      flex: 1; min-height: 0; overflow-y: auto;
+      padding: 16px 20px 20px;
+    }
+    .info-popup-stat-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin-bottom: 14px;
+    }
+    .info-popup-stat-box {
+      background: #FAFAF7; border: 1px solid #EEEDE7;
+      border-radius: 12px; padding: 10px 6px; text-align: center;
+    }
+    .info-popup-stat-box .label {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #8A959F; margin-bottom: 4px;
+    }
+    .info-popup-stat-box .value {
+      font-size: 18px; font-weight: 800; color: #0A0F0D;
+      line-height: 1.1;
+    }
+    .info-popup-section-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #1F2A35;
+      margin: 14px 0 6px;
+    }
+    .info-popup-chip-row {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .info-popup-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #F4F3EE; color: #1F2A35;
+      font-size: 12px; font-weight: 700;
+      padding: 6px 12px; border-radius: 999px;
+      border: 1px solid #EEEDE7;
+    }
+    .info-popup-cta {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%;
+      background: linear-gradient(135deg, #1E3A5F, #0B1221);
+      color: #fff; font-weight: 700; font-size: 14px;
+      padding: 12px 16px; border-radius: 14px;
+      margin-top: 14px;
+      border: none; cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+    .info-popup-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(30,58,95,0.25); }
+    .info-popup-cta:active { transform: translateY(0); }
+
+    /* Badge variant — big icon block */
+    .info-popup-badge-display {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 8px 0 4px;
+    }
+    .info-popup-badge-icon {
+      width: 96px; height: 96px; border-radius: 24px;
+      background: rgba(255,255,255,0.10);
+      border: 2px solid rgba(255,255,255,0.18);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 56px; line-height: 1;
+      box-shadow: 0 8px 24px rgba(109,40,217,0.3);
+    }
+    .info-popup-badge-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .info-popup-badge-status.earned {
+      background: rgba(34,197,94,0.18); color: #BBF7D0; border: 1px solid rgba(34,197,94,0.3);
+    }
+    .info-popup-badge-status.not-earned {
+      background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    /* Visual: tappable hint on row sub-elements (subtle) */
+    .lb-row [data-avatar-wrap],
+    .lb-row [data-rank-wrap],
+    .lb-row [data-badge-id] {
+      cursor: pointer;
+    }
     /* Sits below the stats line; only rendered when the player actually has chips
        or badges to show, so empty/idle players keep the compact 2-line layout. */
     .lb-achievements-row {
@@ -1262,51 +1411,28 @@
 
 
     /* ===== Rank Medals (Gold/Silver/Bronze) ===== */
-    .rank-medal-gold {
-      width: 32px !important;
-      height: 32px !important;
-      border-radius: 50% !important;
-      background: linear-gradient(135deg, #FFD700 0%, #F4C430 50%, #D4A24C 100%) !important;
-      box-shadow: 0 2px 8px rgba(212, 162, 76, 0.4), inset 0 -2px 4px rgba(0,0,0,0.1) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 16px !important;
-      line-height: 1 !important;
-      border: 2px solid rgba(255, 255, 255, 0.5) !important;
-    }
-    .rank-medal-silver {
-      width: 32px !important;
-      height: 32px !important;
-      border-radius: 50% !important;
-      background: linear-gradient(135deg, #E8E8E8 0%, #C0C0C0 50%, #A8A8A8 100%) !important;
-      box-shadow: 0 2px 8px rgba(168, 168, 168, 0.35), inset 0 -2px 4px rgba(0,0,0,0.08) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 16px !important;
-      line-height: 1 !important;
-      border: 2px solid rgba(255, 255, 255, 0.5) !important;
-    }
+    /* Clean emoji-only medals — no circular background, no extra padding */
+    .rank-medal-gold,
+    .rank-medal-silver,
     .rank-medal-bronze {
-      width: 32px !important;
-      height: 32px !important;
-      border-radius: 50% !important;
-      background: linear-gradient(135deg, #E8B88A 0%, #CD7F32 50%, #B87333 100%) !important;
-      box-shadow: 0 2px 8px rgba(184, 115, 51, 0.35), inset 0 -2px 4px rgba(0,0,0,0.08) !important;
-      display: flex !important;
+      display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      font-size: 16px !important;
+      font-size: 18px !important;
       line-height: 1 !important;
-      border: 2px solid rgba(255, 255, 255, 0.5) !important;
+      width: auto !important;
+      height: auto !important;
+      background: none !important;
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
     .lb-row-compact .rank-medal-gold,
     .lb-row-compact .rank-medal-silver,
     .lb-row-compact .rank-medal-bronze {
-      width: 28px !important;
-      height: 28px !important;
-      font-size: 14px !important;
+      font-size: 22px !important;
     }
 
     /* ===== Player Avatars (Leaderboard) ===== */
@@ -1357,13 +1483,13 @@
 
     /* Compact rank display */
     .lb-row-compact .rank-num {
-      width: 28px !important;
-      height: 28px !important;
-      font-size: 12px !important;
-      border-radius: 8px !important;
+      width: 32px !important;
+      height: 32px !important;
+      font-size: 13px !important;
+      border-radius: 10px !important;
     }
     .lb-row-compact .rank-medal {
-      font-size: 18px !important;
+      font-size: 22px !important;
       line-height: 1 !important;
     }
 
@@ -1378,20 +1504,21 @@
       line-height: 1.3 !important;
     }
     .lb-row-compact .points-num {
-      font-size: 18px !important;
+      font-size: 20px !important;
       font-weight: 800 !important;
       line-height: 1 !important;
     }
     .lb-row-compact .points-label {
-      font-size: 9px !important;
-      margin-top: 1px !important;
+      font-size: 10px !important;
+      margin-top: 2px !important;
+      font-weight: 700 !important;
     }
 
     /* Compact badges inline */
     .lb-row-compact .lb-badge {
-      width: 16px !important;
-      height: 16px !important;
-      font-size: 10px !important;
+      width: 18px !important;
+      height: 18px !important;
+      font-size: 11px !important;
     }
     .lb-row-compact .lb-streak {
       font-size: 10px !important;
@@ -1721,9 +1848,402 @@
       .h2h-backdrop, .h2h-content, .h2h-content-fade { transition: none !important; }
       .h2h-skel-title, .h2h-skel-close, .h2h-skel-stat, .h2h-skel-row { animation: none !important; }
     }
+
+    /* ===== FIFA Ranking Badge ===== */
+    .fifa-rank-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-top: 4px;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .fifa-rank-top10 {
+      background: linear-gradient(135deg, #FFD700, #F4C430);
+      color: #1a1208;
+      box-shadow: 0 1px 3px rgba(212, 162, 76, 0.3);
+    }
+    .fifa-rank-top25 {
+      background: linear-gradient(135deg, #C0C0C0, #A8A8A8);
+      color: #1a1a1a;
+      box-shadow: 0 1px 3px rgba(168, 168, 168, 0.3);
+    }
+    .fifa-rank-top50 {
+      background: linear-gradient(135deg, #CD7F32, #B87333);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(184, 115, 51, 0.3);
+    }
+    .fifa-rank-other {
+      background: #F4F3EE;
+      color: #8A959F;
+      border: 1px solid #EEEDE7;
+    }
+
+
+    /* ===== Country Details Modal ===== */
+    .country-modal {
+      position: fixed; inset: 0; z-index: 55;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 0; pointer-events: none;
+    }
+    @media (min-width: 640px) {
+      .country-modal { align-items: center; padding: 1rem; }
+    }
+    .country-modal-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(10, 15, 13, 0.5);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      opacity: 0; transition: opacity 220ms ease-out;
+      pointer-events: auto;
+    }
+    .country-modal-panel {
+      position: relative;
+      background: #fff;
+      border-radius: 1.5rem 1.5rem 0 0;
+      width: 100%; max-width: 28rem;
+      max-height: 85vh;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 280ms cubic-bezier(0.32, 0.72, 0.16, 1);
+      will-change: transform;
+      pointer-events: auto;
+      box-shadow: 0 -20px 60px -10px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    @media (min-width: 640px) {
+      .country-modal-panel {
+        border-radius: 1.5rem;
+        transform: translateY(20px) scale(0.96);
+        transition: transform 220ms cubic-bezier(0.32, 0.72, 0.16, 1), opacity 220ms ease-out;
+        opacity: 0;
+      }
+    }
+    .country-modal.is-open .country-modal-backdrop { opacity: 1; }
+    .country-modal.is-open .country-modal-panel  { transform: translateY(0); opacity: 1; }
+    .country-modal.is-closing .country-modal-backdrop { opacity: 0; }
+    .country-modal.is-closing .country-modal-panel  { transform: translateY(100%); }
+    @media (min-width: 640px) {
+      .country-modal.is-closing .country-modal-panel { transform: translateY(20px) scale(0.96); opacity: 0; }
+    }
+
+    .country-modal-header {
+      position: relative;
+      padding: 24px 20px 16px;
+      background: linear-gradient(135deg, rgba(30,58,95,0.92) 0%, rgba(11,18,33,0.88) 100%);
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .country-modal-header::before {
+      content: '';
+      position: absolute; top: -40px; right: -40px;
+      width: 140px; height: 140px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,162,76,0.25), transparent 70%);
+      pointer-events: none;
+    }
+    .country-modal-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 150ms ease;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    .country-modal-close:hover { background: rgba(255,255,255,0.2); }
+    .country-modal-close svg { width: 16px; height: 16px; }
+
+    .country-modal-flag-wrap {
+      width: 64px; height: 48px; border-radius: 8px;
+      overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.2);
+      flex-shrink: 0;
+    }
+    .country-modal-flag-wrap img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+
+    .country-modal-body {
+      flex: 1; min-height: 0;
+      overflow-y: auto;
+      padding: 16px 20px 24px;
+    }
+
+    .country-stat-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin-bottom: 16px;
+    }
+    .country-stat-box {
+      background: #FAFAF7; border: 1px solid #EEEDE7;
+      border-radius: 14px; padding: 10px 6px; text-align: center;
+    }
+    .country-stat-box .label {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #8A959F; margin-bottom: 4px;
+    }
+    .country-stat-box .value {
+      font-size: 15px; font-weight: 800; color: #0A0F0D;
+      line-height: 1.2;
+    }
+
+    .country-section-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #1F2A35;
+      margin: 16px 0 8px; display: flex; align-items: center; gap: 6px;
+    }
+
+    .country-form-pills {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .country-form-pill {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .country-form-pill.w { background: #DCFCE7; color: #15803D; }
+    .country-form-pill.d { background: #FEF3C7; color: #92400E; }
+    .country-form-pill.l { background: #FEE2E2; color: #B91C1C; }
+
+    .country-players-list {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .country-player-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; background: #FAFAF7;
+      border: 1px solid #EEEDE7; border-radius: 12px;
+    }
+    .country-player-star {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: linear-gradient(135deg, #FFD700, #F4C430);
+      color: #1a1208; font-size: 10px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .country-player-name {
+      font-size: 13px; font-weight: 700; color: #0A0F0D;
+      flex: 1; min-width: 0;
+    }
+    .country-player-badge {
+      font-size: 9px; font-weight: 700; padding: 3px 8px;
+      border-radius: 999px; background: #F4F3EE; color: #8A959F;
+      flex-shrink: 0;
+    }
+
+    .country-style-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, #FFFBF0, #FDF6E3);
+      border: 1px solid rgba(212,162,76,0.25);
+      color: #92400E; font-size: 12px; font-weight: 700;
+      padding: 8px 14px; border-radius: 12px;
+    }
+
+    .country-fifa-rank-big {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 12px;
+      font-size: 16px; font-weight: 900; color: #fff;
+      background: linear-gradient(135deg, #D4A24C, #B8860B);
+      box-shadow: 0 2px 8px rgba(212,162,76,0.3);
+      flex-shrink: 0;
+    }
+
+    .country-best-finish {
+      background: linear-gradient(135deg, rgba(212,162,76,0.08), rgba(255,251,240,0.6));
+      border: 1px solid rgba(212,162,76,0.2);
+      border-radius: 12px; padding: 10px 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .country-best-finish .trophy { font-size: 18px; }
+    .country-best-finish .text {
+      font-size: 12px; font-weight: 700; color: #92400E;
+    }
+
+    /* Make flags tappable */
+    .fixture-team-flag, .team-flag-lg, .team-flag-sm, .team-flag-xs {
+      cursor: pointer;
+      transition: transform 150ms ease, filter 150ms ease;
+    }
+    .fixture-team-flag:active, .team-flag-lg:active, .team-flag-sm:active, .team-flag-xs:active {
+      transform: scale(0.92);
+      filter: brightness(0.9);
+    }
+
 </style>
-<base target="_blank">
-<base target="_blank">
+
+  <!-- FIFA World Rankings (June 2026) -->
+  <script>
+    const FIFA_RANKINGS = {
+      "Argentina": 1, "Spain": 2, "France": 3, "England": 4, "Portugal": 5,
+      "Brazil": 6, "Morocco": 7, "Netherlands": 8, "Belgium": 9, "Germany": 10,
+      "Croatia": 11, "Italy": 12, "Colombia": 13, "Mexico": 14, "Senegal": 15,
+      "Uruguay": 16, "USA": 17, "United States": 17, "Japan": 18, "Switzerland": 19,
+      "Denmark": 20, "Iran": 21, "Turkey": 22, "Türkiye": 22, "Ecuador": 23,
+      "Austria": 24, "South Korea": 25, "Korea": 25, "Korea Republic": 25,
+      "Nigeria": 26, "Australia": 27, "Algeria": 28, "Egypt": 29, "Canada": 30,
+      "Norway": 31, "Ukraine": 32, "Panama": 33, "Ivory Coast": 34, "Poland": 35,
+      "Russia": 36, "Wales": 37, "Sweden": 38, "Serbia": 39, "Paraguay": 40,
+      "Czechia": 41, "Czech Republic": 41, "Czech": 41, "Hungary": 42,
+      "Scotland": 43, "Tunisia": 44, "Cameroon": 45, "DR Congo": 46, "D.R. Congo": 46,
+      "DRC": 46, "Democratic Republic of Congo": 46, "Congo DR": 46,
+      "Greece": 47, "Slovakia": 48, "Venezuela": 49, "Uzbekistan": 50,
+      "Qatar": 55, "Iraq": 57, "South Africa": 60, "Saudi Arabia": 61,
+      "Jordan": 63, "Bosnia and Herzegovina": 65, "Bosnia & Herzegovina": 65,
+      "Bosnia": 65, "Bosnia-Herzegovina": 65, "Bosnia Herzegovina": 65,
+      "Cape Verde": 69, "Cabo Verde": 69, "Ghana": 74, "Curaçao": 82,
+      "Curacao": 82, "Haiti": 83, "New Zealand": 85
+    };
+
+    function getFIFARanking(countryName) {
+      if (!countryName) return null;
+      if (FIFA_RANKINGS[countryName] !== undefined) return FIFA_RANKINGS[countryName];
+      var lower = countryName.toLowerCase();
+      for (var key in FIFA_RANKINGS) {
+        if (key.toLowerCase() === lower) return FIFA_RANKINGS[key];
+      }
+      return null;
+    }
+
+    function renderFIFABadge(rank) {
+      if (!rank) return '';
+      var colorClass = '';
+      if (rank <= 10) colorClass = 'fifa-rank-top10';
+      else if (rank <= 25) colorClass = 'fifa-rank-top25';
+      else if (rank <= 50) colorClass = 'fifa-rank-top50';
+      else colorClass = 'fifa-rank-other';
+      return '<span class="fifa-rank-badge ' + colorClass + '">FIFA #' + rank + '</span>';
+    }
+  </script>
+
+  <!-- Country Details Data (no hardcoded groups - read from DOM) -->
+  <script>
+    const COUNTRY_DETAILS = {
+      "Mexico": { rank: 14, bestFinish: "Quarter-finals (1970, 1986)", appearances: 17, coach: "Javier Aguirre", star: "Santiago Giménez", keyPlayers: ["Santiago Giménez", "Edson Álvarez", "Hirving Lozano"], form: ["W", "D", "W", "L", "W"], style: "Technical, possession-based" },
+      "South Africa": { rank: 60, bestFinish: "Group Stage", appearances: 3, coach: "Hugo Broos", star: "Percy Tau", keyPlayers: ["Percy Tau", "Ronwen Williams", "Themba Zwane"], form: ["D", "W", "L", "D", "W"], style: "Counter-attacking, physical" },
+      "South Korea": { rank: 25, bestFinish: "4th Place (2002)", appearances: 11, coach: "Hong Myung-bo", star: "Son Heung-min", keyPlayers: ["Son Heung-min", "Lee Kang-in", "Kim Min-jae"], form: ["W", "W", "D", "W", "L"], style: "High pressing, fast transitions" },
+      "Czechia": { rank: 41, bestFinish: "Runners-up (1934, 1962)", appearances: 1, coach: "Ivan Hašek", star: "Patrik Schick", keyPlayers: ["Patrik Schick", "Tomáš Souček", "Vladimír Coufal"], form: ["L", "W", "D", "W", "D"], style: "Organized, disciplined" },
+      "Canada": { rank: 30, bestFinish: "Group Stage (2022)", appearances: 2, coach: "Jesse Marsch", star: "Alphonso Davies", keyPlayers: ["Alphonso Davies", "Jonathan David", "Cyle Larin"], form: ["W", "L", "W", "D", "W"], style: "High intensity, direct" },
+      "Bosnia and Herzegovina": { rank: 65, bestFinish: "Debut", appearances: 0, coach: "Sergej Barbarez", star: "Edin Džeko", keyPlayers: ["Edin Džeko", "Rade Krunić", "Amar Dedić"], form: ["D", "L", "W", "D", "L"], style: "Technical, experienced" },
+      "Bosnia": { rank: 65, bestFinish: "Debut", appearances: 0, coach: "Sergej Barbarez", star: "Edin Džeko", keyPlayers: ["Edin Džeko", "Rade Krunić", "Amar Dedić"], form: ["D", "L", "W", "D", "L"], style: "Technical, experienced" },
+      "Bosnia & Herzegovina": { rank: 65, bestFinish: "Debut", appearances: 0, coach: "Sergej Barbarez", star: "Edin Džeko", keyPlayers: ["Edin Džeko", "Rade Krunić", "Amar Dedić"], form: ["D", "L", "W", "D", "L"], style: "Technical, experienced" },
+      "France": { rank: 3, bestFinish: "Winners (1998, 2018)", appearances: 16, coach: "Didier Deschamps", star: "Kylian Mbappé", keyPlayers: ["Kylian Mbappé", "Antoine Griezmann", "Aurélien Tchouaméni"], form: ["W", "W", "D", "W", "W"], style: "Balanced, explosive attack" },
+      "Spain": { rank: 2, bestFinish: "Winners (2010)", appearances: 16, coach: "Luis de la Fuente", star: "Lamine Yamal", keyPlayers: ["Lamine Yamal", "Rodri", "Nico Williams"], form: ["W", "W", "W", "D", "W"], style: "Possession, tiki-taka" },
+      "Argentina": { rank: 1, bestFinish: "Winners (1978, 1986, 2022)", appearances: 18, coach: "Lionel Scaloni", star: "Lionel Messi", keyPlayers: ["Lionel Messi", "Julián Álvarez", "Enzo Fernández"], form: ["W", "W", "W", "D", "W"], style: "Counter-attacking, Messi-centric" },
+      "England": { rank: 4, bestFinish: "Winners (1966)", appearances: 16, coach: "Thomas Tuchel", star: "Jude Bellingham", keyPlayers: ["Jude Bellingham", "Bukayo Saka", "Harry Kane"], form: ["W", "D", "W", "W", "L"], style: "Direct, set-piece threat" },
+      "Portugal": { rank: 5, bestFinish: "3rd Place (1966)", appearances: 8, coach: "Roberto Martínez", star: "Cristiano Ronaldo", keyPlayers: ["Cristiano Ronaldo", "Bruno Fernandes", "Bernardo Silva"], form: ["W", "W", "L", "W", "W"], style: "Technical, individual brilliance" },
+      "Brazil": { rank: 6, bestFinish: "Winners (5 times)", appearances: 22, coach: "Carlo Ancelotti", star: "Vinícius Júnior", keyPlayers: ["Vinícius Júnior", "Rodrygo", "Marquinhos"], form: ["W", "L", "W", "D", "W"], style: "Samba flair, attacking" },
+      "Morocco": { rank: 7, bestFinish: "4th Place (2022)", appearances: 6, coach: "Walid Regragui", star: "Achraf Hakimi", keyPlayers: ["Achraf Hakimi", "Youssef En-Nesyri", "Sofyan Amrabat"], form: ["W", "D", "W", "W", "D"], style: "Compact, defensive solidity" },
+      "Netherlands": { rank: 8, bestFinish: "Runners-up (1974, 1978, 2010)", appearances: 11, coach: "Ronald Koeman", star: "Virgil van Dijk", keyPlayers: ["Virgil van Dijk", "Frenkie de Jong", "Cody Gakpo"], form: ["D", "W", "W", "L", "W"], style: "Total football, versatile" },
+      "Belgium": { rank: 9, bestFinish: "3rd Place (2018)", appearances: 14, coach: "Domenico Tedesco", star: "Kevin De Bruyne", keyPlayers: ["Kevin De Bruyne", "Romelu Lukaku", "Jérémy Doku"], form: ["L", "W", "D", "W", "D"], style: "Golden generation, creative" },
+      "Germany": { rank: 10, bestFinish: "Winners (1954, 1974, 1990, 2014)", appearances: 20, coach: "Julian Nagelsmann", star: "Jamal Musiala", keyPlayers: ["Jamal Musiala", "Florian Wirtz", "Joshua Kimmich"], form: ["W", "W", "D", "W", "W"], style: "Efficient, pressing" },
+      "Croatia": { rank: 11, bestFinish: "Runners-up (2018, 2022)", appearances: 6, coach: "Zlatko Dalić", star: "Luka Modrić", keyPlayers: ["Luka Modrić", "Mateo Kovačić", "Joško Gvardiol"], form: ["D", "W", "D", "W", "L"], style: "Midfield mastery, resilient" },
+      "Colombia": { rank: 13, bestFinish: "Quarter-finals (2014)", appearances: 6, coach: "Néstor Lorenzo", star: "James Rodríguez", keyPlayers: ["James Rodríguez", "Luis Díaz", "Davinson Sánchez"], form: ["W", "W", "W", "D", "W"], style: "Passionate, attacking" },
+      "Senegal": { rank: 15, bestFinish: "Quarter-finals (2022)", appearances: 3, coach: "Aliou Cissé", star: "Sadio Mané", keyPlayers: ["Sadio Mané", "Kalidou Koulibaly", "Ismaïla Sarr"], form: ["W", "D", "W", "L", "W"], style: "Physical, pacey wingers" },
+      "USA": { rank: 17, bestFinish: "3rd Place (1930)", appearances: 11, coach: "Mauricio Pochettino", star: "Christian Pulisic", keyPlayers: ["Christian Pulisic", "Gio Reyna", "Folarin Balogun"], form: ["W", "L", "W", "D", "W"], style: "Energetic, athletic" },
+      "United States": { rank: 17, bestFinish: "3rd Place (1930)", appearances: 11, coach: "Mauricio Pochettino", star: "Christian Pulisic", keyPlayers: ["Christian Pulisic", "Gio Reyna", "Folarin Balogun"], form: ["W", "L", "W", "D", "W"], style: "Energetic, athletic" },
+      "Uruguay": { rank: 16, bestFinish: "Winners (1930, 1950)", appearances: 14, coach: "Marcelo Bielsa", star: "Darwin Núñez", keyPlayers: ["Darwin Núñez", "Federico Valverde", "Ronald Araújo"], form: ["W", "D", "L", "W", "W"], style: "Gritty, fighting spirit" },
+      "Japan": { rank: 18, bestFinish: "Round of 16 (multiple)", appearances: 7, coach: "Hajime Moriyasu", star: "Takefusa Kubo", keyPlayers: ["Takefusa Kubo", "Kaoru Mitoma", "Wataru Endo"], form: ["W", "W", "D", "W", "W"], style: "Technical, quick passing" },
+      "Switzerland": { rank: 19, bestFinish: "Quarter-finals (3x)", appearances: 12, coach: "Murat Yakin", star: "Granit Xhaka", keyPlayers: ["Granit Xhaka", "Manuel Akanji", "Breel Embolo"], form: ["D", "W", "D", "L", "W"], style: "Organized, solid defense" },
+      "Iran": { rank: 21, bestFinish: "Group Stage", appearances: 6, coach: "Amir Ghalenoei", star: "Sardar Azmoun", keyPlayers: ["Sardar Azmoun", "Mehdi Taremi", "Alireza Jahanbakhsh"], form: ["W", "D", "W", "W", "D"], style: "Defensive, counter-attacking" },
+      "Turkey": { rank: 22, bestFinish: "3rd Place (2002)", appearances: 2, coach: "Vincenzo Montella", star: "Arda Güler", keyPlayers: ["Arda Güler", "Hakan Çalhanoğlu", "Barış Alper Yılmaz"], form: ["W", "W", "D", "W", "L"], style: "Passionate, home support" },
+      "Türkiye": { rank: 22, bestFinish: "3rd Place (2002)", appearances: 2, coach: "Vincenzo Montella", star: "Arda Güler", keyPlayers: ["Arda Güler", "Hakan Çalhanoğlu", "Barış Alper Yılmaz"], form: ["W", "W", "D", "W", "L"], style: "Passionate, home support" },
+      "Austria": { rank: 24, bestFinish: "3rd Place (1954)", appearances: 7, coach: "Ralf Rangnick", star: "Marcel Sabitzer", keyPlayers: ["Marcel Sabitzer", "Marko Arnautović", "Konrad Laimer"], form: ["W", "W", "W", "D", "W"], style: "Pressing, disciplined" },
+      "Ecuador": { rank: 23, bestFinish: "Round of 16 (2006)", appearances: 4, coach: "Sebastián Beccacece", star: "Enner Valencia", keyPlayers: ["Enner Valencia", "Moisés Caicedo", "Piero Hincapié"], form: ["L", "W", "D", "W", "W"], style: "Physical, altitude advantage" },
+      "Australia": { rank: 27, bestFinish: "Round of 16 (2006, 2022)", appearances: 6, coach: "Tony Popovic", star: "Mathew Ryan", keyPlayers: ["Mathew Ryan", "Jackson Irvine", "Mitchell Duke"], form: ["W", "D", "L", "W", "D"], style: "Hard-working, physical" },
+      "Algeria": { rank: 28, bestFinish: "Round of 16 (2014)", appearances: 4, coach: "Vladimir Petković", star: "Riyad Mahrez", keyPlayers: ["Riyad Mahrez", "Islam Slimani", "Youcef Atal"], form: ["D", "W", "L", "D", "W"], style: "Technical, North African flair" },
+      "Egypt": { rank: 29, bestFinish: "Round of 16 (1934)", appearances: 3, coach: "Hossam Hassan", star: "Mohamed Salah", keyPlayers: ["Mohamed Salah", "Omar Marmoush", "Trézéguet"], form: ["W", "D", "W", "D", "L"], style: "Salah-dependent, counter-attacking" },
+      "Norway": { rank: 31, bestFinish: "Group Stage (3x)", appearances: 3, coach: "Ståle Solbakken", star: "Erling Haaland", keyPlayers: ["Erling Haaland", "Martin Ødegaard", "Jørgen Strand Larsen"], form: ["W", "W", "D", "W", "W"], style: "Haaland-centric, direct" },
+      "Panama": { rank: 33, bestFinish: "Group Stage (2018)", appearances: 1, coach: "Thomas Christiansen", star: "José Fajardo", keyPlayers: ["José Fajardo", "Adalberto Carrasquilla", "Michael Amir Murillo"], form: ["L", "W", "D", "L", "W"], style: "Physical, CONCACAF grit" },
+      "Ivory Coast": { rank: 34, bestFinish: "Group Stage (3x)", appearances: 3, coach: "Emerse Faé", star: "Sébastien Haller", keyPlayers: ["Sébastien Haller", "Franck Kessié", "Simon Adingra"], form: ["W", "D", "W", "L", "D"], style: "Powerful, athletic" },
+      "Sweden": { rank: 38, bestFinish: "Runners-up (1958)", appearances: 12, coach: "Jon Dahl Tomasson", star: "Victor Gyökeres", keyPlayers: ["Victor Gyökeres", "Dejan Kulusevski", "Alexander Isak"], form: ["D", "W", "L", "D", "W"], style: "Organized, set-pieces" },
+      "Paraguay": { rank: 40, bestFinish: "Quarter-finals (2010)", appearances: 8, coach: "Gustavo Alfaro", star: "Julio Enciso", keyPlayers: ["Julio Enciso", "Miguel Almirón", "Omar Alderete"], form: ["W", "D", "D", "W", "L"], style: "Defensive, tough" },
+      "Scotland": { rank: 43, bestFinish: "Group Stage (8x)", appearances: 8, coach: "Steve Clarke", star: "Andy Robertson", keyPlayers: ["Andy Robertson", "John McGinn", "Scott McTominay"], form: ["L", "D", "W", "L", "D"], style: "Fighting spirit, underdogs" },
+      "DR Congo": { rank: 46, bestFinish: "Group Stage (1974)", appearances: 1, coach: "Sébastien Desabre", star: "Yoane Wissa", keyPlayers: ["Yoane Wissa", "Chancel Mbemba", "Théo Bongonda"], form: ["D", "W", "L", "D", "W"], style: "Physical, unpredictable" },
+      "D.R. Congo": { rank: 46, bestFinish: "Group Stage (1974)", appearances: 1, coach: "Sébastien Desabre", star: "Yoane Wissa", keyPlayers: ["Yoane Wissa", "Chancel Mbemba", "Théo Bongonda"], form: ["D", "W", "L", "D", "W"], style: "Physical, unpredictable" },
+      "DRC": { rank: 46, bestFinish: "Group Stage (1974)", appearances: 1, coach: "Sébastien Desabre", star: "Yoane Wissa", keyPlayers: ["Yoane Wissa", "Chancel Mbemba", "Théo Bongonda"], form: ["D", "W", "L", "D", "W"], style: "Physical, unpredictable" },
+      "Tunisia": { rank: 44, bestFinish: "Group Stage (5x)", appearances: 6, coach: "Kais Yaâkoubi", star: "Ellyes Skhiri", keyPlayers: ["Ellyes Skhiri", "Youssef Msakni", "Ali Abdi"], form: ["D", "L", "W", "D", "L"], style: "Tactical, disciplined" },
+      "Uzbekistan": { rank: 50, bestFinish: "Debut", appearances: 0, coach: "Srečko Katanec", star: "Eldor Shomurodov", keyPlayers: ["Eldor Shomurodov", "Jaloliddin Masharipov", "Otabek Shukurov"], form: ["W", "W", "D", "W", "D"], style: "Rising Asian power" },
+      "Qatar": { rank: 55, bestFinish: "Group Stage (2022)", appearances: 1, coach: "Luis Enrique", star: "Akram Afif", keyPlayers: ["Akram Afif", "Almoez Ali", "Hassan Al-Haydos"], form: ["L", "D", "L", "W", "D"], style: "Technical, Asian champions" },
+      "Iraq": { rank: 57, bestFinish: "Group Stage (1986)", appearances: 1, coach: "Jesús Casas", star: "Aymen Hussein", keyPlayers: ["Aymen Hussein", "Zidane Iqbal", "Amjad Attwan"], form: ["W", "L", "D", "W", "L"], style: "Passionate, unpredictable" },
+      "Saudi Arabia": { rank: 61, bestFinish: "Round of 16 (1994)", appearances: 6, coach: "Hervé Renard", star: "Salem Al-Dawsari", keyPlayers: ["Salem Al-Dawsari", "Firas Al-Buraikan", "Mohamed Kanno"], form: ["L", "W", "D", "L", "W"], style: "Technical, Asian experience" },
+      "Jordan": { rank: 63, bestFinish: "Debut", appearances: 0, coach: "Hussein Ammouta", star: "Musa Al-Taamari", keyPlayers: ["Musa Al-Taamari", "Yazan Al-Naimat", "Noor Al-Rawabdeh"], form: ["W", "D", "W", "L", "D"], style: "Surprise package, cohesive" },
+      "Cape Verde": { rank: 69, bestFinish: "Debut", appearances: 0, coach: "Bubista", star: "Ryan Mendes", keyPlayers: ["Ryan Mendes", "Jamiro Monteiro", "Dylan Tavares"], form: ["D", "W", "D", "L", "W"], style: "Island spirit, compact" },
+      "Cabo Verde": { rank: 69, bestFinish: "Debut", appearances: 0, coach: "Bubista", star: "Ryan Mendes", keyPlayers: ["Ryan Mendes", "Jamiro Monteiro", "Dylan Tavares"], form: ["D", "W", "D", "L", "W"], style: "Island spirit, compact" },
+      "Ghana": { rank: 74, bestFinish: "Quarter-finals (2010)", appearances: 4, coach: "Otto Addo", star: "Mohammed Kudus", keyPlayers: ["Mohammed Kudus", "Thomas Partey", "Jordan Ayew"], form: ["L", "D", "W", "L", "D"], style: "Physical, African power" },
+      "Haiti": { rank: 83, bestFinish: "Debut", appearances: 0, coach: "Sébastien Migné", star: "Duckens Nazon", keyPlayers: ["Duckens Nazon", "Frantzdy Pierrot", "Bryan Alceus"], form: ["W", "L", "D", "W", "L"], style: "Underdog, fighting spirit" },
+      "Curaçao": { rank: 82, bestFinish: "Debut", appearances: 0, coach: "Dick Advocaat", star: "Leandro Bacuna", keyPlayers: ["Leandro Bacuna", "Rangelo Janga", "Juninho Bacuna"], form: ["D", "L", "W", "D", "L"], style: "Dutch-influenced, technical" },
+      "Curacao": { rank: 82, bestFinish: "Debut", appearances: 0, coach: "Dick Advocaat", star: "Leandro Bacuna", keyPlayers: ["Leandro Bacuna", "Rangelo Janga", "Juninho Bacuna"], form: ["D", "L", "W", "D", "L"], style: "Dutch-influenced, technical" },
+      "New Zealand": { rank: 85, bestFinish: "Group Stage (1982, 2010)", appearances: 2, coach: "Darren Bazeley", star: "Chris Wood", keyPlayers: ["Chris Wood", "Liberato Cacace", "Marko Stamenić"], form: ["W", "D", "W", "D", "W"], style: "All Whites, organized" }
+    };
+
+    function getCountryDetails(name) {
+      if (!name) return null;
+      if (COUNTRY_DETAILS[name]) return COUNTRY_DETAILS[name];
+      var lower = name.toLowerCase();
+      for (var key in COUNTRY_DETAILS) {
+        if (key.toLowerCase() === lower) return COUNTRY_DETAILS[key];
+      }
+      return null;
+    }
+  </script>
+
+  <!-- Country Code to Full Name Mapping -->
+  <script>
+    var COUNTRY_CODE_MAP = {
+      "AF": "Afghanistan", "AL": "Albania", "DZ": "Algeria", "AD": "Andorra", "AO": "Angola",
+      "AR": "Argentina", "AM": "Armenia", "AU": "Australia", "AT": "Austria", "AZ": "Azerbaijan",
+      "BS": "Bahamas", "BH": "Bahrain", "BD": "Bangladesh", "BB": "Barbados", "BY": "Belarus",
+      "BE": "Belgium", "BZ": "Belize", "BJ": "Benin", "BT": "Bhutan", "BO": "Bolivia",
+      "BA": "Bosnia and Herzegovina", "BW": "Botswana", "BR": "Brazil", "BN": "Brunei", "BG": "Bulgaria",
+      "BF": "Burkina Faso", "BI": "Burundi", "KH": "Cambodia", "CM": "Cameroon", "CA": "Canada",
+      "CV": "Cape Verde", "CF": "Central African Republic", "TD": "Chad", "CL": "Chile", "CN": "China",
+      "CO": "Colombia", "KM": "Comoros", "CG": "Congo", "CD": "DR Congo", "CR": "Costa Rica",
+      "CI": "Ivory Coast", "HR": "Croatia", "CU": "Cuba", "CY": "Cyprus", "CZ": "Czechia",
+      "DK": "Denmark", "DJ": "Djibouti", "DM": "Dominica", "DO": "Dominican Republic", "EC": "Ecuador",
+      "EG": "Egypt", "SV": "El Salvador", "GQ": "Equatorial Guinea", "ER": "Eritrea", "EE": "Estonia",
+      "ET": "Ethiopia", "FJ": "Fiji", "FI": "Finland", "FR": "France", "GA": "Gabon",
+      "GM": "Gambia", "GE": "Georgia", "DE": "Germany", "GH": "Ghana", "GR": "Greece",
+      "GT": "Guatemala", "GN": "Guinea", "GW": "Guinea-Bissau", "GY": "Guyana", "HT": "Haiti",
+      "HN": "Honduras", "HU": "Hungary", "IS": "Iceland", "IN": "India", "ID": "Indonesia",
+      "IR": "Iran", "IQ": "Iraq", "IE": "Ireland", "IL": "Israel", "IT": "Italy",
+      "JM": "Jamaica", "JP": "Japan", "JO": "Jordan", "KZ": "Kazakhstan", "KE": "Kenya",
+      "KI": "Kiribati", "KP": "North Korea", "KR": "South Korea", "KW": "Kuwait", "KG": "Kyrgyzstan",
+      "LA": "Laos", "LV": "Latvia", "LB": "Lebanon", "LS": "Lesotho", "LR": "Liberia",
+      "LY": "Libya", "LI": "Liechtenstein", "LT": "Lithuania", "LU": "Luxembourg", "MG": "Madagascar",
+      "MW": "Malawi", "MY": "Malaysia", "MV": "Maldives", "ML": "Mali", "MT": "Malta",
+      "MH": "Marshall Islands", "MR": "Mauritania", "MU": "Mauritius", "MX": "Mexico", "FM": "Micronesia",
+      "MD": "Moldova", "MC": "Monaco", "MN": "Mongolia", "ME": "Montenegro", "MA": "Morocco",
+      "MZ": "Mozambique", "MM": "Myanmar", "NA": "Namibia", "NR": "Nauru", "NP": "Nepal",
+      "NL": "Netherlands", "NZ": "New Zealand", "NI": "Nicaragua", "NE": "Niger", "NG": "Nigeria",
+      "MK": "North Macedonia", "NO": "Norway", "OM": "Oman", "PK": "Pakistan", "PW": "Palau",
+      "PA": "Panama", "PG": "Papua New Guinea", "PY": "Paraguay", "PE": "Peru", "PH": "Philippines",
+      "PL": "Poland", "PT": "Portugal", "QA": "Qatar", "RO": "Romania", "RU": "Russia",
+      "RW": "Rwanda", "KN": "Saint Kitts and Nevis", "LC": "Saint Lucia", "VC": "Saint Vincent",
+      "WS": "Samoa", "SM": "San Marino", "ST": "Sao Tome", "SA": "Saudi Arabia", "SN": "Senegal",
+      "RS": "Serbia", "SC": "Seychelles", "SL": "Sierra Leone", "SG": "Singapore", "SK": "Slovakia",
+      "SI": "Slovenia", "SB": "Solomon Islands", "SO": "Somalia", "ZA": "South Africa", "SS": "South Sudan",
+      "ES": "Spain", "LK": "Sri Lanka", "SD": "Sudan", "SR": "Suriname", "SE": "Sweden",
+      "CH": "Switzerland", "SY": "Syria", "TJ": "Tajikistan", "TZ": "Tanzania", "TH": "Thailand",
+      "TL": "Timor-Leste", "TG": "Togo", "TO": "Tonga", "TT": "Trinidad and Tobago", "TN": "Tunisia",
+      "TR": "Turkey", "TM": "Turkmenistan", "TV": "Tuvalu", "UG": "Uganda", "UA": "Ukraine",
+      "AE": "United Arab Emirates", "GB": "United Kingdom", "US": "USA", "UY": "Uruguay", "UZ": "Uzbekistan",
+      "VU": "Vanuatu", "VA": "Vatican City", "VE": "Venezuela", "VN": "Vietnam", "YE": "Yemen",
+      "ZM": "Zambia", "ZW": "Zimbabwe"
+    };
+
+    function resolveCountryName(name) {
+      if (!name) return '';
+      name = name.trim();
+      // If it's a 2-letter code, map it
+      if (name.length === 2 && COUNTRY_CODE_MAP[name.toUpperCase()]) {
+        return COUNTRY_CODE_MAP[name.toUpperCase()];
+      }
+      return name;
+    }
+  </script>
+
+
 <base target="_blank">
 </head>
 <body class="text-ink-900">
@@ -3178,5 +3698,459 @@
   </div>
   <script src="/assets/js/bonus-engine.js"></script>
   <script type="text/javascript" src="/assets/js/index.js"></script>
+
+  <!-- Auto-inject FIFA ranking badges into fixture cards -->
+  <script>
+    (function() {
+      function injectFIFABadges() {
+        var blocks = document.querySelectorAll('.fixture-team-block');
+        blocks.forEach(function(block) {
+          if (block.querySelector('.fifa-rank-badge')) return;
+          var nameEl = block.querySelector('.fixture-team-name');
+          if (!nameEl) return;
+          var countryName = nameEl.textContent.trim();
+          var rank = getFIFARanking(countryName);
+          if (rank) {
+            var badge = document.createElement('span');
+            badge.className = 'fifa-rank-badge';
+            var colorClass = '';
+            if (rank <= 10) colorClass = 'fifa-rank-top10';
+            else if (rank <= 25) colorClass = 'fifa-rank-top25';
+            else if (rank <= 50) colorClass = 'fifa-rank-top50';
+            else colorClass = 'fifa-rank-other';
+            badge.classList.add(colorClass);
+            badge.textContent = 'FIFA #' + rank;
+            nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+          }
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectFIFABadges);
+      } else {
+        injectFIFABadges();
+      }
+
+      var observer = new MutationObserver(function(mutations) {
+        var shouldInject = false;
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1) {
+              if (node.classList && node.classList.contains('fixture-team-block')) {
+                shouldInject = true;
+              } else if (node.querySelector && node.querySelector('.fixture-team-block')) {
+                shouldInject = true;
+              }
+            }
+          });
+        });
+        if (shouldInject) {
+          clearTimeout(window._fifaInjectTimer);
+          window._fifaInjectTimer = setTimeout(injectFIFABadges, 50);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
+
+
+  <!-- Player / Badge Info Popup — opens when an avatar or badge on the leaderboard is tapped -->
+  <div id="info-popup" class="info-popup hidden">
+    <div class="info-popup-backdrop" onclick="hideInfoPopup()"></div>
+    <div class="info-popup-panel" role="dialog" aria-modal="true" aria-labelledby="info-popup-title" tabindex="-1">
+      <div class="info-popup-header" id="info-popup-header">
+        <button class="info-popup-close tap" onclick="hideInfoPopup()" aria-label="Close">
+          <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div id="info-popup-header-content">
+          <!-- Filled dynamically by JS based on variant -->
+        </div>
+      </div>
+      <div class="info-popup-body no-scrollbar" id="info-popup-body">
+        <!-- Filled dynamically by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Country Details Modal -->
+  <div id="country-modal" class="country-modal hidden">
+    <div class="country-modal-backdrop" onclick="hideCountryModal()"></div>
+    <div class="country-modal-panel" role="dialog" aria-modal="true" aria-labelledby="country-modal-name" tabindex="-1">
+      <div class="country-modal-header">
+        <div class="flex items-center justify-between mb-3">
+          <div class="country-modal-flag-wrap">
+            <img src="" alt="" id="country-modal-flag-img">
+          </div>
+          <div class="country-fifa-rank-big" id="country-modal-rank" title="FIFA World Ranking">#</div>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="min-w-0">
+            <h3 class="text-xl font-bold tracking-tight" id="country-modal-name">Country</h3>
+            <p class="text-xs text-white/60 mt-0.5" id="country-modal-group">Group —</p>
+          </div>
+          <button class="country-modal-close tap" onclick="hideCountryModal()">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="country-modal-body no-scrollbar">
+        <div class="country-stat-grid">
+          <div class="country-stat-box">
+            <div class="label">Appearances</div>
+            <div class="value" id="country-modal-apps">—</div>
+          </div>
+          <div class="country-stat-box">
+            <div class="label">Best Finish</div>
+            <div class="value" id="country-modal-best" style="font-size:12px;">—</div>
+          </div>
+          <div class="country-stat-box">
+            <div class="label">Coach</div>
+            <div class="value" id="country-modal-coach" style="font-size:12px;">—</div>
+          </div>
+        </div>
+        <div class="country-best-finish" id="country-modal-best-wrap">
+          <span class="trophy">🏆</span>
+          <span class="text" id="country-modal-best-text">—</span>
+        </div>
+        <div class="country-section-title">
+          <span>📊</span> Recent Form (Last 5)
+        </div>
+        <div class="country-form-pills" id="country-modal-form"></div>
+        <div class="country-section-title">
+          <span>⚽</span> Playing Style
+        </div>
+        <div class="country-style-chip" id="country-modal-style">—</div>
+        <div class="country-section-title">
+          <span>⭐</span> Key Players
+        </div>
+        <div class="country-players-list" id="country-modal-players"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function extractCountryNameFromFlag(flagEl) {
+      // Strategy 1: Look in .fixture-team-block (Predictions tab)
+      var block = flagEl.closest('.fixture-team-block');
+      if (block) {
+        var nameEl = block.querySelector('.fixture-team-name');
+        if (nameEl) {
+          var name = nameEl.textContent.trim();
+          if (name) return resolveCountryName(name);
+        }
+      }
+
+      // Strategy 2: Walk up the DOM looking for any element with a country name
+      var el = flagEl.parentElement;
+      for (var depth = 0; depth < 6 && el; depth++) {
+        // Check all text nodes in this ancestor
+        var allText = el.textContent.trim().split(/\s+/);
+        for (var t = 0; t < allText.length; t++) {
+          var word = allText[t].trim();
+          if (word && word.length > 2 && word !== 'VS' && word !== 'vs' && 
+              word !== 'Group' && word.indexOf('Group') === -1 &&
+              word.indexOf(':') === -1 && !/^\d+$/.test(word)) {
+            var resolved = resolveCountryName(word);
+            if (resolved && resolved.length > 2 && COUNTRY_DETAILS[resolved]) {
+              return resolved;
+            }
+          }
+        }
+        // Also check for specific class patterns
+        var nameByClass = el.querySelector('.fixture-team-name, .team-name, [class*="team" i] [class*="name" i]');
+        if (nameByClass && nameByClass !== flagEl) {
+          var className = nameByClass.textContent.trim();
+          if (className && className.length > 2) {
+            var classResolved = resolveCountryName(className);
+            if (classResolved.length > 2) return classResolved;
+          }
+        }
+        el = el.parentElement;
+      }
+
+      // Strategy 3: Check siblings at multiple levels
+      var parent = flagEl.parentElement;
+      if (parent) {
+        // Direct siblings
+        for (var j = 0; j < parent.children.length; j++) {
+          var sibling = parent.children[j];
+          if (sibling !== flagEl) {
+            var txt = sibling.textContent.trim();
+            if (txt && txt.length > 1 && txt !== 'VS' && txt !== 'vs' && txt.indexOf(':') === -1) {
+              var resolved = resolveCountryName(txt);
+              if (resolved && resolved.length > 2) return resolved;
+            }
+          }
+        }
+        // Parent's siblings
+        var parentNext = parent.nextElementSibling;
+        if (parentNext) {
+          var ptxt = parentNext.textContent.trim();
+          if (ptxt && ptxt.length > 1) {
+            var presolved = resolveCountryName(ptxt);
+            if (presolved && presolved.length > 2) return presolved;
+          }
+        }
+        var parentPrev = parent.previousElementSibling;
+        if (parentPrev) {
+          var pptxt = parentPrev.textContent.trim();
+          if (pptxt && pptxt.length > 1) {
+            var ppresolved = resolveCountryName(pptxt);
+            if (ppresolved && ppresolved.length > 2) return ppresolved;
+          }
+        }
+      }
+
+      // Strategy 4: Use flag attributes
+      if (flagEl.alt) {
+        var altResolved = resolveCountryName(flagEl.alt.trim());
+        if (altResolved && altResolved.length > 2) return altResolved;
+      }
+      if (flagEl.dataset && flagEl.dataset.country) {
+        var dataResolved = resolveCountryName(flagEl.dataset.country.trim());
+        if (dataResolved && dataResolved.length > 2) return dataResolved;
+      }
+      if (flagEl.getAttribute('aria-label')) {
+        var ariaResolved = resolveCountryName(flagEl.getAttribute('aria-label').trim());
+        if (ariaResolved && ariaResolved.length > 2) return ariaResolved;
+      }
+
+      // Strategy 5: Parse src path for country code
+      if (flagEl.src) {
+        var srcLower = flagEl.src.toLowerCase();
+        var srcPatterns = [
+          /\/flags\/([a-z]{2})[^a-z]/i,
+          /\/([a-z]{2})\.png/i,
+          /\/([a-z]{2})\.jpg/i,
+          /\/([a-z]{2})\.svg/i,
+          /\/([a-z]{2})[^a-z]/i
+        ];
+        for (var p = 0; p < srcPatterns.length; p++) {
+          var match = srcLower.match(srcPatterns[p]);
+          if (match) {
+            var srcResolved = resolveCountryName(match[1]);
+            if (srcResolved && srcResolved.length > 2) return srcResolved;
+          }
+        }
+      }
+
+      // Strategy 6: Last resort - check if alt is a 2-letter code we can map
+      if (flagEl.alt && flagEl.alt.length === 2) {
+        var lastResort = resolveCountryName(flagEl.alt);
+        if (lastResort && lastResort.length > 2) return lastResort;
+      }
+
+      return '';
+    }
+
+    function extractGroupFromFixture(flagEl) {
+      var el = flagEl.parentElement;
+      for (var i = 0; i < 10 && el; i++) {
+        var groupLabel = el.querySelector('.fixture-stage-label');
+        if (groupLabel) {
+          var text = groupLabel.textContent.trim();
+          var match = text.match(/GROUP[\s]+([A-Z])/i);
+          if (match) return 'Group ' + match[1].toUpperCase();
+        }
+        var anyGroup = el.querySelector('[class*="group" i]');
+        if (anyGroup) {
+          var gtext = anyGroup.textContent.trim();
+          var gmatch = gtext.match(/GROUP[\s]+([A-Z])/i);
+          if (gmatch) return 'Group ' + gmatch[1].toUpperCase();
+        }
+        el = el.parentElement;
+      }
+      return '—';
+    }
+
+    function showCountryModal(countryName, flagSrc, groupName) {
+      var data = getCountryDetails(countryName);
+      if (!data) {
+        var rank = getFIFARanking(countryName);
+        _renderCountryModal({
+          name: countryName || 'Unknown',
+          rank: rank || '—',
+          group: groupName || '—',
+          appearances: '—',
+          bestFinish: '—',
+          coach: '—',
+          star: '—',
+          keyPlayers: [],
+          form: [],
+          style: 'No data available for this country'
+        }, flagSrc);
+        return;
+      }
+      var mergedData = Object.assign({}, data);
+      mergedData.name = countryName;
+      if (groupName && groupName !== '—') mergedData.group = groupName;
+      _renderCountryModal(mergedData, flagSrc);
+    }
+
+    function _renderCountryModal(data, flagSrc) {
+      document.getElementById('country-modal-name').textContent = data.name || 'Unknown';
+      document.getElementById('country-modal-group').textContent = data.group ? data.group : (data.group || '—');
+      document.getElementById('country-modal-rank').textContent = data.rank ? '#' + data.rank : '—';
+      document.getElementById('country-modal-apps').textContent = data.appearances !== undefined ? data.appearances : '—';
+      document.getElementById('country-modal-best').textContent = data.bestFinish || '—';
+      document.getElementById('country-modal-best-text').textContent = data.bestFinish || 'No prior World Cup data';
+      document.getElementById('country-modal-coach').textContent = data.coach || '—';
+      document.getElementById('country-modal-style').textContent = data.style || '—';
+
+      var flagImg = document.getElementById('country-modal-flag-img');
+      if (flagSrc) { flagImg.src = flagSrc; flagImg.alt = data.name || ''; }
+      else { flagImg.src = ''; flagImg.alt = ''; }
+
+      var formContainer = document.getElementById('country-modal-form');
+      formContainer.innerHTML = '';
+      if (data.form && data.form.length) {
+        data.form.forEach(function(r) {
+          var pill = document.createElement('span');
+          pill.className = 'country-form-pill ' + r.toLowerCase();
+          pill.textContent = r;
+          formContainer.appendChild(pill);
+        });
+      } else {
+        formContainer.innerHTML = '<span class="text-xs text-ink-400">No recent form data</span>';
+      }
+
+      var playersContainer = document.getElementById('country-modal-players');
+      playersContainer.innerHTML = '';
+      var players = data.keyPlayers || [];
+      if (players.length) {
+        players.forEach(function(p, i) {
+          var row = document.createElement('div');
+          row.className = 'country-player-row';
+          var isStar = i === 0;
+          row.innerHTML = '<div class="country-player-star">' + (isStar ? '★' : (i+1)) + '</div><div class="country-player-name">' + p + '</div>' + (isStar ? '<span class="country-player-badge">Star</span>' : '');
+          playersContainer.appendChild(row);
+        });
+      } else {
+        playersContainer.innerHTML = '<span class="text-xs text-ink-400">No player data available</span>';
+      }
+
+      var modal = document.getElementById('country-modal');
+      modal.classList.remove('hidden');
+      void modal.offsetWidth;
+      modal.classList.add('is-open');
+      modal.classList.remove('is-closing');
+      document.body.style.overflow = 'hidden';
+      // A11y: move focus into the modal so screen readers and keyboard users
+      // know context has changed. Close button is the safest landing spot.
+      // Previous focus target is stored on hideCountryModal restore.
+      var closeBtn = modal.querySelector('.country-modal-close');
+      if (closeBtn) {
+        setTimeout(function() { closeBtn.focus(); }, 50);
+      }
+    }
+
+    // Tracks the element that triggered the modal so we can restore focus on close.
+    var _countryModalLastFocus = null;
+
+    function hideCountryModal() {
+      var modal = document.getElementById('country-modal');
+      modal.classList.add('is-closing');
+      modal.classList.remove('is-open');
+      setTimeout(function() {
+        modal.classList.add('hidden');
+        modal.classList.remove('is-closing');
+        document.body.style.overflow = '';
+        // A11y: restore focus to whatever opened the modal (the flag, typically)
+        if (_countryModalLastFocus && typeof _countryModalLastFocus.focus === 'function') {
+          try { _countryModalLastFocus.focus(); } catch (e) { /* element may be gone */ }
+          _countryModalLastFocus = null;
+        }
+      }, 300);
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') hideCountryModal();
+    });
+
+    // Flag image path to country name mapping
+    var FLAG_SRC_MAP = {
+      'ar': 'Argentina', 'au': 'Australia', 'at': 'Austria', 'be': 'Belgium',
+      'ba': 'Bosnia and Herzegovina', 'br': 'Brazil', 'ca': 'Canada', 'cv': 'Cape Verde',
+      'td': 'Chad', 'cl': 'Chile', 'co': 'Colombia', 'cr': 'Costa Rica', 'hr': 'Croatia',
+      'cz': 'Czechia', 'dk': 'Denmark', 'cd': 'DR Congo', 'ec': 'Ecuador', 'eg': 'Egypt',
+      'gb-eng': 'England', 'fr': 'France', 'de': 'Germany', 'gh': 'Ghana', 'gr': 'Greece',
+      'gt': 'Guatemala', 'hn': 'Honduras', 'ir': 'Iran', 'iq': 'Iraq', 'it': 'Italy',
+      'jm': 'Jamaica', 'jp': 'Japan', 'jo': 'Jordan', 'kr': 'South Korea', 'kw': 'Kuwait',
+      'mx': 'Mexico', 'ma': 'Morocco', 'nl': 'Netherlands', 'nz': 'New Zealand', 'ng': 'Nigeria',
+      'no': 'Norway', 'pa': 'Panama', 'py': 'Paraguay', 'pe': 'Peru', 'pl': 'Poland',
+      'pt': 'Portugal', 'qa': 'Qatar', 'ie': 'Ireland', 'ro': 'Romania', 'sa': 'Saudi Arabia',
+      'sn': 'Senegal', 'rs': 'Serbia', 'sk': 'Slovakia', 'za': 'South Africa', 'es': 'Spain',
+      'se': 'Sweden', 'ch': 'Switzerland', 'tn': 'Tunisia', 'tr': 'Turkey', 'ua': 'Ukraine',
+      'us': 'USA', 'uy': 'Uruguay', 'uz': 'Uzbekistan', 've': 'Venezuela', 'wales': 'Wales',
+      'zw': 'Zimbabwe'
+    };
+
+    function getCountryFromFlagSrc(src) {
+      if (!src) return '';
+      // Extract filename from path
+      var parts = src.split('/');
+      var filename = parts[parts.length - 1];
+      // Remove extension
+      var name = filename.split('.')[0].toLowerCase();
+      // Remove any suffixes like -flag, -lg, -sm
+      name = name.replace(/-flag$/, '').replace(/-lg$/, '').replace(/-sm$/, '').replace(/-xs$/, '');
+      if (FLAG_SRC_MAP[name]) return FLAG_SRC_MAP[name];
+      // Try with common variations
+      if (name === 'czech-republic' || name === 'czech_rep') return 'Czechia';
+      if (name === 'south-korea' || name === 'south_korea' || name === 'korea') return 'South Korea';
+      if (name === 'bosnia-herzegovina' || name === 'bosnia') return 'Bosnia and Herzegovina';
+      if (name === 'united-states' || name === 'united_states' || name === 'america') return 'USA';
+      if (name === 'england') return 'England';
+      if (name === 'dr-congo' || name === 'dr_congo' || name === 'drc') return 'DR Congo';
+      if (name === 'curacao') return 'Curaçao';
+      if (name === 'cape-verde' || name === 'cape_verde') return 'Cape Verde';
+      if (name === 'new-zealand' || name === 'new_zealand') return 'New Zealand';
+      if (name === 'saudi-arabia' || name === 'saudi_arabia') return 'Saudi Arabia';
+      if (name === 'ivory-coast' || name === 'ivory_coast') return 'Ivory Coast';
+      if (name === 'costa-rica' || name === 'costa_rica') return 'Costa Rica';
+      return '';
+    }
+
+    document.addEventListener('click', function(e) {
+      var flag = e.target.closest('.fixture-team-flag, .team-flag-lg, .team-flag-sm, .team-flag-xs');
+      if (!flag) return;
+      e.stopPropagation();
+      e.preventDefault();
+
+      // Try multiple extraction methods in order of reliability
+      var countryName = '';
+      var flagSrc = flag.src || flag.getAttribute('src') || '';
+
+      // Method 1: Image src path (most reliable for home tab)
+      countryName = getCountryFromFlagSrc(flagSrc);
+
+      // Method 2: DOM extraction (for predictions tab)
+      if (!countryName) {
+        countryName = extractCountryNameFromFlag(flag);
+      }
+
+      // Method 3: Alt text with code resolution
+      if (!countryName && flag.alt) {
+        countryName = resolveCountryName(flag.alt.trim());
+      }
+
+      // Method 4: data-country attribute
+      if (!countryName && flag.dataset && flag.dataset.country) {
+        countryName = resolveCountryName(flag.dataset.country.trim());
+      }
+
+      var groupName = extractGroupFromFixture(flag);
+
+      if (!countryName) {
+        console.warn('Could not extract country name from flag', flag, 'src:', flagSrc);
+        return;
+      }
+
+      // A11y: remember the trigger so we can return focus to it when modal closes.
+      _countryModalLastFocus = flag;
+      showCountryModal(countryName, flagSrc, groupName);
+    });
+  </script>
+
 </body>
 </html>

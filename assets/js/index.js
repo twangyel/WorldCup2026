@@ -1666,6 +1666,209 @@ return `
     }
 
     // ============== HEAD-TO-HEAD ==============
+    // ===== Info popup (player / badge) =====
+    // Lightweight bottom-sheet that opens when an avatar or badge is tapped on
+    // the leaderboard. Two variants share one DOM element and toggle styling.
+    // Restores focus to the trigger when closed (a11y parity with country modal).
+    let _infoPopupLastFocus = null
+    let _infoPopupKeyHandler = null
+
+    function showInfoPopup(headerHtml, bodyHtml, variant) {
+      const modal = document.getElementById('info-popup')
+      if (!modal) return
+      _infoPopupLastFocus = document.activeElement
+      const headerEl = document.getElementById('info-popup-header')
+      const headerContentEl = document.getElementById('info-popup-header-content')
+      const bodyEl = document.getElementById('info-popup-body')
+      headerEl.classList.remove('variant-player', 'variant-badge')
+      headerEl.classList.add('variant-' + variant)
+      headerContentEl.innerHTML = headerHtml
+      bodyEl.innerHTML = bodyHtml
+      modal.classList.remove('hidden')
+      void modal.offsetWidth // force reflow so transition runs
+      modal.classList.add('is-open')
+      modal.classList.remove('is-closing')
+      document.body.style.overflow = 'hidden'
+
+      // Focus the close button so keyboard/screen-reader users land in-modal
+      const closeBtn = modal.querySelector('.info-popup-close')
+      if (closeBtn) setTimeout(() => closeBtn.focus(), 50)
+
+      // Escape closes
+      _infoPopupKeyHandler = (e) => { if (e.key === 'Escape') hideInfoPopup() }
+      document.addEventListener('keydown', _infoPopupKeyHandler)
+    }
+
+    function hideInfoPopup() {
+      const modal = document.getElementById('info-popup')
+      if (!modal) return
+      modal.classList.add('is-closing')
+      modal.classList.remove('is-open')
+      setTimeout(() => {
+        modal.classList.add('hidden')
+        modal.classList.remove('is-closing')
+        document.body.style.overflow = ''
+        if (_infoPopupLastFocus && typeof _infoPopupLastFocus.focus === 'function') {
+          try { _infoPopupLastFocus.focus() } catch (e) {}
+          _infoPopupLastFocus = null
+        }
+      }, 280)
+      if (_infoPopupKeyHandler) {
+        document.removeEventListener('keydown', _infoPopupKeyHandler)
+        _infoPopupKeyHandler = null
+      }
+    }
+
+    function showPlayerInfo(uid) {
+      const stats = window.__lbCachedStats || []
+      const s = stats.find(x => (x.user_id || x.id) === uid)
+      if (!s) return
+      const myId = getUser()?.id
+      const isSelf = uid === myId
+      // Recompute rank from sorted stats (stats is already sorted in render order)
+      const idx = stats.findIndex(x => (x.user_id || x.id) === uid)
+      const rank = idx + 1
+      const total = stats.length
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+      const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
+      const combos = s.combo_count || 0
+      const streak = (typeof lbStreakMap !== 'undefined' && lbStreakMap[uid]) || 0
+      const name = escapeHtml(s.name || s.full_name || 'Anonymous')
+      const dept = s.department ? escapeHtml(s.department) : ''
+      const avatarBig = getAvatarHtml(s.name, s.avatar_url, rank, 64)
+        .replace(/class="lb-avatar/, 'class="lb-avatar" style="width:64px;height:64px;font-size:22px;border-radius:18px;" data-temp')
+      // The above style override is a quick way to upsize without touching getAvatarHtml.
+
+      const headerHtml = `
+        <div class="flex items-center gap-3 relative z-[1]">
+          <div style="flex-shrink:0;">${avatarBig}</div>
+          <div class="flex-1 min-w-0">
+            <h3 id="info-popup-title" class="text-lg font-bold tracking-tight truncate">${name}${isSelf ? ' <span class="text-[10px] font-bold text-white/70 ml-1">(YOU)</span>' : ''}</h3>
+            ${dept ? `<p class="text-xs text-white/60 mt-0.5 truncate">${dept}</p>` : ''}
+            <p class="text-xs text-white/70 mt-1">${medal ? medal + ' ' : ''}Rank #${rank} of ${total}</p>
+          </div>
+        </div>
+      `
+
+      // Build small "highlight" chips for active states
+      const highlights = []
+      if (streak >= 3) highlights.push(`<span class="info-popup-pill">🔥 ${streak}-match streak</span>`)
+      if (combos >= 1) highlights.push(`<span class="info-popup-pill">⚡ ${combos} exact combo${combos > 1 ? 's' : ''}</span>`)
+      if (rank === 1 && (s.points || 0) > 0) highlights.push(`<span class="info-popup-pill">👑 Reigning champion</span>`)
+      if (rank >= 2 && rank <= 3) highlights.push(`<span class="info-popup-pill">🏆 In the prize zone</span>`)
+      const highlightsHtml = highlights.length
+        ? `<div class="info-popup-section-title">Right now</div><div class="info-popup-chip-row">${highlights.join('')}</div>`
+        : ''
+
+      const ctaHtml = !isSelf
+        ? `<button class="info-popup-cta" onclick="hideInfoPopup(); setTimeout(() => openH2H('${uid}'), 280);">⚔️ Compare head-to-head</button>`
+        : ''
+
+      const bodyHtml = `
+        <div class="info-popup-stat-grid">
+          <div class="info-popup-stat-box">
+            <div class="label">Points</div>
+            <div class="value">${s.points || 0}</div>
+          </div>
+          <div class="info-popup-stat-box">
+            <div class="label">Correct</div>
+            <div class="value">${correct}</div>
+          </div>
+          <div class="info-popup-stat-box">
+            <div class="label">Exact</div>
+            <div class="value">${s.exact || 0}</div>
+          </div>
+        </div>
+        ${highlightsHtml}
+        ${ctaHtml}
+      `
+
+      showInfoPopup(headerHtml, bodyHtml, 'player')
+    }
+
+    function showBadgeInfo(badgeId, uid) {
+      const stats = window.__lbCachedStats || []
+      const s = stats.find(x => (x.user_id || x.id) === uid)
+      if (!s) return
+      const exact = s.exact || 0
+      const points = s.points || 0
+      const combos = s.combo_count || 0
+      const streak = (typeof lbStreakMap !== 'undefined' && lbStreakMap[uid]) || 0
+      const playerName = escapeHtml(s.name || 'Anonymous')
+      const myId = getUser()?.id
+      const isSelf = uid === myId
+
+      // Each entry: { icon, name, criteria, progress(s), earned(s) }
+      // progress: short string showing how far along they are (e.g. "7 exact scores")
+      // earned:  boolean
+      const ALL = {
+        'champion':    { icon: '👑', name: 'Champion',     criteria: 'Sit at the top of the leaderboard with at least 1 point.',
+                         progress: () => `Currently ranked #${(stats.findIndex(x => (x.user_id || x.id) === uid) + 1)} of ${stats.length}`,
+                         earned: () => (stats.findIndex(x => (x.user_id || x.id) === uid) === 0) && points > 0 },
+        'sharpshoot':  { icon: '🎯', name: 'Sharpshooter', criteria: 'Predict 5 or more exact scores across the tournament.',
+                         progress: () => `${exact} exact score${exact === 1 ? '' : 's'} so far`,
+                         earned: () => exact >= 5 },
+        'nostradamus': { icon: '🔮', name: 'Nostradamus',  criteria: 'Predict 2 or more exact scores in total (any time, any matches).',
+                         progress: () => `${exact} exact score${exact === 1 ? '' : 's'} so far`,
+                         earned: () => exact >= 2 },
+        'centurion':   { icon: '💯', name: 'Centurion',    criteria: 'Reach 100 or more total points.',
+                         progress: () => `${points} pts so far`,
+                         earned: () => points >= 100 },
+        'streak-chip': { icon: '🔥', name: 'Hot Streak',   criteria: 'Score points in 3 or more consecutive resolved matches.',
+                         progress: () => `${streak} match${streak === 1 ? '' : 'es'} in a row`,
+                         earned: () => streak >= 3 },
+        'combo-chip':  { icon: '⚡', name: 'Exact Combo',   criteria: '2 exact scores back-to-back. +3 bonus per combo. Earn 3+ combos to unlock the Combo King badge.',
+                         progress: () => `${combos} combo${combos === 1 ? '' : 's'} so far`,
+                         earned: () => combos >= 1 },
+        'combo':       { icon: '⚡', name: 'Combo King',    criteria: 'Earn 3 or more exact combos (back-to-back exact scores) across the tournament.',
+                         progress: () => `${combos} combo${combos === 1 ? '' : 's'} so far`,
+                         earned: () => combos >= 3 },
+        'overflow':    { icon: '🏆', name: 'More badges',  criteria: 'Other achievements earned by this player. Tap the player to see their full profile.',
+                         progress: () => '',
+                         earned: () => true }
+      }
+      const def = ALL[badgeId]
+      if (!def) {
+        console.warn('[showBadgeInfo] unknown badge id:', badgeId)
+        return
+      }
+      const isEarned = def.earned()
+      const progressText = def.progress()
+
+      const headerHtml = `
+        <div class="info-popup-badge-display relative z-[1]">
+          <div class="info-popup-badge-icon">${def.icon}</div>
+          <div>
+            <h3 id="info-popup-title" class="text-xl font-bold tracking-tight text-center">${escapeHtml(def.name)}</h3>
+            <div class="flex justify-center mt-2">
+              <span class="info-popup-badge-status ${isEarned ? 'earned' : 'not-earned'}">
+                ${isEarned ? '✓ Earned' : 'Not yet earned'}
+              </span>
+            </div>
+          </div>
+        </div>
+      `
+
+      const bodyHtml = `
+        <div class="info-popup-section-title">How to earn it</div>
+        <p class="text-sm text-ink-700 leading-relaxed">${escapeHtml(def.criteria)}</p>
+
+        ${progressText ? `
+          <div class="info-popup-section-title">${isSelf ? 'Your progress' : escapeHtml(playerName) + "'s progress"}</div>
+          <div class="info-popup-pill" style="background:${isEarned ? 'rgba(34,197,94,0.12)' : '#F4F3EE'};color:${isEarned ? '#15803D' : '#1F2A35'};">
+            ${escapeHtml(progressText)}
+          </div>
+        ` : ''}
+      `
+
+      showInfoPopup(headerHtml, bodyHtml, 'badge')
+    }
+
+    // Expose to global scope so onclick handlers in the modal work
+    window.hideInfoPopup = hideInfoPopup
+    window.showPlayerInfo = showPlayerInfo
+    window.showBadgeInfo = showBadgeInfo
+
     async function openH2H(opponentId) {
       const myId = getUser()?.id
       if (!myId || opponentId === myId) return  // no self-H2H
@@ -2344,19 +2547,330 @@ function buildLeaderboardShareText(stats, subtab) {
 async function shareLeaderboard() {
   const stats = window.__lbCachedStats || []
   const subtab = window.__lbSubtab || 'overall'
+
+  if (stats.length === 0) {
+    showToast('No standings to share yet', 'info')
+    return
+  }
+
+  // Try to generate the image card. If anything in canvas-land fails, fall back
+  // to the original text-based share so users never end up with nothing.
+  let blob = null
+  try {
+    blob = await generateLeaderboardCardBlob(stats, subtab)
+  } catch (e) {
+    console.warn('[shareLeaderboard] image generation failed, falling back to text:', e)
+  }
+
   const text = buildLeaderboardShareText(stats, subtab)
 
+  // Path 1: native share with the image file (best UX — WhatsApp shows it inline)
+  if (blob && navigator.canShare) {
+    const filename = `wcpl-leaderboard-${subtab}-${Date.now()}.png`
+    const file = new File([blob], filename, { type: 'image/png' })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'WC 2026 Prediction League',
+          text
+        })
+        showToast('Shared!', 'success')
+        return
+      } catch (e) {
+        if (e.name === 'AbortError') return // user cancelled — don't fall back
+        console.warn('[shareLeaderboard] native share failed:', e)
+      }
+    }
+  }
+
+  // Path 2: download the image, then open WhatsApp with the caption text
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `wcpl-leaderboard-${Date.now()}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('Image saved · attach it in WhatsApp', 'success')
+    setTimeout(() => {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    }, 250)
+    return
+  }
+
+  // Path 3: pure text fallback (no canvas / no share API at all)
   if (navigator.share) {
     try {
       await navigator.share({ title: 'WC Predictions League', text })
       return
     } catch (e) {
       if (e.name === 'AbortError') return
-      console.warn('Native share failed, falling back:', e)
     }
   }
-  const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
-  window.open(waUrl, '_blank')
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
+// ===== Leaderboard share image generator =====
+// Renders the current standings to a portrait PNG card following the same
+// visual language as the achievement cards (deep navy + gold accents +
+// dot pattern). Returns a Blob ready for navigator.share or download.
+async function generateLeaderboardCardBlob(stats, subtab) {
+  const WIDTH = 1080
+  // Show up to top 12 rows. Card height scales with row count so smaller
+  // leagues don't get a half-empty image.
+  const MAX_ROWS = 12
+  const rowsToShow = Math.min(stats.length, MAX_ROWS)
+
+  // Layout constants
+  const HEADER_H = 220
+  const PROGRESS_H = 90
+  const PODIUM_H = 360
+  const ROW_H = 92
+  const FOOTER_H = 120
+  const podiumRows = Math.min(3, rowsToShow)
+  const listRows = Math.max(0, rowsToShow - podiumRows)
+  const HEIGHT = HEADER_H + PROGRESS_H + (podiumRows > 0 ? PODIUM_H : 0) + (listRows * ROW_H) + FOOTER_H + 40
+
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH
+  canvas.height = HEIGHT
+  const ctx = canvas.getContext('2d')
+
+  // ===== Background: deep navy gradient (matches achievement cards) =====
+  const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
+  bgGrad.addColorStop(0, '#0B1221')
+  bgGrad.addColorStop(0.5, '#152849')
+  bgGrad.addColorStop(1, '#1E3A5F')
+  ctx.fillStyle = bgGrad
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  // Subtle dot pattern overlay
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
+  for (let y = 0; y < HEIGHT; y += 32) {
+    for (let x = 0; x < WIDTH; x += 32) {
+      ctx.beginPath()
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  // Gold corner glow
+  const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
+  glow.addColorStop(0, 'rgba(212, 162, 76, 0.30)')
+  glow.addColorStop(1, 'rgba(212, 162, 76, 0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  const cx = WIDTH / 2
+
+  // ===== Header =====
+  ctx.fillStyle = '#D4A24C'
+  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('🏆  WC 2026 PREDICTION LEAGUE', cx, 90)
+
+  // Decorative line
+  ctx.strokeStyle = 'rgba(212, 162, 76, 0.4)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(cx - 220, 115)
+  ctx.lineTo(cx + 220, 115)
+  ctx.stroke()
+
+  // Subtitle: which leaderboard view
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 56px system-ui, -apple-system, sans-serif'
+  ctx.fillText(subtab === 'matchday' ? 'Matchday Standings' : 'Overall Standings', cx, 180)
+
+  // ===== Tournament progress strip =====
+  const progressY = HEADER_H + 10
+  const rows = window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || []
+  const totalMatches = rows.length
+  const playedMatches = rows.filter(f => f.home_score !== null && f.away_score !== null).length
+  const pct = totalMatches > 0 ? (playedMatches / totalMatches) : 0
+
+  if (totalMatches > 0) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
+    ctx.font = '26px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(`${playedMatches} of ${totalMatches} matches played`, 80, progressY + 10)
+    ctx.fillStyle = '#D4A24C'
+    ctx.font = 'bold 26px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(`${Math.round(pct * 100)}%`, WIDTH - 80, progressY + 10)
+
+    // Progress bar
+    const barY = progressY + 35
+    const barX = 80
+    const barW = WIDTH - 160
+    const barH = 10
+    // Track
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.10)'
+    roundRect(ctx, barX, barY, barW, barH, 5)
+    ctx.fill()
+    // Fill
+    const fillGrad = ctx.createLinearGradient(barX, barY, barX + barW, barY)
+    fillGrad.addColorStop(0, '#F4C430')
+    fillGrad.addColorStop(1, '#D4A24C')
+    ctx.fillStyle = fillGrad
+    roundRect(ctx, barX, barY, Math.max(8, barW * pct), barH, 5)
+    ctx.fill()
+  }
+
+  // ===== Top 3 podium =====
+  let y = HEADER_H + PROGRESS_H
+  if (podiumRows > 0) {
+    const medals = ['🥇', '🥈', '🥉']
+    const medalColors = ['#F4C430', '#C0C0C0', '#CD7F32']
+    // Show top 3 as three big tiles side by side. Order them as 2-1-3 visually
+    // (silver-left, gold-center, bronze-right) like a real Olympic podium.
+    const podiumOrder = podiumRows === 3 ? [1, 0, 2] : [0, 1, 2].slice(0, podiumRows)
+    const tileW = (WIDTH - 200) / podiumRows
+    const baseX = 100
+    podiumOrder.forEach((idx, pos) => {
+      const s = stats[idx]
+      if (!s) return
+      const x = baseX + (pos * tileW) + (tileW / 2)
+      // Center tile is taller / bigger for #1
+      const isFirst = idx === 0
+      const tileTop = y + 30 + (isFirst ? 0 : 40)
+
+      // Card background — soft white panel
+      const cardY = tileTop + 80
+      const cardH = 200
+      const cardW = tileW - 30
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
+      ctx.strokeStyle = medalColors[idx] + '80'
+      ctx.lineWidth = 2
+      roundRect(ctx, x - cardW / 2, cardY, cardW, cardH, 18)
+      ctx.fill()
+      ctx.stroke()
+
+      // Medal
+      ctx.font = `${isFirst ? 100 : 80}px system-ui, -apple-system, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(medals[idx], x, tileTop + (isFirst ? 90 : 80))
+
+      // Name (truncate if too long)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = `bold ${isFirst ? 30 : 26}px system-ui, -apple-system, sans-serif`
+      const name = truncateForCanvas(ctx, s.name || 'Anonymous', cardW - 30)
+      ctx.fillText(name, x, cardY + 70)
+
+      // Stats
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
+      ctx.font = '22px system-ui, -apple-system, sans-serif'
+      ctx.fillText(`${s.exact || 0} exact · ${s.points || 0} pts`, x, cardY + 110)
+
+      // Points (big)
+      ctx.fillStyle = medalColors[idx]
+      ctx.font = `bold ${isFirst ? 56 : 46}px system-ui, -apple-system, sans-serif`
+      ctx.fillText(`${s.points || 0}`, x, cardY + 175)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+      ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+      ctx.fillText('PTS', x, cardY + 195)
+    })
+    y += PODIUM_H
+  }
+
+  // ===== Ranks 4 to N — list rows =====
+  if (listRows > 0) {
+    for (let i = podiumRows; i < rowsToShow; i++) {
+      const s = stats[i]
+      if (!s) continue
+      const rank = i + 1
+      const rowY = y
+
+      // Row background panel
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.06)'
+      roundRect(ctx, 80, rowY + 8, WIDTH - 160, ROW_H - 16, 14)
+      ctx.fill()
+
+      // Rank number tile
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'
+      roundRect(ctx, 100, rowY + 22, 56, 56, 12)
+      ctx.fill()
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(String(rank), 128, rowY + 60)
+
+      // Name
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 30px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'left'
+      const nameMax = WIDTH - 100 - 56 - 24 - 180 - 100 // leave room for points
+      const name = truncateForCanvas(ctx, s.name || 'Anonymous', nameMax)
+      ctx.fillText(name, 180, rowY + 48)
+
+      // Stats line below name
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
+      ctx.font = '22px system-ui, -apple-system, sans-serif'
+      const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
+      ctx.fillText(`${correct} correct · ${s.exact || 0} exact`, 180, rowY + 78)
+
+      // Points (right)
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 40px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'right'
+      ctx.fillText(String(s.points || 0), WIDTH - 110, rowY + 56)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif'
+      ctx.fillText('PTS', WIDTH - 110, rowY + 80)
+
+      y += ROW_H
+    }
+  }
+
+  // ===== Footer =====
+  const footerY = HEIGHT - 70
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.font = '24px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('Think you can do better? Join the league:', cx, footerY - 30)
+  ctx.fillStyle = '#D4A24C'
+  ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
+  ctx.fillText('wcpredictionleague.vercel.app', cx, footerY + 5)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob)
+      else reject(new Error('toBlob returned null'))
+    }, 'image/png', 0.95)
+  })
+}
+
+// Canvas helper: rounded rectangle path (canvas roundRect isn't universal yet)
+function roundRect(ctx, x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2
+  if (h < 2 * r) r = h / 2
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+// Canvas helper: truncate text with ellipsis to fit a max pixel width.
+// Uses ctx.measureText which respects current font.
+function truncateForCanvas(ctx, text, maxWidth) {
+  if (!text) return ''
+  if (ctx.measureText(text).width <= maxWidth) return text
+  const ellipsis = '…'
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    const candidate = text.slice(0, mid) + ellipsis
+    if (ctx.measureText(candidate).width <= maxWidth) lo = mid
+    else hi = mid - 1
+  }
+  return text.slice(0, lo) + ellipsis
 }
 
 // ===== Tournament Progress Strip =====
@@ -2597,13 +3111,13 @@ async function loadLeaderboard() {
 
         // Streak flame (overall tab only)
         const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
-        const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row">🔥${streakN}</span>` : ''
+        const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row" data-badge-id="streak-chip">🔥${streakN}</span>` : ''
 
         // Combo bolt (overall tab only) — fires from the first combo so the rules
         // sheet's "+3 Exact Combo" promise is visibly delivered, even before the
         // 3+ Combo King badge threshold. Mirrors the streak chip pattern.
         const comboN = (lbSubtab === 'overall') ? (s.combo_count || 0) : 0
-        const comboHtml = comboN >= 1 ? `<span class="lb-combo" title="${comboN} exact combo${comboN > 1 ? 's' : ''}">⚡${comboN}</span>` : ''
+        const comboHtml = comboN >= 1 ? `<span class="lb-combo" title="${comboN} exact combo${comboN > 1 ? 's' : ''}" data-badge-id="combo-chip">⚡${comboN}</span>` : ''
 
         // (Projected winnings used to render here per row — moved to the Prize Pool
         // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
@@ -2641,7 +3155,7 @@ async function loadLeaderboard() {
         <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} ${rankClass} flex items-center gap-3"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           <div class="shrink-0">${rankDisplay}</div>
-          <div class="shrink-0">
+          <div class="shrink-0" data-avatar-wrap>
             ${getAvatarHtml(s.name, s.avatar_url, rank, 32)}
           </div>
           <div class="flex-1 min-w-0">
@@ -2674,20 +3188,41 @@ async function loadLeaderboard() {
       // Called on every leaderboard render so it stays in sync after realtime updates.
       renderTournamentProgress()
 
-      // ===== H2H tap-to-open: attach click handler to every leaderboard row =====
-      // Tapping a row opens a head-to-head modal comparing you against that player.
-      // Tapping your own row is a no-op (handled inside openH2H).
-      // Uses addEventListener + dedup guard so realtime re-renders don't stack listeners. (Polish 3)
+      // ===== Row tap routing =====
+      // Clicks are now context-aware:
+      //   • Avatar OR rank tile  → showPlayerInfo (basic profile + "Compare H2H" CTA)
+      //   • Badge / chip         → showBadgeInfo  (badge name, criteria, earned status)
+      //   • Anywhere else        → openH2H        (original behavior)
+      // Self-row stays interactive for avatar/badge taps but skips the H2H fallback.
       c.querySelectorAll('[data-uid]').forEach(el => {
         const uid = el.dataset.uid
-        if (uid === myId) return  // skip self — no rivalry with yourself
-        if (el.dataset.h2hBound) return  // don't double-bind on re-renders
+        if (el.dataset.rowBound) return  // dedup on re-renders
         el.style.cursor = 'pointer'
-        el.addEventListener('click', () => openH2H(uid))
-        el.dataset.h2hBound = '1'
+        el.addEventListener('click', (e) => {
+          // Badge or chip click → badge info
+          const badgeEl = e.target.closest('[data-badge-id]')
+          if (badgeEl && el.contains(badgeEl)) {
+            e.stopPropagation()
+            showBadgeInfo(badgeEl.dataset.badgeId, uid)
+            return
+          }
+          // Avatar or rank tile click → player info
+          const avatarEl = e.target.closest('[data-avatar-wrap], [data-rank-wrap]')
+          if (avatarEl && el.contains(avatarEl)) {
+            e.stopPropagation()
+            showPlayerInfo(uid)
+            return
+          }
+          // Everything else → H2H (skip self)
+          if (uid === myId) return
+          openH2H(uid)
+        })
+        el.dataset.rowBound = '1'
 
         // Tiny chevron in the right edge to signal tappability. (Polish 2)
-        if (!el.querySelector('.h2h-chevron')) {
+        // Skip for self-row — H2H isn't meaningful with yourself, and avatar/badge
+        // taps are still available without the row-level chevron suggesting otherwise.
+        if (uid !== myId && !el.querySelector('.h2h-chevron')) {
           // Ensure parent is positioned so the absolute child anchors correctly
           if (getComputedStyle(el).position === 'static') el.style.position = 'relative'
           const chev = document.createElement('div')
@@ -2778,13 +3313,31 @@ async function loadLeaderboard() {
     let prizePollInterval = null
 
    function setupRealtime() {
+  // Track the most recent refresh-trigger so we can collapse bursts (own save
+  // fires multiple events: the prediction INSERT/UPSERT then a separate UPDATE
+  // for `submitted_at`). Without debouncing this re-renders fixtures 2-3 times
+  // back-to-back which the user sees as a flicker.
+  let _predRefreshTimer = null
+
   // 1) Predictions: ALL events (kept for leaderboard refresh when someone submits)
   // Also refreshes Match Preview so the "X/Y locked in" counter stays live.
   supabaseClient.channel('lb')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => {
-      refreshSocialCaches().then(() => {
-        loadLeaderboard(); loadFixtures(); loadHome()
-      })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload) => {
+      // Skip echoes from the current user's own save — handleSavePrediction
+      // already updates local state and re-renders directly, so realtime
+      // bouncing back the same change just causes a visible flicker.
+      const myId = getUser()?.id
+      const changedUid = payload?.new?.user_id || payload?.old?.user_id
+      if (myId && changedUid && changedUid === myId) return
+
+      // Debounce other users' bursts (e.g. an admin doing bulk updates) so we
+      // refresh at most once per 300ms window.
+      clearTimeout(_predRefreshTimer)
+      _predRefreshTimer = setTimeout(() => {
+        refreshSocialCaches().then(() => {
+          loadLeaderboard(); loadFixtures(); loadHome()
+        })
+      }, 300)
     })
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') console.log('LB channel status:', status)
@@ -4202,10 +4755,10 @@ window.promptShareScore = promptShareScore
       const overflow = earned.length - visible.length
 
       const iconsHtml = visible
-        .map(b => `<span class="lb-badge" title="${b.id}">${b.icon}</span>`)
+        .map(b => `<span class="lb-badge" title="${b.id}" data-badge-id="${b.id}">${b.icon}</span>`)
         .join('')
       const overflowHtml = overflow > 0
-        ? `<span class="lb-badge lb-badge-more" title="${overflow} more badge${overflow > 1 ? 's' : ''}">+${overflow}</span>`
+        ? `<span class="lb-badge lb-badge-more" title="${overflow} more badge${overflow > 1 ? 's' : ''}" data-badge-id="overflow">+${overflow}</span>`
         : ''
       return iconsHtml + overflowHtml
     }
