@@ -708,28 +708,17 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           onConflict: 'prediction_id' // or your unique constraint column
         });
 
-      if (upsertError) {
+   if (upsertError) {
         console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
-     } else {
-        // Only recalc if this user has LATER resolved matches than the one we just scored.
-        // In the common case (admin scores fixtures in order), there are none → skip the
-        // O(n) chain rewrite. Heals the out-of-order case without the quadratic hit. (Bug 6)
-        //
-        // gte + neq catches simultaneous-kickoff fixtures too (Bug 7b). Slightly over-triggers
-        // on same-kickoff fixtures scored in order, but recalc is idempotent so it's harmless.
+      } else {
+        // Always heal this user's full chain after every save. Same correctness
+        // guarantee as the Recalc All button, at a negligible cost (one user,
+        // a few dozen rows). Eliminates any divergence between award and recalc
+        // paths regardless of root cause (stale kickoffs, gating edge cases, etc).
         try {
-          const { count: laterCount } = await supabaseClient
-            .from('prediction_results')
-            .select('prediction_id', { count: 'exact', head: true })
-            .eq('user_id', pred.user_id)
-            .gte('kickoff', fixture.kickoff)
-            .neq('fixture_id', fixtureId);
-
-          if ((laterCount || 0) > 0) {
-            await recalculateUserBonuses(pred.user_id);
-          }
+          await recalculateUserBonuses(pred.user_id);
         } catch (recalcErr) {
-          console.error(`[recalc] downstream heal failed for ${pred.user_id}:`, recalcErr);
+          console.error(`[recalc] heal failed for ${pred.user_id}:`, recalcErr);
         }
       }
     } catch (err) {
