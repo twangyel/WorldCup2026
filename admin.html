@@ -2066,8 +2066,9 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
       const val = pendingKickoffs[id]; if (!val) { showToast('No change', 'warning'); return }
       if (typeof updateFixtureKickoff !== 'function') { showToast('updateFixtureKickoff helper missing', 'error'); return }
       // datetime-local gives local time without timezone — convert to UTC ISO
-const localDate = new Date(val)
-const iso = new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000).toISOString()
+// datetime-local value is already parsed as local time by `new Date()`,
+      // so toISOString() converts it to UTC correctly. No manual offset math.
+      const iso = new Date(val).toISOString()
       const { error } = await updateFixtureKickoff(id, iso)
       if (error) return showToast(error.message, 'error')
       const f = allFixtures.find(x => x.id === id); if (f) f.kickoff = iso
