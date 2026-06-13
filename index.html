@@ -1145,17 +1145,17 @@
 
     /* Compact leaderboard row - minimal vertical padding, full width */
     .lb-row-compact {
-      padding: 10px 16px !important;
-      margin: 0 !important;
-      width: 100% !important;
-      border-radius: 14px !important;
-      border: 1px solid rgba(238, 237, 231, 0.6) !important;
-      background: rgba(255, 255, 255, 0.95) !important;
-      box-shadow: 0 1px 3px rgba(10, 15, 13, 0.04) !important;
-      backdrop-filter: blur(8px) !important;
-      -webkit-backdrop-filter: blur(8px) !important;
-      transition: all 200ms ease !important;
-    }
+  padding: 10px 24px 10px 16px !important;   /* was: 10px 16px */
+  margin: 0 !important;
+  width: 100% !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(238, 237, 231, 0.6) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 1px 3px rgba(10, 15, 13, 0.04) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  transition: all 200ms ease !important;
+}
     .lb-row-compact:hover {
       background: rgba(255, 255, 255, 1) !important;
       box-shadow: 0 4px 12px rgba(10, 15, 13, 0.08) !important;
@@ -1439,8 +1439,8 @@
 .lb-row-compact .rank-medal-gold,
 .lb-row-compact .rank-medal-silver,
 .lb-row-compact .rank-medal-bronze {
-  width: 28px !important;
-  height: 32px !important;
+  width: 34px !important;
+  height: 38px !important;
 }
 
     /* ===== Player Avatars (Leaderboard) ===== */
@@ -1497,7 +1497,7 @@
       border-radius: 10px !important;
     }
     .lb-row-compact .rank-medal {
-      font-size: 22px !important;
+      font-size: 28px !important;
       line-height: 1 !important;
     }
 
