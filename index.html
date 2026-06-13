@@ -868,13 +868,20 @@
       display: inline-flex; align-items: center; gap: 2px;
       font-size: 10px; font-weight: 800;
       padding: 3px 7px; border-radius: 999px;
-      margin-left: 4px;
       vertical-align: middle;
       line-height: 1;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,0.4);
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* Fixed-width column so trend badges align vertically across rows
+       and the points column stays in a straight line whether a row has a badge or not. */
+    .lb-trend-col {
+      width: 44px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
     }
     .rank-trend.up   { background: rgba(220, 252, 231, 0.85); color: #15803D; }
     .rank-trend.down { background: rgba(254, 226, 226, 0.85); color: #B91C1C; }
@@ -1416,27 +1423,25 @@
     /* ===== Rank Medals (Gold/Silver/Bronze) ===== */
     /* Clean emoji-only medals — no circular background, no extra padding */
     .rank-medal-gold,
-    .rank-medal-silver,
-    .rank-medal-bronze {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 18px !important;
-      line-height: 1 !important;
-      width: auto !important;
-      height: auto !important;
-      background: none !important;
-      border: none !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
-      padding: 0 !important;
-      margin: 0 !important;
-    }
-    .lb-row-compact .rank-medal-gold,
-    .lb-row-compact .rank-medal-silver,
-    .lb-row-compact .rank-medal-bronze {
-      font-size: 22px !important;
-    }
+.rank-medal-silver,
+.rank-medal-bronze {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 30px !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.lb-row-compact .rank-medal-gold,
+.lb-row-compact .rank-medal-silver,
+.lb-row-compact .rank-medal-bronze {
+  width: 28px !important;
+  height: 32px !important;
+}
 
     /* ===== Player Avatars (Leaderboard) ===== */
     .lb-avatar {

@@ -457,6 +457,23 @@
             </button>
           </div>
         </div>
+        <div class="card">
+          <div class="p-5">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg shrink-0">📸</div>
+              <div class="flex-1">
+                <h2 class="font-bold text-base tracking-tight">Stamp Rank Snapshot</h2>
+                <p class="text-xs text-ink-500 mt-0.5 leading-relaxed">
+                  Saves the current overall standings as the baseline for the next matchday's trend arrows (▲ / ▼). Click this right after you've finalized scoring for a matchday. The first stamp produces no visible arrows — you'll see them after the next matchday is stamped.
+                </p>
+              </div>
+            </div>
+            <button id="stamp-snapshot-btn" onclick="stampMatchdaySnapshot()"
+              class="w-full bg-ink-900 text-white font-semibold py-3 rounded-2xl tap flex items-center justify-center gap-2">
+              <span id="stamp-snapshot-label">Stamp Rank Snapshot</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- PRIZE -->
@@ -1116,6 +1133,114 @@ function confirmRecalcAll() {
   })
 }
 
+// Self-contained leaderboard query for admin stamping. Mirrors
+// getLeaderboardFromResults() in index.js exactly — same paid-profile filter,
+// same BonusEngine aggregation, same tiebreaker chain. Critical that this
+// stays in sync with the public render path.
+async function _adminFetchOverallStandings() {
+  const [{ data: results }, { data: profiles }] = await Promise.all([
+    supabaseClient.from('prediction_results').select('*'),
+    supabaseClient.from('profiles')
+      .select('id, full_name, department, name, fee_paid, avatar_url')
+      .eq('fee_paid', true)
+  ])
+
+  if (!profiles || profiles.length === 0) return []
+
+  const stats = profiles.map(profile => {
+    const uid = profile.id
+    const userResults = (results || []).filter(r => r.user_id === uid)
+    let engineStats
+    try {
+      if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
+        engineStats = BonusEngine.aggregateUserStats(uid, userResults)
+      } else {
+        let points = 0, exact = 0, gd = 0, result = 0
+        userResults.forEach(r => {
+          points += r.final_points || r.points_awarded || 0
+          const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)
+          if (base === 5) exact++
+          else if (base === 3) gd++
+          else if (base === 2) result++
+        })
+        engineStats = { points, exact, gd, result, total_predictions: userResults.length }
+      }
+    } catch (e) {
+      console.warn('[admin stamp] BonusEngine failed for', uid, e)
+      engineStats = { points: 0, exact: 0, gd: 0, result: 0 }
+    }
+    return { user_id: uid, ...engineStats }
+  })
+
+  // Same tiebreaker chain as getLeaderboardFromResults: points → exact → gd → result
+  stats.sort((a, b) => {
+    if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0)
+    if ((b.exact  || 0) !== (a.exact  || 0)) return (b.exact  || 0) - (a.exact  || 0)
+    if ((b.gd     || 0) !== (a.gd     || 0)) return (b.gd     || 0) - (a.gd     || 0)
+    return (b.result || 0) - (a.result || 0)
+  })
+  return stats
+}
+
+async function stampMatchdaySnapshot(opts = {}) {
+  const silent = opts.silent === true
+  const btn = document.getElementById('stamp-snapshot-btn')
+  const label = document.getElementById('stamp-snapshot-label')
+  if (!silent && btn) { btn.disabled = true; btn.classList.add('opacity-60', 'pointer-events-none') }
+  if (!silent && label) label.textContent = 'Stamping…'
+
+  try {
+    const stats = await _adminFetchOverallStandings()
+    if (!stats || stats.length === 0) {
+      if (!silent) alert('No leaderboard data — cannot stamp snapshot')
+      return
+    }
+
+    const { data: finished } = await supabaseClient
+      .from('fixtures')
+      .select('kickoff, home_score, away_score')
+      .not('home_score', 'is', null)
+      .not('away_score', 'is', null)
+      .order('kickoff', { ascending: false })
+      .limit(1)
+
+    if (!finished || finished.length === 0) {
+      if (!silent) alert('No finished matches yet — nothing to stamp')
+      return
+    }
+    const matchKey = new Date(finished[0].kickoff).toDateString()
+
+    const ranks = {}
+    stats.forEach((s, i) => {
+      const uid = s.user_id
+      if (uid) ranks[uid] = i + 1
+    })
+
+    if (!silent && !confirm(`Stamp snapshot for "${matchKey}" with ${Object.keys(ranks).length} users?\n\nThis becomes the baseline that the NEXT matchday's trend arrows diff against.`)) {
+      return
+    }
+
+    const { error } = await supabaseClient.rpc('stamp_rank_snapshot', {
+      p_match_key: matchKey,
+      p_ranks: ranks
+    })
+
+    if (error) {
+      console.error('[admin stamp] failed:', error)
+      if (!silent) alert('Stamp failed: ' + error.message)
+      return
+    }
+    console.log(`[admin stamp] ✓ ${matchKey} — ${Object.keys(ranks).length} users`)
+    if (!silent) alert(`✓ Stamped snapshot for "${matchKey}" — ${Object.keys(ranks).length} users`)
+  } catch (e) {
+    console.error('[admin stamp] threw:', e)
+    if (!silent) alert('Stamp failed: ' + (e.message || e))
+  } finally {
+    if (!silent && btn) { btn.disabled = false; btn.classList.remove('opacity-60', 'pointer-events-none') }
+    if (!silent && label) label.textContent = 'Stamp Rank Snapshot'
+  }
+}
+
 async function executeRecalcAll() {
   const btn = document.getElementById('recalc-all-btn')
   const label = document.getElementById('recalc-all-label')
@@ -1135,6 +1260,15 @@ async function executeRecalcAll() {
       showToast(`All ${users} player${users === 1 ? '' : 's'} already in sync — nothing to update.`, 'success')
     } else {
       showToast(`Recalculated ${users} player${users === 1 ? '' : 's'}, ${updated} row${updated === 1 ? '' : 's'} updated.`, 'success')
+    }
+
+    // Re-stamp the rank snapshot to reflect the recalculated standings.
+    // Only stamp when there were no errors — we don't want to baseline against
+    // half-broken data. If updated === 0, stamping is still cheap (idempotent
+    // overwrite with identical ranks) so no need to skip it.
+    if (errors === 0) {
+      stampMatchdaySnapshot({ silent: true })
+        .catch(e => console.warn('[auto-stamp after recalc] failed:', e))
     }
   } catch (err) {
     console.error('[recalc-all] Failed:', err)
@@ -2397,6 +2531,8 @@ if (bothSet) {
     showToast('Score saved — awarding points…', 'success')
     try {
       await awardPointsForFixture(id, Number(finalHome), Number(finalAway))
+      stampMatchdaySnapshot({ silent: true })
+        .catch(e => console.warn('[auto-stamp] failed:', e))
       showToast('Points awarded to all players', 'success')
 
       // Refresh whichever leaderboard surface is currently visible.

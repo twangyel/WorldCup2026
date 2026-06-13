@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wc-predictions-v6'
+const CACHE_NAME = 'wc-predictions-v7'
 const urlsToCache = [
   '/',
   '/index.html',

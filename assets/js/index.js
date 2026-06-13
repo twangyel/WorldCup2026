@@ -2439,57 +2439,50 @@ recentEl.innerHTML = finished.map(f => {
     // ===== Persistent rank trend snapshots =====
     // Key the snapshot to the "latest resolved matchday". When that changes, we
     // compare current ranks to the snapshot taken right BEFORE that matchday.
-    function rankTrendSnapshotKey() {
-      const md = getLatestMatchday()
-      return md ? `lb_rank_snapshot_${md.matchKey}` : null
-    }
-    function getStoredTrend() {
-      const key = rankTrendSnapshotKey()
-      if (!key) return { ranks: null, expiresAt: 0 }
-      try {
-        const raw = localStorage.getItem(key)
-        if (!raw) return { ranks: null, expiresAt: 0 }
-        return JSON.parse(raw)
-      } catch (e) { return { ranks: null, expiresAt: 0 } }
-    }
-    function storeTrend(snapshot) {
-      const key = rankTrendSnapshotKey()
-      if (!key) return
-      try { localStorage.setItem(key, JSON.stringify(snapshot)) } catch (e) { /* ignore */ }
-    }
-    // After a new matchday resolves, capture the pre-matchday ranks so we can
-    // diff once. We approximate "pre-matchday ranks" by saving on FIRST sighting
-    // of a new matchday key, using whatever ranks were stored from the previous key.
-    function computeTrendMap(currentStats) {
-      const md = getLatestMatchday()
-      if (!md) return {}
-      const key = rankTrendSnapshotKey()
-      const PRIOR_KEYS_LS = 'lb_rank_history'
-      let history = {}
-      try { history = JSON.parse(localStorage.getItem(PRIOR_KEYS_LS) || '{}') } catch(e) {}
-      const priorRanks = history[key]?.ranks
-      // Save current ranks for next time
-      const currentRanks = {}
-      currentStats.forEach((s, i) => { currentRanks[s.user_id || s.id] = i + 1 })
-      // Only stamp if not already stamped for this matchday
-      if (!history[key]) {
-        // First time seeing this matchday -> snapshot the *previous* known ranks from history
-        const lastKey = Object.keys(history).sort().pop()
-        const baseline = lastKey ? history[lastKey].ranks : null
-        history[key] = { ranks: currentRanks, baseline, stampedAt: Date.now() }
-        try { localStorage.setItem(PRIOR_KEYS_LS, JSON.stringify(history)) } catch(e) {}
-      } else {
-        // Keep refreshing currentRanks but preserve baseline
-        history[key].ranks = currentRanks
-        try { localStorage.setItem(PRIOR_KEYS_LS, JSON.stringify(history)) } catch(e) {}
+  // ===== Server-backed rank trend snapshots =====
+    // Single source of truth: public.rank_snapshots. Every user diffs against
+    // the same row, so badges are deterministic across devices and sessions.
+
+    let _snapshotCache = null
+    let _snapshotCacheAt = 0
+    const SNAPSHOT_CACHE_MS = 60 * 1000  // refetch at most once a minute
+
+    async function getLatestRankSnapshot() {
+      if (_snapshotCache && Date.now() - _snapshotCacheAt < SNAPSHOT_CACHE_MS) {
+        return _snapshotCache
       }
-      const baseline = history[key]?.baseline
-      if (!baseline) return {}
-      // Show trend for 24h after matchday stamped
-      const ageMs = Date.now() - (history[key].stampedAt || 0)
-      if (ageMs > 24 * 3600 * 1000) return {}
+      const { data, error } = await supabaseClient
+        .from('rank_snapshots')
+        .select('match_key, ranks, stamped_at')
+        .order('stamped_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) {
+        console.warn('[trend] snapshot fetch failed:', error.message)
+        return null
+      }
+      _snapshotCache = data || null
+      _snapshotCacheAt = Date.now()
+      return _snapshotCache
+    }
+
+    function invalidateSnapshotCache() {
+      _snapshotCache = null
+      _snapshotCacheAt = 0
+    }
+
+    // Pure builder. Takes the same `overallStats` array used to render the
+    // leaderboard, plus the fetched snapshot. Returns { uid: { dir, delta } }.
+    function buildTrendMap(currentStats, snapshot) {
+      if (!snapshot || !snapshot.ranks) return {}
+      const ageMs = Date.now() - new Date(snapshot.stamped_at).getTime()
+      if (ageMs > 24 * 3600 * 1000) return {}  // 24h window — same UX as before
+
+      const baseline = snapshot.ranks
       const trend = {}
-      Object.entries(currentRanks).forEach(([uid, newRank]) => {
+      currentStats.forEach((s, i) => {
+        const uid = s.user_id || s.id
+        const newRank = i + 1
         const oldRank = baseline[uid]
         if (oldRank === undefined) {
           trend[uid] = { dir: 'new', delta: 0 }
@@ -2498,9 +2491,23 @@ recentEl.innerHTML = finished.map(f => {
         } else if (newRank > oldRank) {
           trend[uid] = { dir: 'down', delta: newRank - oldRank }
         }
-        // equal -> nothing (no noisy dashes)
       })
       return trend
+    }
+
+    // Realtime: when admin stamps, everyone's badges refresh without manual reload.
+    try {
+      supabaseClient
+        .channel('rank_snapshots_changes')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'rank_snapshots' },
+            () => {
+              invalidateSnapshotCache()
+              if (typeof loadLeaderboard === 'function') loadLeaderboard()
+            })
+        .subscribe()
+    } catch (e) {
+      console.warn('[trend] realtime subscribe failed (non-fatal):', e)
     }
 
     // ===== Next-match CTA card =====
@@ -2971,7 +2978,8 @@ async function loadLeaderboard() {
 
       const overallStats = overallRes?.data || []
       // Always compute trend off the OVERALL standings (matchday tab has its own logic)
-      lbTrendMap = computeTrendMap(overallStats)
+      const _trendSnapshot = await getLatestRankSnapshot()
+      lbTrendMap = buildTrendMap(overallStats, _trendSnapshot)
 
       // Pick stats for current sub-tab
       let stats = overallStats
@@ -3164,10 +3172,9 @@ async function loadLeaderboard() {
               <span class="player-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
               ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded shrink-0">YOU</span>' : ''}
             </div>
-            <!-- Line 2: the actual ranking data — stats + trend movement -->
+            <!-- Line 2: the actual ranking data — stats only; trend lives in its own aligned column -->
             <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
               ${statsLine}
-              ${trendHtml}
             </div>
             <!-- Line 3: achievements row — chips + badges, free to wrap. Only rendered if there's something to show. -->
             ${hasAchievements ? `<div class="lb-achievements-row flex items-center gap-1.5 flex-wrap">${achievementsHtml}</div>` : ''}
@@ -3177,6 +3184,7 @@ async function loadLeaderboard() {
               return hint ? `<div class="lb-row-hint">${escapeHtml(hint)}</div>` : ''
             })() : ''}
           </div>
+          <div class="lb-trend-col shrink-0">${trendHtml}</div>
           <div class="text-right shrink-0">
             <div class="points-num font-bold text-brand-700" data-points-el>${s.points || 0}</div>
             <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
@@ -4763,6 +4771,30 @@ window.promptShareScore = promptShareScore
       return iconsHtml + overflowHtml
     }
 
+    // Custom SVG medals for top-3 ranks. Replaces 🥇🥈🥉 emoji which render
+// inconsistently across platforms and look like placeholders on Apple devices.
+function rankMedalSvg(rank) {
+  const presets = {
+    1: { fill1: '#FFE57A', fill2: '#F4C430', fill3: '#A87808', rim1: '#FFF2A8', rim2: '#8A5E08', num: '#5E3D00' },
+    2: { fill1: '#F5F5F5', fill2: '#C0C0C0', fill3: '#7A7A7A', rim1: '#FAFAFA', rim2: '#6A6A6A', num: '#3A3A3A' },
+    3: { fill1: '#E8B88A', fill2: '#CD7F32', fill3: '#7A4615', rim1: '#F0C9A0', rim2: '#6B3A10', num: '#3D1F08' }
+  }
+  const p = presets[rank]
+  if (!p) return ''
+  const id = `m${rank}`
+  return `<svg width="26" height="30" viewBox="0 0 26 30" xmlns="http://www.w3.org/2000/svg" aria-label="${rank===1?'1st':rank===2?'2nd':'3rd'} place" style="display:block">
+    <defs>
+      <linearGradient id="${id}f" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${p.fill1}"/><stop offset="50%" stop-color="${p.fill2}"/><stop offset="100%" stop-color="${p.fill3}"/></linearGradient>
+      <linearGradient id="${id}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${p.rim1}"/><stop offset="100%" stop-color="${p.rim2}"/></linearGradient>
+    </defs>
+    <path d="M6 2 L10 16 L13 13 L16 16 L20 2 Z" fill="#D63341"/>
+    <path d="M6 2 L10 16 L13 13 Z" fill="#A8232E"/>
+    <circle cx="13" cy="19" r="8.5" fill="url(#${id}r)"/>
+    <circle cx="13" cy="19" r="7" fill="url(#${id}f)"/>
+    <text x="13" y="22.5" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="800" fill="${p.num}">${rank}</text>
+  </svg>`
+}
+
     // ============== PREVIEW MODE (Feature 4) ==============
     async function enterPreviewMode() {
       previewMode = true;
@@ -4857,7 +4889,7 @@ function exitPreviewMode() {
           <div class="preview-blur">
             ${fake.map((s, i) => {
               const rank = i + 1
-              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+              const medal = rank <= 3 && hasPoints ? rankMedalSvg(rank) : ''
               const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
               const rankDisp = medal
                 ? `<div class="${medalClass}">${medal}</div>`
