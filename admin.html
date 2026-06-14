@@ -660,6 +660,25 @@
     </div>
   </div>
 
+  <!-- Back-button guard: on any back press, navigate to index.html instead of
+       letting the browser close the app (happens in PWA mode or on deep loads). -->
+  <script>
+    (function () {
+      try {
+        // Push a sentinel state so the first back press fires popstate.
+        history.pushState({ adminBackGuard: true }, '', location.href);
+        window.addEventListener('popstate', function () {
+          // Back was pressed — go home rather than closing.
+          window.location.href = 'index.html';
+        });
+      } catch (e) {
+        // History API unavailable; nothing to do. The anchor "Back to App"
+        // link still works for an explicit return.
+        console.warn('[back-guard] init failed:', e);
+      }
+    })();
+  </script>
+
   <script>
     // ============== FLAGS ==============
         const FLAG_MAP = {
