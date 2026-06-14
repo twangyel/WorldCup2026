@@ -1262,14 +1262,6 @@ async function executeRecalcAll() {
       showToast(`Recalculated ${users} player${users === 1 ? '' : 's'}, ${updated} row${updated === 1 ? '' : 's'} updated.`, 'success')
     }
 
-    // Re-stamp the rank snapshot to reflect the recalculated standings.
-    // Only stamp when there were no errors — we don't want to baseline against
-    // half-broken data. If updated === 0, stamping is still cheap (idempotent
-    // overwrite with identical ranks) so no need to skip it.
-    if (errors === 0) {
-      stampMatchdaySnapshot({ silent: true })
-        .catch(e => console.warn('[auto-stamp after recalc] failed:', e))
-    }
   } catch (err) {
     console.error('[recalc-all] Failed:', err)
     showToast('Recalculation failed. Check console for details.', 'error')
@@ -2495,6 +2487,57 @@ document.getElementById('csv-input').value = '';
         ]
       })
     }
+async function ensureMatchdayBaseline(fixtureKickoff) {
+  // Matchday key = the calendar date of this fixture's kickoff.
+  // (Same convention stampMatchdaySnapshot already uses: toDateString.)
+  const targetKey = new Date(fixtureKickoff).toDateString();
+
+  // What matchday is the current baseline keyed to?
+  const { data: latest, error: snapErr } = await supabaseClient
+    .from('rank_snapshots')
+    .select('match_key, stamped_at')
+    .order('stamped_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (snapErr) {
+    console.warn('[baseline] could not read latest snapshot (continuing):', snapErr.message);
+    // Don't block scoring on a snapshot read failure.
+  }
+
+  // Already baselined for this matchday → nothing to do. This is what keeps the
+  // arrows alive across every save within the same matchday.
+  if (latest && latest.match_key === targetKey) {
+    return { stamped: false, reason: 'already-baselined' };
+  }
+
+  // First save of a NEW matchday. Capture current standings = end of the
+  // PREVIOUS matchday (this matchday's results aren't awarded yet), and tag the
+  // snapshot with the matchday it is the baseline FOR.
+  const stats = await _adminFetchOverallStandings();
+  if (!stats || stats.length === 0) {
+    console.warn('[baseline] no standings to stamp; skipping');
+    return { stamped: false, reason: 'no-standings' };
+  }
+
+  const ranks = {};
+  stats.forEach((s, i) => { if (s.user_id) ranks[s.user_id] = i + 1; });
+
+  const { error } = await supabaseClient.rpc('stamp_rank_snapshot', {
+    p_match_key: targetKey,        // baseline FOR this matchday
+    p_ranks: ranks
+  });
+
+  if (error) {
+    console.error('[baseline] stamp failed:', error);
+    return { stamped: false, reason: 'stamp-error' };
+  }
+
+  console.log(`[baseline] froze pre-matchday standings for "${targetKey}" — ${Object.keys(ranks).length} users`);
+  return { stamped: true };
+}
+
+
 async function executeSaveScore(id) {
   // Double-check: only the next upcoming match can be scored
   const now = new Date()
@@ -2529,10 +2572,9 @@ async function executeSaveScore(id) {
 
 if (bothSet) {
     showToast('Score saved — awarding points…', 'success')
+    try { await ensureMatchdayBaseline(f.kickoff) } catch (e) { console.warn('[baseline] failed:', e) }
     try {
       await awardPointsForFixture(id, Number(finalHome), Number(finalAway))
-      stampMatchdaySnapshot({ silent: true })
-        .catch(e => console.warn('[auto-stamp] failed:', e))
       showToast('Points awarded to all players', 'success')
 
       // Refresh whichever leaderboard surface is currently visible.

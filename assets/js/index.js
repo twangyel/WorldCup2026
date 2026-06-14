@@ -2476,7 +2476,7 @@ recentEl.innerHTML = finished.map(f => {
     function buildTrendMap(currentStats, snapshot) {
       if (!snapshot || !snapshot.ranks) return {}
       const ageMs = Date.now() - new Date(snapshot.stamped_at).getTime()
-      if (ageMs > 24 * 3600 * 1000) return {}  // 24h window — same UX as before
+      if (ageMs > 7 * 24 * 3600 * 1000) return {}
 
       const baseline = snapshot.ranks
       const trend = {}
