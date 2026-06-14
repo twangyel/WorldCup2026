@@ -1105,6 +1105,11 @@ let fixtures = []
 let predictions = []
 let pendingPredictions = {}
 
+// ============== NAVIGATION HISTORY ==============
+let navHistory = []           // Stack of visited tabs for back navigation
+let currentNavIndex = -1      // Current position in history
+let isNavigatingBack = false  // Flag to prevent pushing during popstate handling
+
 /* ===== NEW FEATURES STATE =====
  *
  * REQUIRED DB CHANGE for prediction lock timestamp (Feature 1):
@@ -2921,7 +2926,7 @@ async function renderMatchHighlights() {
     const topRows = topPicks.map((p, i) => {
       const win = (p.final_points || 0) > 0
       const mvp = i === 0 && win
-        ? '<span style="margin-left:6px; background:#D4A24C; color:#0B1221; font-size:9px; font-weight:700; padding:1px 6px; border-radius:8px;">👑 Match MVP</span>'
+        ? '<span style="margin-left:6px; background:#D4A24C; color:#0B1221; font-size:10px; font-weight:800; padding:2px 8px; border-radius:10px; display:inline-flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="#0B1221" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>MATCH MVP</span>'
         : ''
       return `<div style="display:flex; align-items:center; gap:8px; padding:7px 9px; margin:3px 0; border-radius:8px; background:${win ? 'rgba(212,162,76,.13)' : 'rgba(255,255,255,.05)'}; ${win ? 'border:1px solid rgba(212,162,76,.4);' : ''}">
         <span style="font-size:14px;">${medals[i] || ''}</span>
@@ -2944,7 +2949,7 @@ async function renderMatchHighlights() {
 
     return `<div style="background:linear-gradient(135deg,#0B1221,#152849); border:1px solid rgba(212,162,76,.18); border-radius:18px; padding:16px; margin-bottom:14px;">
       <div style="display:flex; align-items:center; justify-content:space-between;">
-        <span style="color:#D4A24C; font-size:13px; font-weight:700;">🏆 ${fixture.stage || 'Match'}</span>
+        <span style="color:#D4A24C; font-size:13px; font-weight:700;">🏆 ${fixture.stage || 'Match'} · Highlights</span>
         <span style="color:rgba(255,255,255,.5); font-size:10px; letter-spacing:.5px;">${fmtMatchDate(fixture.kickoff)}</span>
       </div>
       <div style="display:flex; align-items:center; justify-content:center; gap:18px; padding:14px 0 8px;">
@@ -2987,6 +2992,21 @@ function loadFlagImage(url) {
   })
 }
 
+// Draw a filled 5-point star centred at (cx, cy) with outer radius r.
+function drawCanvasStar(ctx, cx, cy, r, color) {
+  const spikes = 5, inner = r * 0.42
+  ctx.beginPath()
+  for (let i = 0; i < spikes * 2; i++) {
+    const ang = (Math.PI / spikes) * i - Math.PI / 2
+    const rr = i % 2 === 0 ? r : inner
+    const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+  }
+  ctx.closePath()
+  ctx.fillStyle = color
+  ctx.fill()
+}
+
 // ---- Canvas PNG generator for the admin share ----
 async function generateMatchHighlightCardBlob(fixtureId) {
   const d = buildMatchHighlightData(fixtureId)
@@ -3027,16 +3047,15 @@ async function generateMatchHighlightCardBlob(fixtureId) {
 
   const cx = WIDTH / 2
 
-  // Header
-  ctx.textAlign = 'left'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 34px system-ui, sans-serif'
-  ctx.fillText('🏆 WC Predictions', 60, 80)
-  const badge = (fixture.stage || 'Match').toUpperCase()
-  ctx.font = 'bold 24px system-ui, sans-serif'
-  const bw = ctx.measureText(badge).width + 44
-  ctx.fillStyle = '#D4A24C'; roundRect(ctx, WIDTH - 60 - bw, 52, bw, 40, 20); ctx.fill()
-  ctx.fillStyle = '#0B1221'; ctx.textAlign = 'center'; ctx.fillText(badge, WIDTH - 60 - bw / 2, 80)
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '24px system-ui, sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText(fmtMatchDate(fixture.kickoff), cx, 128)
+  // Header — mirror the in-app card: stage + "Highlights" on the left, date on the right.
+  const stageLabel = `🏆 ${fixture.stage || 'Match'} · Highlights`
+  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 34px system-ui, sans-serif'
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+  ctx.fillText(stageLabel, 60, 90)
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - 60, 90)
+  ctx.textBaseline = 'alphabetic'
 
   // Score block with flags
   let y = HEADER_H
@@ -3107,13 +3126,31 @@ async function generateMatchHighlightCardBlob(fixtureId) {
     ctx.textBaseline = 'middle'
     ctx.font = '40px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'
     ctx.fillText(medals[i] || '', 84, cyl)
-    // name + bonus emoji
-    let label = p.name
-    if ((p.combo_bonus || 0) > 0) label += ' ⚡'
-    if ((p.streak_bonus || 0) > 0) label += ' 🔥'
-    if (i === 0 && win) label += '  👑 MVP'
-    ctx.font = 'bold 30px system-ui, sans-serif'; ctx.fillStyle = '#fff'
-    ctx.fillText(truncateForCanvas(ctx, label, 540), 150, cyl)
+    // name + bonus emoji (MVP rendered separately below as a real gold pill)
+    const isMvp = i === 0 && win
+    let nameLabel = p.name
+    if ((p.combo_bonus || 0) > 0) nameLabel += ' ⚡'
+    if ((p.streak_bonus || 0) > 0) nameLabel += ' 🔥'
+    ctx.font = 'bold 30px system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
+    const nameMax = isMvp ? 360 : 540
+    const drawnName = truncateForCanvas(ctx, nameLabel, nameMax)
+    ctx.fillText(drawnName, 150, cyl)
+
+    if (isMvp) {
+      const nameW = ctx.measureText(drawnName).width
+      const pillX = 150 + nameW + 14
+      const pillH = 38, padX = 14, starSize = 20, starGap = 8
+      ctx.font = 'bold 22px system-ui, sans-serif'
+      const labelW = ctx.measureText('MATCH MVP').width
+      const pillW = padX + starSize + starGap + labelW + padX
+      // gold pill
+      ctx.fillStyle = '#D4A24C'
+      roundRect(ctx, pillX, cyl - pillH / 2, pillW, pillH, pillH / 2); ctx.fill()
+      // star + dark label
+      drawCanvasStar(ctx, pillX + padX + starSize / 2, cyl, starSize / 2, '#0B1221')
+      ctx.fillStyle = '#0B1221'; ctx.textAlign = 'left'
+      ctx.fillText('MATCH MVP', pillX + padX + starSize + starGap, cyl + 1)
+    }
     ctx.font = 'bold 34px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'right'
     ctx.fillText(`${p.home} – ${p.away}`, WIDTH - 200, cyl)
     ctx.font = 'bold 28px system-ui, sans-serif'; ctx.fillStyle = win ? '#4ADE80' : '#F87171'
@@ -3130,9 +3167,15 @@ async function generateMatchHighlightCardBlob(fixtureId) {
     roundRect(ctx, 60, panelY, WIDTH - 120, 104, 16); ctx.fill(); ctx.stroke()
     ctx.fillStyle = '#93C5FD'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'left'
     ctx.fillText('🎯 BOLDEST CALL', 88, panelY + 38)
-    ctx.fillStyle = '#fff'; ctx.font = '26px system-ui, sans-serif'
-    const onlyTxt = `${maverick.name} called ${maverick.home}–${maverick.away} — only ${maverickPop} had it`
-    ctx.fillText(truncateForCanvas(ctx, onlyTxt, WIDTH - 260), 88, panelY + 78)
+    // Two-segment draw so the player's name renders bold while the rest is regular weight.
+    const restTxt = ` called ${maverick.home}–${maverick.away} when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did`
+    const textX = 88, textY = panelY + 78
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
+    ctx.font = 'bold 26px system-ui, sans-serif'
+    ctx.fillText(maverick.name, textX, textY)
+    const nameW = ctx.measureText(maverick.name).width
+    ctx.font = '26px system-ui, sans-serif'
+    ctx.fillText(truncateForCanvas(ctx, restTxt, WIDTH - 260 - nameW), textX + nameW, textY)
     ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 30px system-ui, sans-serif'; ctx.textAlign = 'right'
     ctx.fillText(`+${maverick.final_points || 0}`, WIDTH - 88, panelY + 78)
   }
@@ -3158,10 +3201,24 @@ async function shareMatchHighlight(fixtureId) {
 
   const text = `🏆 WC 2026 Prediction League\n${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team} (${f.stage || ''})\n${d.summary.exact} nailed the exact score · ${d.summary.pointsWon} pts won\n\nJoin 👇\nhttps://wcpredictionleague.vercel.app`
 
+  // WhatsApp's share intent silently drops the caption when a file is attached,
+  // so we copy it to the clipboard first — user can long-press paste in the chat.
+  let captionCopied = false
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      captionCopied = true
+    }
+  } catch (e) { console.warn('[shareMatchHighlight] clipboard copy failed:', e) }
+
   if (blob && navigator.canShare) {
     const file = new File([blob], `wcpl-match-${Date.now()}.png`, { type: 'image/png' })
     if (navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'WC 2026 Prediction League', text }); showToast('Shared!', 'success'); return }
+      try {
+        await navigator.share({ files: [file], title: 'WC 2026 Prediction League', text })
+        showToast(captionCopied ? 'Shared · caption copied, long-press to paste' : 'Shared!', 'success')
+        return
+      }
       catch (e) { if (e.name === 'AbortError') return; console.warn('[shareMatchHighlight] native share failed:', e) }
     }
   }
@@ -5135,6 +5192,11 @@ function rankMedalSvg(rank) {
       document.getElementById('app-shell').classList.remove('hidden')
       document.getElementById('preview-banner').classList.remove('hidden')
 
+        // Initialize navigation history for preview mode
+  navHistory = ['predictions']
+  currentNavIndex = 0
+  history.replaceState({ tab: 'predictions', navIndex: 0 }, '', '#predictions')
+
       // Hide stuff that doesn't apply to guests
       document.getElementById('user-name').textContent = 'Guest'
       const logoutBtn = document.querySelector('[onclick="confirmLogout()"]')
@@ -5647,6 +5709,11 @@ async function showApp() {
     document.getElementById('app-shell').classList.remove('hidden')
      subscribeToOwnDeletion()
 
+         // Initialize navigation history
+    navHistory = ['home']
+    currentNavIndex = 0
+    history.replaceState({ tab: 'home', navIndex: 0 }, '', '#home')
+
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
 
@@ -5714,7 +5781,7 @@ window.signOut = async function smoothSignOut() {
     
 // Switch to predictions tab and scroll to a specific fixture
 function switchToFixture(fixtureId) {
-  switchTab('predictions')
+  switchTab('predictions', true)
   // After tab switch and render, scroll to the fixture
   setTimeout(() => {
     const el = document.getElementById(`fixture-${fixtureId}`)
@@ -5728,49 +5795,61 @@ function switchToFixture(fixtureId) {
   }, 150)
 }
 
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
-      const target = document.getElementById(`tab-${tab}`)
-      target.classList.remove('hidden')
-      // re-trigger animation
-      target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
-      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
-      if (tab === 'home') loadHome()
-      if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
-      if (tab === 'predictions') {
-        previewMode ? renderFixtures() : loadFixtures()
-        // Auto-scroll to the first OPEN (predictable) fixture after render
-        setTimeout(() => {
-          const now = new Date()
-          const upcoming = fixtures
-            .filter(f => new Date(f.kickoff) > now && f.home_score === null)
-            .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-          const BATCH_SIZE = 3
-          const BATCH_HOURS = 48
-          const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
-          const openMatchIds = new Set()
-          upcoming.forEach((f, i) => {
-            if (i < BATCH_SIZE) openMatchIds.add(f.id)
-            if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
-          })
-          const firstOpen = upcoming.find(f => openMatchIds.has(f.id))
-          if (firstOpen) {
-            const el = document.getElementById(`fixture-${firstOpen.id}`)
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          }
-        }, 100)
+function switchTab(tab, pushHistory = true) {
+  // Don't push duplicate consecutive entries
+  if (pushHistory && !isNavigatingBack && navHistory[currentNavIndex] !== tab) {
+    // If we navigated back and then switched, truncate forward history
+    if (currentNavIndex < navHistory.length - 1) {
+      navHistory = navHistory.slice(0, currentNavIndex + 1)
+    }
+    navHistory.push(tab)
+    currentNavIndex++
+    // Push to browser history so swipe-back works
+    history.pushState({ tab: tab, navIndex: currentNavIndex }, '', `#${tab}`)
+  }
+
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
+  const target = document.getElementById(`tab-${tab}`)
+  target.classList.remove('hidden')
+  // re-trigger animation
+  target.style.animation = 'none'; target.offsetHeight; target.style.animation = ''
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab))
+  if (tab === 'home') loadHome()
+  if (tab === 'leaderboard') previewMode ? renderPreviewLeaderboard() : loadLeaderboard()
+  if (tab === 'predictions') {
+    previewMode ? renderFixtures() : loadFixtures()
+    // Auto-scroll to the first OPEN (predictable) fixture after render
+    setTimeout(() => {
+      const now = new Date()
+      const upcoming = fixtures
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const BATCH_SIZE = 3
+      const BATCH_HOURS = 48
+      const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
+      const openMatchIds = new Set()
+      upcoming.forEach((f, i) => {
+        if (i < BATCH_SIZE) openMatchIds.add(f.id)
+        if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
+      })
+      const firstOpen = upcoming.find(f => openMatchIds.has(f.id))
+      if (firstOpen) {
+        const el = document.getElementById(`fixture-${firstOpen.id}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
-      if (tab === 'extras' && !previewMode) {
-        if (typeof loadMyLeagues === 'function') loadMyLeagues()
-      }
-      if (tab === 'profile' && !previewMode) {
+    }, 100)
+  }
+  if (tab === 'extras' && !previewMode) {
+    if (typeof loadMyLeagues === 'function') loadMyLeagues()
+  }
+  if (tab === 'profile' && !previewMode) {
     renderBadges()
     updateProfileCards()
   }
-      if (tab !== 'predictions') {
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-      }
-    }
+  if (tab !== 'predictions') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 
     // ============== COPY TO CLIPBOARD ==============
     async function copyToClipboard(text, btn) {
@@ -6469,18 +6548,11 @@ async function adminViewLeague(leagueId) {
     }
     
     activeLeagueId = leagueId;
-    switchTab('leaderboard');
+    switchTab('leaderboard', true);
     showToast('Viewing league as admin', 'info');
 }
 
-function selectLeague(leagueId) {
-    activeLeagueId = activeLeagueId === leagueId ? null : leagueId
-    loadMyLeagues()
-    if (activeLeagueId) {
-        showToast('Switched to league leaderboard', 'success')
-        switchTab('leaderboard')
-    }
-}
+        switchTab('leaderboard', true)
 
 function shareLeagueCode(leagueId, code, name) {
     const appUrl = window.location.origin
