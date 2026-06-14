@@ -718,9 +718,14 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     }
   }
 
-  saveRememberMe(whatsapp, remember)
+   saveRememberMe(whatsapp, remember)
   try {
     await showApp()
+    // Issue starter inventory cards after successful login
+    console.log('[Inventory] About to call checkAndIssueStarterCards, currentUser:', currentUser?.id)
+    if (typeof checkAndIssueStarterCards === 'function') {
+      await checkAndIssueStarterCards()
+    }
   } finally {
     setAuthButtonLoading(false)
   }
@@ -917,6 +922,30 @@ function showPaymentGate() {
         })
         .subscribe()
     }
+
+    // Realtime subscription for inventory feature state
+// Realtime subscription for inventory feature state
+function subscribeToInventorySettings() {
+  supabaseClient
+    .channel('inventory-settings')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'system_settings', filter: 'key=eq.inventory_enabled' },
+      (payload) => {
+        console.log('[Inventory] Settings changed:', payload);
+        // Re-render inventory card with new state
+        renderInventoryCard();
+      }
+    )
+    .subscribe((status) => {
+      console.log('[Inventory] Realtime subscription status:', status);
+    });
+}
+
+// Call this during app initialization
+document.addEventListener('DOMContentLoaded', function() {
+  // ... existing init code ...
+  subscribeToInventorySettings();
+});
 
     async function showNormalApp() {
   previewMode = false;
@@ -5702,14 +5731,13 @@ window.replayChampionCelebration = function() {
   checkAndCelebrateTournamentEnd({ trigger: 'manual', force: true })
 }
 
-
 async function showApp() {
   try {
     document.getElementById('auth-screen').classList.add('hidden')
     document.getElementById('app-shell').classList.remove('hidden')
-     subscribeToOwnDeletion()
-
-         // Initialize navigation history
+    subscribeToOwnDeletion()
+    
+    // Initialize navigation history
     navHistory = ['home']
     currentNavIndex = 0
     history.replaceState({ tab: 'home', navIndex: 0 }, '', '#home')
@@ -5723,8 +5751,11 @@ async function showApp() {
     }
 
     await showNormalApp()
+    
+    // ✅ ADD THIS LINE: Explicitly activate the Home tab in the UI
+    switchTab('home', false)
+
     // After the app is up, check whether the tournament has ended.
-    // Fires the champion celebration if so (once per user, on this device).
     try { checkAndCelebrateTournamentEnd({ trigger: 'app-load' }) } catch (e) { console.error('[champion] check on load failed:', e) }
   } catch (err) {
     console.error('showApp error:', err)
@@ -6560,8 +6591,6 @@ async function adminViewLeague(leagueId) {
     switchTab('leaderboard', true);
     showToast('Viewing league as admin', 'info');
 }
-
-        switchTab('leaderboard', true)
 
 function shareLeagueCode(leagueId, code, name) {
     const appUrl = window.location.origin

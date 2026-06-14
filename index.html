@@ -4604,7 +4604,7 @@
      */
     async function getInventoryFeatureState() {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('system_settings')
           .select('value')
           .eq('key', 'inventory_enabled')
@@ -4628,45 +4628,49 @@
     /**
      * Render the inventory card based on feature state
      */
-    async function renderInventoryCard() {
-      const state = await getInventoryFeatureState();
-      const card = document.getElementById('inventory-card');
-      const liveSection = document.getElementById('inventory-live');
-      const teaserSection = document.getElementById('inventory-teaser');
-      const quickBtn = document.getElementById('quick-inventory-btn');
+/**
+ * Render the inventory card based on feature state
+ */
+async function renderInventoryCard() {
+  const state = await getInventoryFeatureState();
+  const card = document.getElementById('inventory-card');
+  const liveSection = document.getElementById('inventory-live');
+  const teaserSection = document.getElementById('inventory-teaser');
+  const quickBtn = document.getElementById('quick-inventory-btn');
 
-      if (!card) return;
+  if (!card) return;
 
-      // Hide everything first
-      card.classList.add('hidden');
-      if (liveSection) liveSection.classList.add('hidden');
-      if (teaserSection) teaserSection.classList.add('hidden');
-      if (quickBtn) quickBtn.classList.add('hidden');
+  // Always reset first
+  card.classList.add('hidden');
+  if (liveSection) liveSection.classList.add('hidden');
+  if (teaserSection) teaserSection.classList.add('hidden');
+  if (quickBtn) quickBtn.classList.add('hidden');
+  stopTeaserCountdown();
 
-      if (state === 'hidden') {
-        // Completely hidden - card and quick button stay hidden
-        return;
-      }
+  if (state === 'hidden') {
+    // Completely hidden — nothing to show
+    return;
+  }
 
-      // Show the card
-      card.classList.remove('hidden');
-      if (quickBtn) quickBtn.classList.remove('hidden');
+  // Show the card
+  card.classList.remove('hidden');
+  if (quickBtn) quickBtn.classList.remove('hidden');
 
-      if (state === 'teaser') {
-        // Show teaser state
-        if (teaserSection) {
-          teaserSection.classList.remove('hidden');
-          startTeaserCountdown();
-        }
-      } else if (state === 'live') {
-        // Show live state
-        if (liveSection) {
-          liveSection.classList.remove('hidden');
-          await loadPlayerInventory();
-          renderInventoryItems();
-        }
-      }
+  if (state === 'teaser') {
+    // Show teaser state
+    if (teaserSection) {
+      teaserSection.classList.remove('hidden');
+      startTeaserCountdown();
     }
+  } else if (state === 'live' || state === 'true') {
+    // Show live state
+    if (liveSection) {
+      liveSection.classList.remove('hidden');
+      await loadPlayerInventory();
+      renderInventoryItems();
+    }
+  }
+}
 
     // ============================================================
     // TEASER COUNTDOWN
@@ -4729,8 +4733,8 @@
       }
 
       try {
-        const { data, error } = await supabase
-          .from('player_inventory')
+        const { data, error } = await supabaseClient
+  .from('player_inventory')
           .select('card_id, quantity')
           .eq('player_id', currentUser.id);
 
@@ -4824,34 +4828,32 @@
     /**
      * Use an inventory card (placeholder - implement game logic here)
      */
-    async function useInventoryCard(cardId) {
-      const card = INVENTORY_CONFIG.cards[cardId];
-      if (!card) return;
+function useInventoryCard(cardId) {
+  const card = INVENTORY_CONFIG.cards[cardId];
+  if (!card) return;
 
-      // Check if user has the card
-      const currentQty = _inventoryState[cardId] || 0;
-      if (currentQty <= 0) {
-        showToast('You don\'t have any ' + card.name + ' cards', 'error');
-        return;
-      }
+  const currentQty = _inventoryState[cardId] || 0;
+  if (currentQty <= 0) {
+    showToast('You don\'t have any ' + card.name + ' cards', 'error');
+    return;
+  }
 
-      // Show confirmation modal (placeholder - you can customize)
-      showModal(
-        card.emoji + ' Use ' + card.name,
-        'Are you sure you want to use your ' + card.name + ' card? This will apply to your next prediction.',
-        [
-          { text: 'Cancel', style: 'secondary', action: hideModal },
-          { 
-            text: 'Use Card', 
-            style: 'primary', 
-            action: async function() {
-              hideModal();
-              await consumeInventoryCard(cardId);
-            }
-          }
-        ]
-      );
-    }
+  showModal({
+    icon: card.emoji,
+    title: 'Use ' + card.name,
+    message: 'Are you sure you want to use your ' + card.name + ' card? This will apply to your next prediction.',
+    actions: [
+      { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+      { text: 'Use Card', onclick: "confirmUseCard('" + cardId + "')", class: 'bg-brand-900 text-white' }
+    ]
+  });
+}
+
+// Separate function to handle the actual card consumption
+async function confirmUseCard(cardId) {
+  hideModal();
+  await consumeInventoryCard(cardId);
+}
 
     /**
      * Consume one card from inventory
@@ -4861,8 +4863,8 @@
 
       try {
         // Decrement in Supabase
-        const { error } = await supabase
-          .from('player_inventory')
+        const { error } = await supabaseClient
+  .from('player_inventory')
           .update({ 
             quantity: _inventoryState[cardId] - 1,
             used_at: new Date().toISOString()
@@ -4912,8 +4914,8 @@
 
       try {
         // Check if already issued
-        const { data: existing, error: checkError } = await supabase
-          .from('player_inventory')
+        const { data: existing, error: checkError } = await supabaseClient
+  .from('player_inventory')
           .select('card_id')
           .eq('player_id', playerId)
           .in('card_id', ['double_points', 'streak_saver']);
@@ -4948,8 +4950,8 @@
           }
         ];
 
-        const { error: insertError } = await supabase
-          .from('player_inventory')
+        const { error: insertError } = await supabaseClient
+  .from('player_inventory')
           .insert(inserts);
 
         if (insertError) {

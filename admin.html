@@ -155,29 +155,6 @@
     .split-sum-bad { color: #B91C1C; }
   </style>
 <base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -991,17 +968,29 @@ function renderInventoryButtons() {
 
 async function setInventoryState(newState) {
   try {
-    const { error } = await supabaseClient
+    // First try to update the existing row
+    let { data, error } = await supabaseClient
       .from('system_settings')
-      .upsert(
-        { 
+      .update({ 
+        key: 'inventory_enabled', 
+        value: newState, 
+        description: 'Your Inventory: false=hidden, teaser=locked preview, true=live',
+        updated_at: new Date().toISOString()
+      })
+      .eq('key', 'inventory_enabled')
+    
+    // If no row was updated (doesn't exist yet), insert it
+    if (!error && data?.length === 0) {
+      const { error: insertError } = await supabaseClient
+        .from('system_settings')
+        .insert({ 
           key: 'inventory_enabled', 
           value: newState, 
           description: 'Your Inventory: false=hidden, teaser=locked preview, true=live',
           updated_at: new Date().toISOString()
-        },
-        { onConflict: 'key' }
-      )
+        })
+      error = insertError
+    }
     
     if (error) throw error
     
@@ -1011,9 +1000,7 @@ async function setInventoryState(newState) {
     const labels = { 'false': 'Hidden', 'teaser': 'Teaser', 'true': 'Live' }
     showToast(`Inventory set to ${labels[newState]}`, 'success')
     
-    // If switching to live for the first time, trigger starter pack issuance
     if (newState === 'true') {
-      // This will be handled by the app layer when players first visit
       showToast('Players will receive starter packs on next app load', 'info')
     }
   } catch (e) {
