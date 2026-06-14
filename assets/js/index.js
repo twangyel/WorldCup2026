@@ -2328,10 +2328,12 @@ recentEl.innerHTML = finished.map(f => {
     function switchLbSubtab(tab) {
       if (tab === lbSubtab) return
       lbSubtab = tab
-      document.getElementById('lb-subtab-overall').classList.toggle('active', tab === 'overall')
-      document.getElementById('lb-subtab-overall').setAttribute('aria-selected', tab === 'overall')
-      document.getElementById('lb-subtab-matchday').classList.toggle('active', tab === 'matchday')
-      document.getElementById('lb-subtab-matchday').setAttribute('aria-selected', tab === 'matchday')
+      ;['overall', 'matchday', 'highlights'].forEach(t => {
+        const el = document.getElementById('lb-subtab-' + t)
+        if (!el) return
+        el.classList.toggle('active', tab === t)
+        el.setAttribute('aria-selected', tab === t ? 'true' : 'false')
+      })
       loadLeaderboard()
     }
 
@@ -2626,27 +2628,36 @@ async function shareLeaderboard() {
 // dot pattern). Returns a Blob ready for navigator.share or download.
 async function generateLeaderboardCardBlob(stats, subtab) {
   const WIDTH = 1080
-  // Show up to top 12 rows. Card height scales with row count so smaller
-  // leagues don't get a half-empty image.
-  const MAX_ROWS = 12
+  const MAX_ROWS = 40                                   // show everyone, with headroom
   const rowsToShow = Math.min(stats.length, MAX_ROWS)
+  const showTrend = subtab !== 'matchday'               // trend only valid on overall
 
-  // Layout constants
-  const HEADER_H = 220
-  const PROGRESS_H = 90
-  const PODIUM_H = 360
-  const ROW_H = 92
-  const FOOTER_H = 120
-  const podiumRows = Math.min(3, rowsToShow)
-  const listRows = Math.max(0, rowsToShow - podiumRows)
-  const HEIGHT = HEADER_H + PROGRESS_H + (podiumRows > 0 ? PODIUM_H : 0) + (listRows * ROW_H) + FOOTER_H + 40
+  // ----- Layout constants -----
+  const HEADER_H = 200
+  const PROGRESS_H = 78
+  const ROW_H = 60
+  const FOOTER_H = 110
+  const PAD = 30
+
+  // Two columns: left holds the first half (incl. top 3), right holds the rest.
+  const half = Math.ceil(rowsToShow / 2)
+  const colRows = half                                  // tallest column = left
+  const LIST_H = colRows * ROW_H
+
+  // Column geometry
+  const SIDE = 50
+  const COL_GAP = 30
+  const colW = (WIDTH - SIDE * 2 - COL_GAP) / 2         // 475 at 1080
+  const colX = [SIDE, SIDE + colW + COL_GAP]            // left edge of each column
+
+  const HEIGHT = HEADER_H + PROGRESS_H + LIST_H + FOOTER_H + PAD
 
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = HEIGHT
   const ctx = canvas.getContext('2d')
 
-  // ===== Background: deep navy gradient (matches achievement cards) =====
+  // ===== Background: deep navy gradient =====
   const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
   bgGrad.addColorStop(0, '#0B1221')
   bgGrad.addColorStop(0.5, '#152849')
@@ -2654,13 +2665,11 @@ async function generateLeaderboardCardBlob(stats, subtab) {
   ctx.fillStyle = bgGrad
   ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
-  // Subtle dot pattern overlay
+  // Subtle dot pattern
   ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
-  for (let y = 0; y < HEIGHT; y += 32) {
-    for (let x = 0; x < WIDTH; x += 32) {
-      ctx.beginPath()
-      ctx.arc(x, y, 1.5, 0, Math.PI * 2)
-      ctx.fill()
+  for (let yy = 0; yy < HEIGHT; yy += 32) {
+    for (let xx = 0; xx < WIDTH; xx += 32) {
+      ctx.beginPath(); ctx.arc(xx, yy, 1.5, 0, Math.PI * 2); ctx.fill()
     }
   }
 
@@ -2679,15 +2688,10 @@ async function generateLeaderboardCardBlob(stats, subtab) {
   ctx.textAlign = 'center'
   ctx.fillText('🏆  WC 2026 PREDICTION LEAGUE', cx, 90)
 
-  // Decorative line
   ctx.strokeStyle = 'rgba(212, 162, 76, 0.4)'
   ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(cx - 220, 115)
-  ctx.lineTo(cx + 220, 115)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx - 220, 115); ctx.lineTo(cx + 220, 115); ctx.stroke()
 
-  // Subtitle: which leaderboard view
   ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 56px system-ui, -apple-system, sans-serif'
   ctx.fillText(subtab === 'matchday' ? 'Matchday Standings' : 'Overall Standings', cx, 180)
@@ -2709,134 +2713,104 @@ async function generateLeaderboardCardBlob(stats, subtab) {
     ctx.textAlign = 'right'
     ctx.fillText(`${Math.round(pct * 100)}%`, WIDTH - 80, progressY + 10)
 
-    // Progress bar
-    const barY = progressY + 35
-    const barX = 80
-    const barW = WIDTH - 160
-    const barH = 10
-    // Track
+    const barY = progressY + 35, barX = 80, barW = WIDTH - 160, barH = 10
     ctx.fillStyle = 'rgba(255, 255, 255, 0.10)'
-    roundRect(ctx, barX, barY, barW, barH, 5)
-    ctx.fill()
-    // Fill
+    roundRect(ctx, barX, barY, barW, barH, 5); ctx.fill()
     const fillGrad = ctx.createLinearGradient(barX, barY, barX + barW, barY)
-    fillGrad.addColorStop(0, '#F4C430')
-    fillGrad.addColorStop(1, '#D4A24C')
+    fillGrad.addColorStop(0, '#F4C430'); fillGrad.addColorStop(1, '#D4A24C')
     ctx.fillStyle = fillGrad
-    roundRect(ctx, barX, barY, Math.max(8, barW * pct), barH, 5)
-    ctx.fill()
+    roundRect(ctx, barX, barY, Math.max(8, barW * pct), barH, 5); ctx.fill()
   }
 
-  // ===== Top 3 podium =====
-  let y = HEADER_H + PROGRESS_H
-  if (podiumRows > 0) {
-    const medals = ['🥇', '🥈', '🥉']
-    const medalColors = ['#F4C430', '#C0C0C0', '#CD7F32']
-    // Show top 3 as three big tiles side by side. Order them as 2-1-3 visually
-    // (silver-left, gold-center, bronze-right) like a real Olympic podium.
-    const podiumOrder = podiumRows === 3 ? [1, 0, 2] : [0, 1, 2].slice(0, podiumRows)
-    const tileW = (WIDTH - 200) / podiumRows
-    const baseX = 100
-    podiumOrder.forEach((idx, pos) => {
-      const s = stats[idx]
-      if (!s) return
-      const x = baseX + (pos * tileW) + (tileW / 2)
-      // Center tile is taller / bigger for #1
-      const isFirst = idx === 0
-      const tileTop = y + 30 + (isFirst ? 0 : 40)
+  // ===== Two-column rows =====
+  const listTop = HEADER_H + PROGRESS_H
+  const medals = ['🥇', '🥈', '🥉']
 
-      // Card background — soft white panel
-      const cardY = tileTop + 80
-      const cardH = 200
-      const cardW = tileW - 30
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
-      ctx.strokeStyle = medalColors[idx] + '80'
-      ctx.lineWidth = 2
-      roundRect(ctx, x - cardW / 2, cardY, cardW, cardH, 18)
-      ctx.fill()
-      ctx.stroke()
+  for (let i = 0; i < rowsToShow; i++) {
+    const s = stats[i]
+    if (!s) continue
+    const rank = i + 1
+    const top3 = i < 3
 
-      // Medal
-      ctx.font = `${isFirst ? 100 : 80}px system-ui, -apple-system, sans-serif`
-      ctx.textAlign = 'center'
-      ctx.fillText(medals[idx], x, tileTop + (isFirst ? 90 : 80))
+    // Place: first `half` go in column 0, the rest in column 1.
+    const col = i < half ? 0 : 1
+    const idxInCol = i < half ? i : i - half
+    const xBase = colX[col]
+    const rowY = listTop + idxInCol * ROW_H
+    const cyl = rowY + ROW_H / 2
 
-      // Name (truncate if too long)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = `bold ${isFirst ? 30 : 26}px system-ui, -apple-system, sans-serif`
-      const name = truncateForCanvas(ctx, s.name || 'Anonymous', cardW - 30)
-      ctx.fillText(name, x, cardY + 70)
-
-      // Stats
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
-      ctx.font = '22px system-ui, -apple-system, sans-serif'
-      ctx.fillText(`${s.exact || 0} exact · ${s.points || 0} pts`, x, cardY + 110)
-
-      // Points (big)
-      ctx.fillStyle = medalColors[idx]
-      ctx.font = `bold ${isFirst ? 56 : 46}px system-ui, -apple-system, sans-serif`
-      ctx.fillText(`${s.points || 0}`, x, cardY + 175)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
-      ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
-      ctx.fillText('PTS', x, cardY + 195)
-    })
-    y += PODIUM_H
-  }
-
-  // ===== Ranks 4 to N — list rows =====
-  if (listRows > 0) {
-    for (let i = podiumRows; i < rowsToShow; i++) {
-      const s = stats[i]
-      if (!s) continue
-      const rank = i + 1
-      const rowY = y
-
-      // Row background panel
+    // Row panel
+    if (top3) {
+      ctx.fillStyle = 'rgba(212, 162, 76, 0.13)'
+      ctx.strokeStyle = 'rgba(212, 162, 76, 0.45)'
+    } else {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.06)'
-      roundRect(ctx, 80, rowY + 8, WIDTH - 160, ROW_H - 16, 14)
-      ctx.fill()
-
-      // Rank number tile
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'
-      roundRect(ctx, 100, rowY + 22, 56, 56, 12)
-      ctx.fill()
-      ctx.fillStyle = '#D4A24C'
-      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(String(rank), 128, rowY + 60)
-
-      // Name
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 30px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'left'
-      const nameMax = WIDTH - 100 - 56 - 24 - 180 - 100 // leave room for points
-      const name = truncateForCanvas(ctx, s.name || 'Anonymous', nameMax)
-      ctx.fillText(name, 180, rowY + 48)
-
-      // Stats line below name
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
-      ctx.font = '22px system-ui, -apple-system, sans-serif'
-      const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
-      ctx.fillText(`${correct} correct · ${s.exact || 0} exact`, 180, rowY + 78)
-
-      // Points (right)
-      ctx.fillStyle = '#D4A24C'
-      ctx.font = 'bold 40px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'right'
-      ctx.fillText(String(s.points || 0), WIDTH - 110, rowY + 56)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
-      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif'
-      ctx.fillText('PTS', WIDTH - 110, rowY + 80)
-
-      y += ROW_H
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0)'
     }
+    ctx.lineWidth = 1.5
+    roundRect(ctx, xBase, rowY + 4, colW, ROW_H - 8, 10)
+    ctx.fill()
+    if (top3) ctx.stroke()
+
+    ctx.textBaseline = 'middle'
+
+    // Rank slot (medal for top 3, else number tile)
+    ctx.textAlign = 'center'
+    if (top3) {
+      ctx.font = '30px system-ui, -apple-system, sans-serif'
+      ctx.fillText(medals[i], xBase + 26, cyl)
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'
+      roundRect(ctx, xBase + 8, cyl - 18, 40, 36, 9); ctx.fill()
+      ctx.fillStyle = '#D4A24C'
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif'
+      ctx.fillText(String(rank), xBase + 28, cyl)
+    }
+
+    // Trend chip
+    const trendX = xBase + 56
+    ctx.textAlign = 'left'
+    if (showTrend) {
+      const tr = (typeof lbTrendMap !== 'undefined' && lbTrendMap) ? lbTrendMap[s.user_id || s.id] : null
+      if (tr && tr.dir === 'up') {
+        ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
+        ctx.fillText('▲' + tr.delta, trendX, cyl)
+      } else if (tr && tr.dir === 'down') {
+        ctx.fillStyle = '#F87171'; ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
+        ctx.fillText('▼' + tr.delta, trendX, cyl)
+      } else if (tr && tr.dir === 'new') {
+        ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 16px system-ui, -apple-system, sans-serif'
+        ctx.fillText('NEW', trendX, cyl)
+      } else {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)'; ctx.font = '20px system-ui, -apple-system, sans-serif'
+        ctx.fillText('–', trendX + 4, cyl)
+      }
+    }
+
+    // Name (truncated to leave room for points)
+    const nameX = xBase + 104
+    const pointsRight = xBase + colW - 14
+    const nameMax = (pointsRight - 46) - nameX
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'left'
+    const name = truncateForCanvas(ctx, s.name || 'Anonymous', nameMax)
+    ctx.fillText(name, nameX, cyl)
+
+    // Points (right of column)
+    ctx.fillStyle = top3 ? '#F4C430' : '#D4A24C'
+    ctx.font = 'bold 32px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(String(s.points || 0), pointsRight, cyl)
+
+    ctx.textBaseline = 'alphabetic'
   }
 
   // ===== Footer =====
   const footerY = HEIGHT - 70
+  ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
   ctx.font = '24px system-ui, -apple-system, sans-serif'
-  ctx.textAlign = 'center'
   ctx.fillText('Think you can do better? Join the league:', cx, footerY - 30)
   ctx.fillStyle = '#D4A24C'
   ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
@@ -2848,6 +2822,359 @@ async function generateLeaderboardCardBlob(stats, subtab) {
       else reject(new Error('toBlob returned null'))
     }, 'image/png', 0.95)
   })
+}
+
+
+// ---- Fallback 3-letter code for canvas when a flag image can't load ----
+function teamCodeFallback(name) {
+  if (!name) return '?'
+  const w = name.trim().split(/\s+/)
+  if (w.length >= 2) return (w[0][0] + w[1][0] + (w[1][1] || '')).toUpperCase()
+  return name.slice(0, 3).toUpperCase()
+}
+
+// Format a kickoff ISO string as "SUN 14 JUN 2026"
+function fmtMatchDate(iso) {
+  const d = new Date(iso)
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT']
+  const mons = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+  return `${days[d.getDay()]} ${d.getDate()} ${mons[d.getMonth()]} ${d.getFullYear()}`
+}
+
+// Build everything the highlight card needs from data already in memory.
+// Returns null if the fixture isn't finished.
+function buildMatchHighlightData(fixtureId) {
+  const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
+    .find(f => f.id === fixtureId)
+  if (!fixture || fixture.home_score === null || fixture.away_score === null) return null
+
+  const picks = (hotTakesByFixture[fixtureId] || []) // sorted by final_points desc when finished
+  const exact = picks.filter(p => p.base_points === 5).length
+  const correctResult = picks.filter(p => p.base_points === 2 || p.base_points === 3).length
+  const pointsWon = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
+  const topPicks = picks.slice(0, 3)
+
+  // Maverick / biggest upset: the scorer whose exact scoreline was predicted by
+  // the fewest players. Exclude the MVP (top pick) when 2+ players scored, so we
+  // don't surface the same person twice.
+  let maverick = null, maverickPop = 0
+  const scorers = picks.filter(p => (p.final_points || 0) > 0)
+  if (scorers.length) {
+    const freq = {}
+    picks.forEach(p => { const k = p.home + '-' + p.away; freq[k] = (freq[k] || 0) + 1 })
+    const pool = scorers.length >= 2 ? scorers.filter(p => p !== topPicks[0]) : scorers
+    maverick = pool.slice().sort((a, b) => {
+      const fa = freq[a.home + '-' + a.away], fb = freq[b.home + '-' + b.away]
+      if (fa !== fb) return fa - fb
+      return (b.final_points || 0) - (a.final_points || 0)
+    })[0] || null
+    if (maverick) maverickPop = freq[maverick.home + '-' + maverick.away]
+  }
+
+  return {
+    fixture,
+    summary: { predictions: picks.length, exact, correctResult, pointsWon },
+    topPicks,
+    maverick,
+    maverickPop
+  }
+}
+
+// Small bonus chips (🔥 streak, ⚡ combo) for a pick.
+function bonusChips(p) {
+  let s = ''
+  if ((p.combo_bonus || 0) > 0) s += '<span style="margin-left:5px;">⚡</span>'
+  if ((p.streak_bonus || 0) > 0) s += '<span style="margin-left:3px;">🔥</span>'
+  return s
+}
+
+// ---- DOM renderer: the in-app Highlights tab (view-only; admin gets share) ----
+async function renderMatchHighlights() {
+  const c = document.getElementById('leaderboard-list')
+  if (!c) return
+  c.innerHTML = '<div class="skel h-40 rounded-2xl"></div>'
+
+  try {
+    if (!Object.keys(hotTakesByFixture).length && typeof refreshSocialCaches === 'function') {
+      await refreshSocialCaches()
+    }
+  } catch (e) { console.warn('[highlights] refresh failed:', e) }
+
+  const all = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
+  const finished = all
+    .filter(f => f.home_score !== null && f.away_score !== null)
+    .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
+
+  if (!finished.length) {
+    c.innerHTML = '<div style="text-align:center; padding:40px 16px; color:rgba(255,255,255,.5);">No finished matches yet.</div>'
+    return
+  }
+
+  const admin = (typeof isAdmin === 'function') ? isAdmin() : false
+  const medals = ['🥇', '🥈', '🥉']
+
+  c.innerHTML = finished.map(f => {
+    const d = buildMatchHighlightData(f.id)
+    if (!d) return ''
+    const { fixture, summary, topPicks, maverick, maverickPop } = d
+
+    const topRows = topPicks.map((p, i) => {
+      const win = (p.final_points || 0) > 0
+      const mvp = i === 0 && win
+        ? '<span style="margin-left:6px; background:#D4A24C; color:#0B1221; font-size:9px; font-weight:700; padding:1px 6px; border-radius:8px;">👑 Match MVP</span>'
+        : ''
+      return `<div style="display:flex; align-items:center; gap:8px; padding:7px 9px; margin:3px 0; border-radius:8px; background:${win ? 'rgba(212,162,76,.13)' : 'rgba(255,255,255,.05)'}; ${win ? 'border:1px solid rgba(212,162,76,.4);' : ''}">
+        <span style="font-size:14px;">${medals[i] || ''}</span>
+        <span style="flex:1; color:#fff; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.name}${bonusChips(p)}${mvp}</span>
+        <span style="color:rgba(255,255,255,.85); font-size:14px; font-weight:700;">${p.home}&nbsp;–&nbsp;${p.away}</span>
+        <span style="color:${win ? '#4ADE80' : '#F87171'}; font-size:11px; font-weight:700; width:34px; text-align:right;">+${p.final_points || 0}</span>
+      </div>`
+    }).join('')
+
+    const upsetBlock = maverick
+      ? `<div style="margin-top:8px; padding:9px 11px; border-radius:10px; background:rgba(96,165,250,.12); border:1px solid rgba(96,165,250,.35);">
+          <div style="color:#93C5FD; font-size:10px; font-weight:700; letter-spacing:.5px; margin-bottom:3px;">🎯 BOLDEST CALL</div>
+          <div style="color:#fff; font-size:12px;"><b>${maverick.name}</b> called <b>${maverick.home}–${maverick.away}</b> when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did · <span style="color:#4ADE80; font-weight:700;">+${maverick.final_points || 0}</span></div>
+        </div>`
+      : ''
+
+    const shareBtn = admin
+      ? `<button onclick="shareMatchHighlight('${f.id}')" style="width:100%; margin-top:10px; background:#D4A24C; color:#0B1221; font-weight:700; font-size:14px; border:none; border-radius:12px; padding:12px; cursor:pointer;">📤 Share to WhatsApp</button>`
+      : ''
+
+    return `<div style="background:linear-gradient(135deg,#0B1221,#152849); border:1px solid rgba(212,162,76,.18); border-radius:18px; padding:16px; margin-bottom:14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="color:#D4A24C; font-size:13px; font-weight:700;">🏆 ${fixture.stage || 'Match'}</span>
+        <span style="color:rgba(255,255,255,.5); font-size:10px; letter-spacing:.5px;">${fmtMatchDate(fixture.kickoff)}</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:18px; padding:14px 0 8px;">
+        <div style="text-align:center; display:flex; flex-direction:column; align-items:center; gap:5px;">
+          ${flagHtml(fixture.home_team, 32)}
+          <div style="color:#fff; font-size:11px;">${fixture.home_team}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="color:#F4C430; font-size:36px; font-weight:800; line-height:1;">${fixture.home_score} <span style="color:rgba(255,255,255,.3);">–</span> ${fixture.away_score}</div>
+          <div style="color:#4ADE80; font-size:10px; font-weight:700; margin-top:3px;">FULL TIME</div>
+        </div>
+        <div style="text-align:center; display:flex; flex-direction:column; align-items:center; gap:5px;">
+          ${flagHtml(fixture.away_team, 32)}
+          <div style="color:#fff; font-size:11px;">${fixture.away_team}</div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-around; padding:12px 4px; margin:8px 0; border-top:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08);">
+        <div style="text-align:center;"><div style="color:#fff; font-size:18px; font-weight:700;">${summary.predictions}</div><div style="color:rgba(255,255,255,.45); font-size:9px;">PREDICTIONS</div></div>
+        <div style="text-align:center;"><div style="color:#fff; font-size:18px; font-weight:700;">${summary.exact}</div><div style="color:rgba(255,255,255,.45); font-size:9px;">EXACT</div></div>
+        <div style="text-align:center;"><div style="color:#fff; font-size:18px; font-weight:700;">${summary.correctResult}</div><div style="color:rgba(255,255,255,.45); font-size:9px;">RESULT</div></div>
+        <div style="text-align:center;"><div style="color:#F4C430; font-size:18px; font-weight:700;">${summary.pointsWon}</div><div style="color:rgba(255,255,255,.45); font-size:9px;">POINTS</div></div>
+      </div>
+      <div style="color:#D4A24C; font-size:11px; font-weight:700; letter-spacing:.5px; margin:6px 0;">⚡ TOP PREDICTIONS</div>
+      ${topRows || '<div style="color:rgba(255,255,255,.4); font-size:12px; padding:4px 0;">No predictions.</div>'}
+      ${upsetBlock}
+      ${shareBtn}
+    </div>`
+  }).join('')
+}
+
+// Load a flag PNG for canvas use (CORS-safe so toBlob still works). Resolves null on failure.
+function loadFlagImage(url) {
+  return new Promise(res => {
+    if (!url) return res(null)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => res(img)
+    img.onerror = () => res(null)
+    img.src = url
+  })
+}
+
+// ---- Canvas PNG generator for the admin share ----
+async function generateMatchHighlightCardBlob(fixtureId) {
+  const d = buildMatchHighlightData(fixtureId)
+  if (!d) throw new Error('Fixture not finished or not found')
+  const { fixture, summary, topPicks, maverick, maverickPop } = d
+
+  // Preload both flags (hi-res). getFlag is defined at the top of this file.
+  const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
+  const [homeImg, awayImg] = await Promise.all([
+    loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
+    loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
+  ])
+
+  const WIDTH = 1080
+  const ROW_H = 84
+  const HEADER_H = 150
+  const SCORE_H = 250
+  const STATS_H = 130
+  const SEC_LABEL = 56
+  const UPSET_H = maverick ? 140 : 0
+  const FOOTER_H = 80
+  const topRows = topPicks.length
+  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL + topRows * ROW_H + UPSET_H + FOOTER_H + 30
+
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH; canvas.height = HEIGHT
+  const ctx = canvas.getContext('2d')
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
+  bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'
+  for (let y = 0; y < HEIGHT; y += 32) for (let x = 0; x < WIDTH; x += 32) { ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill() }
+  const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
+  glow.addColorStop(0, 'rgba(212,162,76,0.30)'); glow.addColorStop(1, 'rgba(212,162,76,0)')
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  const cx = WIDTH / 2
+
+  // Header
+  ctx.textAlign = 'left'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 34px system-ui, sans-serif'
+  ctx.fillText('🏆 WC Predictions', 60, 80)
+  const badge = (fixture.stage || 'Match').toUpperCase()
+  ctx.font = 'bold 24px system-ui, sans-serif'
+  const bw = ctx.measureText(badge).width + 44
+  ctx.fillStyle = '#D4A24C'; roundRect(ctx, WIDTH - 60 - bw, 52, bw, 40, 20); ctx.fill()
+  ctx.fillStyle = '#0B1221'; ctx.textAlign = 'center'; ctx.fillText(badge, WIDTH - 60 - bw / 2, 80)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '24px system-ui, sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText(fmtMatchDate(fixture.kickoff), cx, 128)
+
+  // Score block with flags
+  let y = HEADER_H
+  const flagY = y + 56, fw = 96, fh = 64
+  const leftX = cx - 240, rightX = cx + 240
+
+  function drawFlag(img, name, x) {
+    if (img) {
+      ctx.save()
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.clip()
+      ctx.drawImage(img, x - fw / 2, flagY, fw, fh)
+      ctx.restore()
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.stroke()
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(x, flagY + fh / 2, 50, 0, Math.PI * 2); ctx.stroke()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 32px system-ui, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(teamCodeFallback(name), x, flagY + fh / 2)
+      ctx.textBaseline = 'alphabetic'
+    }
+    ctx.fillStyle = '#fff'; ctx.font = '26px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(truncateForCanvas(ctx, name, 300), x, flagY + fh + 40)
+  }
+  drawFlag(homeImg, fixture.home_team, leftX)
+  drawFlag(awayImg, fixture.away_team, rightX)
+
+  ctx.fillStyle = '#F4C430'; ctx.font = 'bold 92px system-ui, sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
+  ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 24px system-ui, sans-serif'
+  ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 60)
+
+  // Summary stats
+  y = HEADER_H + SCORE_H
+  const stats = [
+    ['PREDICTIONS', summary.predictions, '#fff'],
+    ['EXACT', summary.exact, '#fff'],
+    ['RESULT', summary.correctResult, '#fff'],
+    ['POINTS', summary.pointsWon, '#F4C430']
+  ]
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(WIDTH - 60, y); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(60, y + STATS_H - 10); ctx.lineTo(WIDTH - 60, y + STATS_H - 10); ctx.stroke()
+  const stepW = (WIDTH - 120) / 4
+  stats.forEach((st, i) => {
+    const sx = 60 + stepW * i + stepW / 2
+    ctx.fillStyle = st[2]; ctx.font = 'bold 52px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(String(st[1]), sx, y + 58)
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 20px system-ui, sans-serif'
+    ctx.fillText(st[0], sx, y + 92)
+  })
+
+  // Top predictions
+  y = HEADER_H + SCORE_H + STATS_H
+  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('⚡ TOP PREDICTIONS', 60, y + 36)
+  y += SEC_LABEL
+  const medals = ['🥇', '🥈', '🥉']
+  topPicks.forEach((p, i) => {
+    const win = (p.final_points || 0) > 0
+    const rowY = y + i * ROW_H
+    ctx.fillStyle = win ? 'rgba(212,162,76,0.13)' : 'rgba(255,255,255,0.05)'
+    ctx.strokeStyle = win ? 'rgba(212,162,76,0.45)' : 'rgba(255,255,255,0)'
+    ctx.lineWidth = 1.5
+    roundRect(ctx, 60, rowY + 8, WIDTH - 120, ROW_H - 16, 14); ctx.fill(); if (win) ctx.stroke()
+    const cyl = rowY + ROW_H / 2
+    ctx.textBaseline = 'middle'
+    ctx.font = '40px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'
+    ctx.fillText(medals[i] || '', 84, cyl)
+    // name + bonus emoji
+    let label = p.name
+    if ((p.combo_bonus || 0) > 0) label += ' ⚡'
+    if ((p.streak_bonus || 0) > 0) label += ' 🔥'
+    if (i === 0 && win) label += '  👑 MVP'
+    ctx.font = 'bold 30px system-ui, sans-serif'; ctx.fillStyle = '#fff'
+    ctx.fillText(truncateForCanvas(ctx, label, 540), 150, cyl)
+    ctx.font = 'bold 34px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'right'
+    ctx.fillText(`${p.home} – ${p.away}`, WIDTH - 200, cyl)
+    ctx.font = 'bold 28px system-ui, sans-serif'; ctx.fillStyle = win ? '#4ADE80' : '#F87171'
+    ctx.fillText(`+${p.final_points || 0}`, WIDTH - 84, cyl)
+    ctx.textBaseline = 'alphabetic'
+  })
+
+  // Biggest upset
+  y += topRows * ROW_H
+  if (maverick) {
+    const panelY = y + 12
+    ctx.fillStyle = 'rgba(96,165,250,0.12)'
+    ctx.strokeStyle = 'rgba(96,165,250,0.4)'; ctx.lineWidth = 1.5
+    roundRect(ctx, 60, panelY, WIDTH - 120, 104, 16); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = '#93C5FD'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText('🎯 BOLDEST CALL', 88, panelY + 38)
+    ctx.fillStyle = '#fff'; ctx.font = '26px system-ui, sans-serif'
+    const onlyTxt = `${maverick.name} called ${maverick.home}–${maverick.away} — only ${maverickPop} had it`
+    ctx.fillText(truncateForCanvas(ctx, onlyTxt, WIDTH - 260), 88, panelY + 78)
+    ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 30px system-ui, sans-serif'; ctx.textAlign = 'right'
+    ctx.fillText(`+${maverick.final_points || 0}`, WIDTH - 88, panelY + 78)
+  }
+
+  // Footer
+  ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 28px system-ui, sans-serif'
+  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
+  })
+}
+
+// ---- Admin share (mirrors shareLeaderboard's 3-path fallback) ----
+async function shareMatchHighlight(fixtureId) {
+  const d = buildMatchHighlightData(fixtureId)
+  if (!d) { showToast('Match not finished yet', 'info'); return }
+  const f = d.fixture
+
+  let blob = null
+  try { blob = await generateMatchHighlightCardBlob(fixtureId) }
+  catch (e) { console.warn('[shareMatchHighlight] image gen failed:', e) }
+
+  const text = `🏆 WC 2026 Prediction League\n${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team} (${f.stage || ''})\n${d.summary.exact} nailed the exact score · ${d.summary.pointsWon} pts won\n\nJoin 👇\nhttps://wcpredictionleague.vercel.app`
+
+  if (blob && navigator.canShare) {
+    const file = new File([blob], `wcpl-match-${Date.now()}.png`, { type: 'image/png' })
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'WC 2026 Prediction League', text }); showToast('Shared!', 'success'); return }
+      catch (e) { if (e.name === 'AbortError') return; console.warn('[shareMatchHighlight] native share failed:', e) }
+    }
+  }
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `wcpl-match-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('Image saved · attach it in WhatsApp', 'success')
+    setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'), 250)
+    return
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
 }
 
 // Canvas helper: rounded rectangle path (canvas roundRect isn't universal yet)
@@ -2958,6 +3285,12 @@ function computeRowHint(s, rank, prevPlayer) {
 async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
+
+      if (lbSubtab === 'highlights') {
+        document.getElementById('lb-subtab-meta').textContent = ''
+        await renderMatchHighlights()
+        return
+      }
 
       // Fetch core stats for current sub-tab in parallel with enrichments
       let overallRes, streaks, prizeBd
