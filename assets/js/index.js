@@ -5713,6 +5713,12 @@ async function showApp() {
     navHistory = ['home']
     currentNavIndex = 0
     history.replaceState({ tab: 'home', navIndex: 0 }, '', '#home')
+    // Ensure the visible tab matches the URL on every launch. Without this,
+    // background work in showNormalApp() (parallel loadLeaderboard, subtab DOM
+    // updates) could leave a non-home tab visible at launch on some devices.
+    if (typeof switchTab === 'function') {
+      try { switchTab('home', false) } catch (_) {}
+    }
 
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
@@ -5850,55 +5856,6 @@ function switchTab(tab, pushHistory = true) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
-
-// ===========================================================================
-// Back-button handler
-// ---------------------------------------------------------------------------
-// switchTab() pushes a hash into history on every tab change, but there was
-// no popstate listener — so the device/browser back button silently popped
-// hashes without updating the UI, eventually closing the app. This handler
-// fills the gap, and also closes any open modal/sheet on back instead of
-// navigating tabs under it. The `isNavigatingBack` flag (already declared
-// near the top of this file) prevents the responding switchTab call from
-// pushing a fresh state and ping-ponging.
-// ===========================================================================
-function findOpenModalCloser() {
-  const map = [
-    ['modal-overlay',        typeof hideModal === 'function' ? hideModal : null],
-    ['rules-overlay',        typeof hideRulesSheet === 'function' ? hideRulesSheet : null],
-    ['league-modal-overlay', typeof hideLeagueModal === 'function' ? hideLeagueModal : null],
-    ['ask-admin-overlay',    typeof hideAskAdminModal === 'function' ? hideAskAdminModal : null],
-  ]
-  for (const [id, fn] of map) {
-    const el = document.getElementById(id)
-    if (el && !el.classList.contains('hidden') && fn) return fn
-  }
-  // H2H modal lives in the DOM only while open.
-  const h2h = document.getElementById('h2h-modal')
-  if (h2h && typeof hideH2HModal === 'function') return hideH2HModal
-  return null
-}
-
-window.addEventListener('popstate', function (e) {
-  // 1) If any modal/sheet is visible, close it and stay on the current tab.
-  const closer = findOpenModalCloser()
-  if (closer) {
-    try { closer() } catch (err) { console.warn('[popstate] modal close failed:', err) }
-    // Re-push the current tab so we don't actually navigate away.
-    const currentTab = (typeof navHistory !== 'undefined' && navHistory[currentNavIndex]) || 'home'
-    try { history.pushState({ tab: currentTab, navIndex: currentNavIndex }, '', '#' + currentTab) } catch (_) {}
-    return
-  }
-
-  // 2) Otherwise navigate tabs based on the popped state.
-  const targetTab = (e.state && e.state.tab) || (location.hash || '#home').slice(1) || 'home'
-  if (e.state && typeof e.state.navIndex === 'number') currentNavIndex = e.state.navIndex
-  isNavigatingBack = true
-  try { switchTab(targetTab, false) }
-  catch (err) { console.warn('[popstate] switchTab failed:', err) }
-  finally { isNavigatingBack = false }
-})
-
 
     // ============== COPY TO CLIPBOARD ==============
     async function copyToClipboard(text, btn) {
