@@ -617,6 +617,25 @@ function getMatchdayKey(kickoff) {
  * BUG FIX: Added per-user try/catch so one failure doesn't block others.
  * Added conflict target hint for upsert.
  */
+// ============================================================================
+// REPLACEMENT for awardPointsWithBonuses  (bonus-engine.js, lines ~620–728)
+// ----------------------------------------------------------------------------
+// Why this changes: the old version ran a FULL per-user chain rebuild
+// (recalculateUserBonuses) *inside* the per-prediction loop — i.e. once per
+// player, ~30x per match. That made one Save Score = hundreds of sequential
+// awaited round-trips in the browser, so any interruption (modal close, tab
+// background, mobile connection blip) left later players with NO result row
+// (+0). It also `continue`d past a player on a history-fetch error, dropping
+// their base score entirely.
+//
+// New design = two phases:
+//   PHASE 1  Write base + stage-multiplier rows for ALL predictions in a tight
+//            loop. Base points don't depend on history, so a history failure
+//            can never block a base write. If Phase 2 is interrupted, every
+//            player still has a correct base score (leaderboard stays mostly
+//            right, never all-zeros).
+//   PHASE 2  Heal each affected player's streak/combo chain exactly once.
+// ============================================================================
 async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
   // 1. Get fixture details
   const { data: fixture, error: fixtureError } = await supabaseClient
@@ -626,8 +645,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
     .single();
 
   if (fixtureError || !fixture) {
-    console.error('Failed to load fixture:', fixtureError);
-    return;
+    console.error('[award] Failed to load fixture:', fixtureError);
+    return { written: 0, healed: 0, errors: 1 };
   }
 
   // 2. Get all predictions for this fixture
@@ -637,37 +656,24 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
     .eq('fixture_id', fixtureId);
 
   if (predError || !predictions?.length) {
-    console.error('No predictions found:', predError);
-    return;
+    console.error('[award] No predictions found:', predError);
+    return { written: 0, healed: 0, errors: predError ? 1 : 0 };
   }
 
   const matchdayKey = getMatchdayKey(fixture.kickoff);
+  let written = 0, errors = 0;
 
-  // 3. For each prediction, calculate full points with bonuses
+  // ---- PHASE 1: write base rows for EVERY prediction (no history needed) ----
+  // Streak/combo come out as 0 here (history = []); Phase 2 fills them in.
   for (const pred of predictions) {
     try {
-      // Calculate base points using existing function
       const basePoints = calculatePoints(
-        pred.home_prediction, 
+        pred.home_prediction,
         pred.away_prediction,
-        actualHome, 
+        actualHome,
         actualAway
       );
 
-      // Get user\'s match history for streak/combo calculation
-      const { data: userHistory, error: histError } = await supabaseClient
-        .from('prediction_results') // or your results table
-        .select('*')
-        .eq('user_id', pred.user_id)
-        .lt('kickoff', fixture.kickoff)
-        .order('kickoff', { ascending: true });
-
-      if (histError) {
-        console.error(`History load failed for user ${pred.user_id}:`, histError);
-        continue;
-      }
-
-      // Calculate full points with bonuses
       const fullResult = calculateFullPoints({
         fixtureId: fixtureId,
         userId: pred.user_id,
@@ -679,9 +685,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
         actualHome: actualHome,
         actualAway: actualAway,
         basePoints: basePoints
-      }, userHistory || []);
+      }, []); // <-- empty history on purpose; Phase 2 replays the chain
 
-      // 4. Save to database
       const { error: upsertError } = await supabaseClient
         .from('prediction_results')
         .upsert({
@@ -690,7 +695,7 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           fixture_id: fixtureId,
           home_prediction: pred.home_prediction,
           away_prediction: pred.away_prediction,
-          stage: fixture.stage,                    // FIX (Bug 1): persist stage so recalc preserves multiplier
+          stage: fixture.stage,
           base_points: fullResult.base_points,
           stage_multiplier: fullResult.stage_multiplier,
           multiplied_base: fullResult.multiplied_base,
@@ -704,27 +709,35 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           bonus_breakdown: fullResult.bonus_breakdown,
           kickoff: fixture.kickoff,
           matchday_key: matchdayKey
-        }, { 
-          onConflict: 'prediction_id' // or your unique constraint column
-        });
+        }, { onConflict: 'prediction_id' });
 
-   if (upsertError) {
-        console.error(`Upsert failed for user ${pred.user_id}:`, upsertError);
+      if (upsertError) {
+        console.error(`[award] Base upsert failed for user ${pred.user_id}:`, upsertError);
+        errors++;
       } else {
-        // Always heal this user's full chain after every save. Same correctness
-        // guarantee as the Recalc All button, at a negligible cost (one user,
-        // a few dozen rows). Eliminates any divergence between award and recalc
-        // paths regardless of root cause (stale kickoffs, gating edge cases, etc).
-        try {
-          await recalculateUserBonuses(pred.user_id);
-        } catch (recalcErr) {
-          console.error(`[recalc] heal failed for ${pred.user_id}:`, recalcErr);
-        }
+        written++;
       }
     } catch (err) {
-      console.error(`Failed to process prediction ${pred.id}:`, err);
+      console.error(`[award] Phase 1 failed for prediction ${pred.id}:`, err);
+      errors++;
     }
   }
+
+  // ---- PHASE 2: heal each affected player's chronological chain ONCE ----
+  const uniqueUserIds = [...new Set(predictions.map(p => p.user_id))];
+  let healed = 0;
+  for (const uid of uniqueUserIds) {
+    try {
+      await recalculateUserBonuses(uid);
+      healed++;
+    } catch (recalcErr) {
+      console.error(`[award] Heal failed for ${uid}:`, recalcErr);
+      errors++;
+    }
+  }
+
+  console.log(`[award] fixture ${fixtureId}: ${written} base rows written, ${healed} chains healed, ${errors} errors`);
+  return { written, healed, errors };
 }
 
 // ============== RECALCULATION (out-of-order scoring fix) ==============
