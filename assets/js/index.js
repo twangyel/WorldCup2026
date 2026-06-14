@@ -2328,7 +2328,7 @@ recentEl.innerHTML = finished.map(f => {
     function switchLbSubtab(tab) {
       if (tab === lbSubtab) return
       lbSubtab = tab
-      ;['overall', 'matchday', 'highlights'].forEach(t => {
+      ;['overall', 'highlights'].forEach(t => {
         const el = document.getElementById('lb-subtab-' + t)
         if (!el) return
         el.classList.toggle('active', tab === t)
