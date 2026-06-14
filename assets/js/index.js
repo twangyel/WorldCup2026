@@ -5713,12 +5713,6 @@ async function showApp() {
     navHistory = ['home']
     currentNavIndex = 0
     history.replaceState({ tab: 'home', navIndex: 0 }, '', '#home')
-    // Ensure the visible tab matches the URL on every launch. Without this,
-    // background work in showNormalApp() (parallel loadLeaderboard, subtab DOM
-    // updates) could leave a non-home tab visible at launch on some devices.
-    if (typeof switchTab === 'function') {
-      try { switchTab('home', false) } catch (_) {}
-    }
 
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
@@ -6336,6 +6330,15 @@ async function handleJoinLeague() {
     await loadMyLeagues()
     activeLeagueId = data.id
     switchTab('leaderboard')
+}
+
+// Activate a private league and jump to its leaderboard view. Called from
+// the inline onclick handlers rendered by loadMyLeagues (each league card).
+// Without this, clicking a league throws "selectLeague is not defined".
+function selectLeague(leagueId) {
+  if (!leagueId) return
+  activeLeagueId = leagueId
+  switchTab('leaderboard')
 }
 
 async function loadMyLeagues() {
