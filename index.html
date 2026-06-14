@@ -2078,6 +2078,260 @@
       filter: brightness(0.9);
     }
 
+
+    /* ===== Your Inventory Cards ===== */
+    .inventory-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 24px;
+      padding: 20px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.4);
+      transition: all 300ms ease;
+    }
+    .inventory-card::before {
+      content: '';
+      position: absolute;
+      inset-x: 0;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent);
+    }
+    .inventory-card::after {
+      content: '';
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,162,76,0.15), transparent 70%);
+    }
+
+    /* Teaser state - locked/dimmed */
+    .inventory-teaser {
+      background: linear-gradient(135deg, rgba(30,58,95,0.92) 0%, rgba(11,18,33,0.88) 100%) !important;
+      border: 1px solid rgba(255,255,255,0.1) !important;
+      color: #fff;
+    }
+    .inventory-teaser .inventory-item {
+      opacity: 0.35;
+      filter: grayscale(0.8);
+      pointer-events: none;
+    }
+    .inventory-teaser .inventory-coming-soon {
+      display: flex;
+    }
+    .inventory-coming-soon {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 5;
+      background: rgba(11,18,33,0.15);
+      border-radius: 24px;
+    }
+    .inventory-lock-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    .inventory-teaser-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+    }
+    .inventory-teaser-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+      text-align: center;
+    }
+    .inventory-countdown {
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #D4A24C;
+      font-variant-numeric: tabular-nums;
+      background: rgba(212,162,76,0.15);
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(212,162,76,0.25);
+    }
+
+    /* Inventory items */
+    .inventory-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: #FAFAF7;
+      border: 1.5px solid #EEEDE7;
+      border-radius: 16px;
+      transition: all 200ms ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .inventory-item:hover {
+      background: #fff;
+      border-color: #D4A24C;
+      box-shadow: 0 4px 12px rgba(212,162,76,0.12);
+      transform: translateY(-1px);
+    }
+    .inventory-item:active {
+      transform: scale(0.98);
+    }
+    .inventory-item-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .inventory-item-icon.booster {
+      background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+      box-shadow: 0 2px 8px rgba(212,162,76,0.2);
+    }
+    .inventory-item-icon.insurance {
+      background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+      box-shadow: 0 2px 8px rgba(59,130,246,0.2);
+    }
+    .inventory-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .inventory-item-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0A0F0D;
+      line-height: 1.2;
+    }
+    .inventory-item-desc {
+      font-size: 11px;
+      color: #8A959F;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+    .inventory-item-count {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1E3A5F;
+      font-variant-numeric: tabular-nums;
+      min-width: 28px;
+      text-align: right;
+    }
+    .inventory-item-count.zero {
+      color: #B5BDC5;
+    }
+    .inventory-badge-new {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: linear-gradient(135deg, #EF4444, #DC2626);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(239,68,68,0.3);
+      animation: badgePulse 2s ease-in-out infinite;
+    }
+    @keyframes badgePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    /* Ghost items for teaser */
+    .inventory-ghost {
+      opacity: 0.25;
+      filter: grayscale(1);
+      pointer-events: none;
+    }
+    .inventory-ghost .inventory-item-icon {
+      background: rgba(255,255,255,0.08) !important;
+      box-shadow: none !important;
+    }
+    .inventory-ghost .inventory-item-name,
+    .inventory-ghost .inventory-item-desc,
+    .inventory-ghost .inventory-item-count {
+      color: rgba(255,255,255,0.3) !important;
+    }
+
+    /* Inventory use button */
+    .inventory-use-btn {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: #0A0F0D;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: all 150ms ease;
+      white-space: nowrap;
+    }
+    .inventory-use-btn:hover {
+      background: #1F2A35;
+    }
+    .inventory-use-btn:disabled {
+      background: #EEEDE7;
+      color: #B5BDC5;
+      cursor: not-allowed;
+    }
+
+    /* Inventory section header */
+    .inventory-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #1F2A35;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .inventory-teaser .inventory-section-title {
+      color: rgba(255,255,255,0.6);
+    }
+
+    /* Inventory empty state */
+    .inventory-empty {
+      text-align: center;
+      padding: 24px 16px;
+      color: #8A959F;
+    }
+    .inventory-empty-icon {
+      font-size: 32px;
+      opacity: 0.5;
+      margin-bottom: 8px;
+    }
+    .inventory-empty-text {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .inventory-empty-sub {
+      font-size: 11px;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
 </style>
 
   <!-- FIFA World Rankings (June 2026) -->
@@ -2252,6 +2506,7 @@
   </script>
 
 
+<base target="_blank">
 <base target="_blank">
 </head>
 <body class="text-ink-900">
@@ -3321,6 +3576,86 @@
           </div>
         </div>
 
+
+        <!-- Your Inventory Card -->
+        <div id="inventory-card" class="inventory-card hidden">
+          <!-- LIVE STATE -->
+          <div id="inventory-live" class="hidden">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xl border border-white/20 shadow-sm">🎒</div>
+                <div>
+                  <h3 class="font-bold tracking-tight text-ink-900">Your Inventory</h3>
+                  <p class="text-[11px] text-ink-500 mt-0.5">Boosters & Insurance cards</p>
+                </div>
+              </div>
+              <span id="inventory-total-count" class="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full">0 items</span>
+            </div>
+
+            <!-- Boosters -->
+            <div class="mt-4">
+              <div class="inventory-section-title">⚡ Boosters</div>
+              <div id="inventory-boosters-list" class="space-y-2">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- Insurance -->
+            <div class="mt-4">
+              <div class="inventory-section-title">🛡️ Insurance</div>
+              <div id="inventory-insurance-list" class="space-y-2">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- Empty state (shown when no items) -->
+            <div id="inventory-empty" class="inventory-empty hidden">
+              <div class="inventory-empty-icon">📭</div>
+              <div class="inventory-empty-text">Your inventory is empty</div>
+              <div class="inventory-empty-sub">Complete predictions to earn cards</div>
+            </div>
+          </div>
+
+          <!-- TEASER STATE -->
+          <div id="inventory-teaser" class="hidden inventory-teaser" style="margin:-20px;border-radius:24px;padding:20px;">
+            <div class="flex items-center gap-3 mb-4 relative z-10">
+              <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">🎒</div>
+              <div>
+                <h3 class="font-bold tracking-tight text-white">Your Inventory</h3>
+                <p class="text-[11px] text-white/50 mt-0.5">Boosters & Insurance cards</p>
+              </div>
+            </div>
+
+            <!-- Ghost items -->
+            <div class="space-y-2 relative z-10">
+              <div class="inventory-item inventory-ghost">
+                <div class="inventory-item-icon booster">⚡</div>
+                <div class="inventory-item-info">
+                  <div class="inventory-item-name">Double Points</div>
+                  <div class="inventory-item-desc">2× points on next prediction</div>
+                </div>
+                <div class="inventory-item-count">0</div>
+              </div>
+              <div class="inventory-item inventory-ghost">
+                <div class="inventory-item-icon insurance">🛡️</div>
+                <div class="inventory-item-info">
+                  <div class="inventory-item-name">Streak Saver</div>
+                  <div class="inventory-item-desc">Protects your streak on a wrong call</div>
+                </div>
+                <div class="inventory-item-count">0</div>
+              </div>
+            </div>
+
+            <!-- Coming Soon Overlay -->
+            <div class="inventory-coming-soon">
+              <div class="inventory-lock-icon">🔒</div>
+              <div class="inventory-teaser-text">Coming Soon</div>
+              <div class="inventory-teaser-sub">Gain the edge in predictions</div>
+              <div class="inventory-countdown" id="inventory-teaser-countdown">--d --h --m</div>
+            </div>
+          </div>
+        </div>
+
         <!-- My Leagues Card (moved from Profile) -->
         <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5" id="leagues-card"
              style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
@@ -3388,6 +3723,13 @@
               <div>
                 <div class="text-sm font-bold text-ink-900">My Badges</div>
                 <div class="text-[11px] text-ink-500 mt-0.5">Achievements & streaks</div>
+              </div>
+            </button>
+            <button onclick="switchTab('extras'); setTimeout(()=>{document.getElementById('inventory-card')?.scrollIntoView({behavior:'smooth', block:'center'})}, 250)" id="quick-inventory-btn" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl">🎒</div>
+              <div>
+                <div class="text-sm font-bold text-ink-900">Inventory</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">Boosters & Insurance</div>
               </div>
             </button>
           </div>
@@ -4158,6 +4500,540 @@
       _countryModalLastFocus = flag;
       showCountryModal(countryName, flagSrc, groupName);
     });
+  </script>
+
+
+  
+  <!--
+  ============================================================
+  SUPABASE SCHEMA REQUIRED FOR INVENTORY FEATURE:
+  ============================================================
+
+  1. system_settings table (should already exist):
+     INSERT INTO system_settings (key, value, description)
+     VALUES ('inventory_enabled', 'false', 'Your Inventory: false=hidden, teaser=locked preview, true=live');
+
+  2. player_inventory table (NEW):
+     CREATE TABLE player_inventory (
+       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+       player_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+       card_id TEXT NOT NULL,
+       quantity INTEGER NOT NULL DEFAULT 0,
+       issued_at TIMESTAMPTZ DEFAULT NOW(),
+       used_at TIMESTAMPTZ,
+       source TEXT DEFAULT 'starter_pack',
+       UNIQUE(player_id, card_id)
+     );
+
+     -- Enable RLS
+     ALTER TABLE player_inventory ENABLE ROW LEVEL SECURITY;
+
+     -- Players can only see their own inventory
+     CREATE POLICY "Players can view own inventory"
+       ON player_inventory FOR SELECT
+       USING (auth.uid() = player_id);
+
+     -- Players can update their own inventory (for consuming cards)
+     CREATE POLICY "Players can update own inventory"
+       ON player_inventory FOR UPDATE
+       USING (auth.uid() = player_id);
+
+     -- Only admins can insert/delete (starter packs issued via edge function or admin)
+     CREATE POLICY "Admins can manage all inventory"
+       ON player_inventory FOR ALL
+       USING (EXISTS (
+         SELECT 1 FROM profiles 
+         WHERE id = auth.uid() AND is_admin = true
+       ));
+
+  3. Admin panel toggle:
+     Add a segmented control in admin.html:
+     - Hidden
+     - Teaser  
+     - Live
+
+  ============================================================
+  -->
+
+<!-- ===== YOUR INVENTORY SYSTEM ===== -->
+  <script>
+    // ============================================================
+    // INVENTORY CONFIG
+    // ============================================================
+    const INVENTORY_CONFIG = {
+      // Set this date for the teaser countdown (adjust as needed)
+      teaserLaunchDate: new Date('2026-07-01T00:00:00Z'),
+
+      // Card definitions
+      cards: {
+        double_points: {
+          id: 'double_points',
+          name: 'Double Points',
+          emoji: '⚡',
+          desc: '2× points on your next prediction',
+          type: 'booster',
+          gradient: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+          shadow: '0 2px 8px rgba(212,162,76,0.2)'
+        },
+        streak_saver: {
+          id: 'streak_saver',
+          name: 'Streak Saver',
+          emoji: '🛡️',
+          desc: 'Protects your streak on one wrong call',
+          type: 'insurance',
+          gradient: 'linear-gradient(135deg, #DBEAFE, #BFDBFE)',
+          shadow: '0 2px 8px rgba(59,130,246,0.2)'
+        }
+      }
+    };
+
+    // Current inventory state (in-memory, loaded from Supabase)
+    let _inventoryState = {
+      double_points: 0,
+      streak_saver: 0,
+      lastSynced: null
+    };
+
+    // ============================================================
+    // INVENTORY STATE MANAGEMENT
+    // ============================================================
+
+    /**
+     * Check system_settings for inventory feature state
+     * Returns: 'hidden' | 'teaser' | 'live'
+     */
+    async function getInventoryFeatureState() {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'inventory_enabled')
+          .single();
+
+        if (error || !data) {
+          console.log('[Inventory] Feature state not found, defaulting to hidden');
+          return 'hidden';
+        }
+
+        const val = data.value;
+        if (val === 'true' || val === 'live') return 'live';
+        if (val === 'teaser') return 'teaser';
+        return 'hidden';
+      } catch (e) {
+        console.error('[Inventory] Error checking feature state:', e);
+        return 'hidden';
+      }
+    }
+
+    /**
+     * Render the inventory card based on feature state
+     */
+    async function renderInventoryCard() {
+      const state = await getInventoryFeatureState();
+      const card = document.getElementById('inventory-card');
+      const liveSection = document.getElementById('inventory-live');
+      const teaserSection = document.getElementById('inventory-teaser');
+      const quickBtn = document.getElementById('quick-inventory-btn');
+
+      if (!card) return;
+
+      // Hide everything first
+      card.classList.add('hidden');
+      if (liveSection) liveSection.classList.add('hidden');
+      if (teaserSection) teaserSection.classList.add('hidden');
+      if (quickBtn) quickBtn.classList.add('hidden');
+
+      if (state === 'hidden') {
+        // Completely hidden - card and quick button stay hidden
+        return;
+      }
+
+      // Show the card
+      card.classList.remove('hidden');
+      if (quickBtn) quickBtn.classList.remove('hidden');
+
+      if (state === 'teaser') {
+        // Show teaser state
+        if (teaserSection) {
+          teaserSection.classList.remove('hidden');
+          startTeaserCountdown();
+        }
+      } else if (state === 'live') {
+        // Show live state
+        if (liveSection) {
+          liveSection.classList.remove('hidden');
+          await loadPlayerInventory();
+          renderInventoryItems();
+        }
+      }
+    }
+
+    // ============================================================
+    // TEASER COUNTDOWN
+    // ============================================================
+    let _teaserCountdownInterval = null;
+
+    function startTeaserCountdown() {
+      const el = document.getElementById('inventory-teaser-countdown');
+      if (!el) return;
+
+      function update() {
+        const now = new Date().getTime();
+        const target = INVENTORY_CONFIG.teaserLaunchDate.getTime();
+        const diff = target - now;
+
+        if (diff <= 0) {
+          el.textContent = 'Launching now...';
+          clearInterval(_teaserCountdownInterval);
+          // Auto-refresh to check if state changed to live
+          setTimeout(() => renderInventoryCard(), 2000);
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (days > 0) {
+          el.textContent = days + 'd ' + hours + 'h ' + mins + 'm';
+        } else if (hours > 0) {
+          el.textContent = hours + 'h ' + mins + 'm';
+        } else {
+          el.textContent = mins + 'm';
+        }
+      }
+
+      update();
+      _teaserCountdownInterval = setInterval(update, 60000); // Update every minute
+    }
+
+    function stopTeaserCountdown() {
+      if (_teaserCountdownInterval) {
+        clearInterval(_teaserCountdownInterval);
+        _teaserCountdownInterval = null;
+      }
+    }
+
+    // ============================================================
+    // PLAYER INVENTORY (LIVE STATE)
+    // ============================================================
+
+    /**
+     * Load player's inventory from Supabase
+     * Table: player_inventory (player_id, card_id, quantity, issued_at, used_at)
+     */
+    async function loadPlayerInventory() {
+      if (!currentUser || !currentUser.id) {
+        console.log('[Inventory] No user logged in');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('player_inventory')
+          .select('card_id, quantity')
+          .eq('player_id', currentUser.id);
+
+        if (error) {
+          console.error('[Inventory] Error loading inventory:', error);
+          return;
+        }
+
+        // Reset state
+        _inventoryState.double_points = 0;
+        _inventoryState.streak_saver = 0;
+
+        if (data && data.length > 0) {
+          data.forEach(row => {
+            if (row.card_id === 'double_points') {
+              _inventoryState.double_points = row.quantity || 0;
+            } else if (row.card_id === 'streak_saver') {
+              _inventoryState.streak_saver = row.quantity || 0;
+            }
+          });
+        }
+
+        _inventoryState.lastSynced = new Date().toISOString();
+        console.log('[Inventory] Loaded:', _inventoryState);
+      } catch (e) {
+        console.error('[Inventory] Exception loading inventory:', e);
+      }
+    }
+
+    /**
+     * Render inventory items in the live card
+     */
+    function renderInventoryItems() {
+      const boostersList = document.getElementById('inventory-boosters-list');
+      const insuranceList = document.getElementById('inventory-insurance-list');
+      const emptyState = document.getElementById('inventory-empty');
+      const totalCount = document.getElementById('inventory-total-count');
+
+      if (!boostersList || !insuranceList) return;
+
+      // Clear lists
+      boostersList.innerHTML = '';
+      insuranceList.innerHTML = '';
+
+      const doubleCard = INVENTORY_CONFIG.cards.double_points;
+      const streakCard = INVENTORY_CONFIG.cards.streak_saver;
+
+      const doubleCount = _inventoryState.double_points || 0;
+      const streakCount = _inventoryState.streak_saver || 0;
+      const total = doubleCount + streakCount;
+
+      // Update total count badge
+      if (totalCount) {
+        totalCount.textContent = total + ' item' + (total !== 1 ? 's' : '');
+      }
+
+      // Render Double Points (Booster)
+      const doubleEl = document.createElement('div');
+      doubleEl.className = 'inventory-item';
+      doubleEl.innerHTML = `
+        <div class="inventory-item-icon booster">${doubleCard.emoji}</div>
+        <div class="inventory-item-info">
+          <div class="inventory-item-name">${doubleCard.name}</div>
+          <div class="inventory-item-desc">${doubleCard.desc}</div>
+        </div>
+        <div class="inventory-item-count ${doubleCount === 0 ? 'zero' : ''}">${doubleCount}</div>
+        ${doubleCount > 0 ? '<button class="inventory-use-btn" onclick="useInventoryCard(\'double_points\')">Use</button>' : ''}
+      `;
+      boostersList.appendChild(doubleEl);
+
+      // Render Streak Saver (Insurance)
+      const streakEl = document.createElement('div');
+      streakEl.className = 'inventory-item';
+      streakEl.innerHTML = `
+        <div class="inventory-item-icon insurance">${streakCard.emoji}</div>
+        <div class="inventory-item-info">
+          <div class="inventory-item-name">${streakCard.name}</div>
+          <div class="inventory-item-desc">${streakCard.desc}</div>
+        </div>
+        <div class="inventory-item-count ${streakCount === 0 ? 'zero' : ''}">${streakCount}</div>
+        ${streakCount > 0 ? '<button class="inventory-use-btn" onclick="useInventoryCard(\'streak_saver\')">Use</button>' : ''}
+      `;
+      insuranceList.appendChild(streakEl);
+
+      // Show/hide empty state
+      if (emptyState) {
+        emptyState.classList.toggle('hidden', total > 0);
+      }
+    }
+
+    /**
+     * Use an inventory card (placeholder - implement game logic here)
+     */
+    async function useInventoryCard(cardId) {
+      const card = INVENTORY_CONFIG.cards[cardId];
+      if (!card) return;
+
+      // Check if user has the card
+      const currentQty = _inventoryState[cardId] || 0;
+      if (currentQty <= 0) {
+        showToast('You don\'t have any ' + card.name + ' cards', 'error');
+        return;
+      }
+
+      // Show confirmation modal (placeholder - you can customize)
+      showModal(
+        card.emoji + ' Use ' + card.name,
+        'Are you sure you want to use your ' + card.name + ' card? This will apply to your next prediction.',
+        [
+          { text: 'Cancel', style: 'secondary', action: hideModal },
+          { 
+            text: 'Use Card', 
+            style: 'primary', 
+            action: async function() {
+              hideModal();
+              await consumeInventoryCard(cardId);
+            }
+          }
+        ]
+      );
+    }
+
+    /**
+     * Consume one card from inventory
+     */
+    async function consumeInventoryCard(cardId) {
+      if (!currentUser || !currentUser.id) return;
+
+      try {
+        // Decrement in Supabase
+        const { error } = await supabase
+          .from('player_inventory')
+          .update({ 
+            quantity: _inventoryState[cardId] - 1,
+            used_at: new Date().toISOString()
+          })
+          .eq('player_id', currentUser.id)
+          .eq('card_id', cardId);
+
+        if (error) {
+          console.error('[Inventory] Error consuming card:', error);
+          showToast('Failed to use card. Try again.', 'error');
+          return;
+        }
+
+        // Update local state
+        _inventoryState[cardId]--;
+        renderInventoryItems();
+
+        const card = INVENTORY_CONFIG.cards[cardId];
+        showToast(card.emoji + ' ' + card.name + ' activated!', 'success');
+
+        // TODO: Apply card effect to next prediction
+        // Store active card in localStorage or Supabase active_effects table
+        localStorage.setItem('active_card_' + cardId, JSON.stringify({
+          cardId: cardId,
+          activatedAt: new Date().toISOString(),
+          used: false
+        }));
+
+      } catch (e) {
+        console.error('[Inventory] Exception consuming card:', e);
+        showToast('Something went wrong', 'error');
+      }
+    }
+
+    // ============================================================
+    // ONE-TIME ISSUANCE (When feature goes live)
+    // ============================================================
+
+    /**
+     * Issue starter cards to a player (called once when feature goes live)
+     * This should be called when:
+     * 1. A new player registers after inventory is live
+     * 2. An existing player logs in for the first time after inventory goes live
+     */
+    async function issueStarterCards(playerId) {
+      if (!playerId) return;
+
+      try {
+        // Check if already issued
+        const { data: existing, error: checkError } = await supabase
+          .from('player_inventory')
+          .select('card_id')
+          .eq('player_id', playerId)
+          .in('card_id', ['double_points', 'streak_saver']);
+
+        if (checkError) {
+          console.error('[Inventory] Error checking existing cards:', checkError);
+          return;
+        }
+
+        // If already has cards, don't re-issue
+        if (existing && existing.length > 0) {
+          console.log('[Inventory] Starter cards already issued for player:', playerId);
+          return;
+        }
+
+        // Issue 1x Double Points + 1x Streak Saver
+        const now = new Date().toISOString();
+        const inserts = [
+          {
+            player_id: playerId,
+            card_id: 'double_points',
+            quantity: 1,
+            issued_at: now,
+            source: 'starter_pack'
+          },
+          {
+            player_id: playerId,
+            card_id: 'streak_saver',
+            quantity: 1,
+            issued_at: now,
+            source: 'starter_pack'
+          }
+        ];
+
+        const { error: insertError } = await supabase
+          .from('player_inventory')
+          .insert(inserts);
+
+        if (insertError) {
+          console.error('[Inventory] Error issuing starter cards:', insertError);
+          return;
+        }
+
+        console.log('[Inventory] Starter cards issued to player:', playerId);
+
+        // Show welcome toast
+        showToast('🎒 Welcome! You received 2 starter cards. Check your inventory!', 'success');
+
+        // Refresh inventory display
+        await loadPlayerInventory();
+        renderInventoryItems();
+
+      } catch (e) {
+        console.error('[Inventory] Exception issuing starter cards:', e);
+      }
+    }
+
+    /**
+     * Check if inventory just went live and issue starter cards if needed
+     * Call this during app initialization after login
+     */
+    async function checkAndIssueStarterCards() {
+      if (!currentUser || !currentUser.id) return;
+
+      const state = await getInventoryFeatureState();
+      if (state !== 'live') return;
+
+      // Check localStorage flag to avoid re-checking every load
+      const issuedKey = 'inventory_starter_issued_' + currentUser.id;
+      if (localStorage.getItem(issuedKey) === 'true') {
+        return;
+      }
+
+      await issueStarterCards(currentUser.id);
+      localStorage.setItem(issuedKey, 'true');
+    }
+
+    // ============================================================
+    // EXTRAS TAB RENDER HOOK
+    // ============================================================
+
+    /**
+     * Call this when the Extras tab is shown
+     */
+    async function onExtrasTabShown() {
+      await renderInventoryCard();
+    }
+
+    // Auto-check inventory state when app loads (for logged-in users)
+    document.addEventListener('DOMContentLoaded', function() {
+      // The inventory card will render when Extras tab is first opened
+      // But we can pre-check the feature state in background
+      if (typeof currentUser !== 'undefined' && currentUser) {
+        checkAndIssueStarterCards();
+      }
+    });
+  </script>
+
+
+  <!-- ===== INVENTORY TAB HOOK ===== -->
+  <script>
+    // Hook into tab switching to render inventory when Extras is shown
+    (function() {
+      const extrasTab = document.getElementById('tab-extras');
+      if (!extrasTab) return;
+
+      // Use MutationObserver to detect when Extras tab becomes visible
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const isVisible = !extrasTab.classList.contains('hidden');
+            if (isVisible && typeof renderInventoryCard === 'function') {
+              renderInventoryCard();
+            }
+          }
+        });
+      });
+
+      observer.observe(extrasTab, { attributes: true, attributeFilter: ['class'] });
+    })();
   </script>
 
 </body>

@@ -257,6 +257,7 @@
         </button>
         <button onclick="adminTab('settings')" data-atab="settings" class="seg-btn flex-1 text-sm font-semibold py-3 rounded-xl tap relative flex items-center justify-center">
           <span class="seg-content">⚙️ Settings</span>
+          
         </button>
 
       </div>
@@ -624,6 +625,34 @@
             <div id="private-leagues-switch" class="switch" onclick="togglePrivateLeagues()"></div>
           </div>
 
+          <!-- Inventory Toggle -->
+<div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border mt-4">
+  <div class="min-w-0 mr-3">
+    <div class="font-semibold text-sm">Your Inventory</div>
+    <div class="text-xs text-ink-500 mt-0.5">Booster & Insurance cards for players</div>
+    <div class="text-[11px] text-ink-400 mt-1">Hidden = invisible, Teaser = locked preview, Live = full access</div>
+  </div>
+  <div class="flex gap-1 bg-paper-card border border-paper-border rounded-xl p-1">
+    <button onclick="setInventoryState('false')" id="inv-btn-hidden" class="px-3 py-1.5 rounded-lg text-xs font-semibold tap transition-all">Hidden</button>
+    <button onclick="setInventoryState('teaser')" id="inv-btn-teaser" class="px-3 py-1.5 rounded-lg text-xs font-semibold tap transition-all">Teaser</button>
+    <button onclick="setInventoryState('true')" id="inv-btn-live" class="px-3 py-1.5 rounded-lg text-xs font-semibold tap transition-all">Live</button>
+  </div>
+</div>
+
+<div class="mt-4 p-4 bg-purple-50 rounded-2xl border border-purple-100">
+  <div class="flex items-start gap-2">
+    <span class="text-purple-600 text-lg">ℹ️</span>
+    <div>
+      <div class="text-xs font-bold text-purple-800 uppercase tracking-wider">How it works</div>
+      <div class="text-xs text-purple-700 mt-1 leading-relaxed">
+        <b>Hidden:</b> No UI shown to players.<br>
+        <b>Teaser:</b> Shows "Coming Soon" card in Extras tab.<br>
+        <b>Live:</b> Full inventory with Booster & Insurance cards. One-time starter pack auto-issued when first enabled.
+      </div>
+    </div>
+  </div>
+</div>
+
           <div class="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
             <div class="flex items-start gap-2">
               <span class="text-blue-600 text-lg">ℹ️</span>
@@ -906,6 +935,92 @@ function flagHtml(name, size = 24) {
       overlay.classList.remove('hidden')
       requestAnimationFrame(() => panel.classList.add('shown'))
     }
+
+    // ===== INVENTORY SETTINGS =====
+let inventoryState = 'false' // 'false', 'teaser', 'true'
+
+async function loadInventorySettings() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'inventory_enabled')
+      .single()
+    
+    if (error) {
+      // Row doesn't exist yet — that's fine, default to hidden
+      if (error.code === 'PGRST116') {
+        inventoryState = 'false'
+        renderInventoryButtons()
+        return
+      }
+      throw error
+    }
+    
+    inventoryState = data?.value || 'false'
+    renderInventoryButtons()
+  } catch (e) {
+    console.error('loadInventorySettings error:', e)
+    inventoryState = 'false'
+    renderInventoryButtons()
+  }
+}
+
+function renderInventoryButtons() {
+  const hiddenBtn = document.getElementById('inv-btn-hidden')
+  const teaserBtn = document.getElementById('inv-btn-teaser')
+  const liveBtn = document.getElementById('inv-btn-live')
+  
+  if (!hiddenBtn || !teaserBtn || !liveBtn) return
+  
+  // Reset all
+  const inactiveClass = 'text-ink-500 hover:bg-paper'
+  const activeClasses = {
+    'false': 'bg-ink-900 text-white',
+    'teaser': 'bg-brand-500 text-white',
+    'true': 'bg-emerald-600 text-white'
+  }
+  
+  ;[hiddenBtn, teaserBtn, liveBtn].forEach(btn => {
+    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold tap transition-all ' + inactiveClass
+  })
+  
+  const activeBtn = inventoryState === 'true' ? liveBtn : inventoryState === 'teaser' ? teaserBtn : hiddenBtn
+  activeBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold tap transition-all ' + activeClasses[inventoryState]
+}
+
+async function setInventoryState(newState) {
+  try {
+    const { error } = await supabaseClient
+      .from('system_settings')
+      .upsert(
+        { 
+          key: 'inventory_enabled', 
+          value: newState, 
+          description: 'Your Inventory: false=hidden, teaser=locked preview, true=live',
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'key' }
+      )
+    
+    if (error) throw error
+    
+    inventoryState = newState
+    renderInventoryButtons()
+    
+    const labels = { 'false': 'Hidden', 'teaser': 'Teaser', 'true': 'Live' }
+    showToast(`Inventory set to ${labels[newState]}`, 'success')
+    
+    // If switching to live for the first time, trigger starter pack issuance
+    if (newState === 'true') {
+      // This will be handled by the app layer when players first visit
+      showToast('Players will receive starter packs on next app load', 'info')
+    }
+  } catch (e) {
+    console.error('setInventoryState error:', e)
+    showToast(e.message || 'Failed to update inventory setting', 'error')
+  }
+}
     function hideModal() {
       const overlay = document.getElementById('modal-overlay')
       const panel = document.getElementById('modal-content')
@@ -3267,6 +3382,7 @@ window.setSystemSettings = async function(payload) {
         if (error) throw error
         systemSettings = { ...systemSettings, ...data }
         renderSettings()
+        await loadInventorySettings()
       } catch (e) {
         console.error('loadSystemSettings error:', e)
       }
