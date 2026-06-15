@@ -422,15 +422,15 @@
             <div class="flex items-start gap-3 mb-3">
               <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg shrink-0">🔧</div>
               <div class="flex-1">
-                <h2 class="font-bold text-base tracking-tight">Recalculate All Bonuses</h2>
+                <h2 class="font-bold text-base tracking-tight">Publish Results</h2>
                 <p class="text-xs text-ink-500 mt-0.5 leading-relaxed">
-                  Replays every player's match history in kickoff order and rebuilds streaks, combos, and multipliers. Use this if scores were entered out of order, or before declaring the final leaderboard.
+                  Awards points for all saved scores and pushes the updated leaderboard to every player. Saved scores stay hidden until you press this. Also rebuilds streaks, combos, and multipliers in kickoff order, so it's safe to run anytime.
                 </p>
               </div>
             </div>
             <button id="recalc-all-btn" onclick="confirmRecalcAll()"
               class="w-full bg-ink-900 text-white font-semibold py-3 rounded-2xl tap flex items-center justify-center gap-2">
-              <span id="recalc-all-label">Recalculate All Bonuses</span>
+              <span id="recalc-all-label">Publish Results</span>
               <span id="recalc-all-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             </button>
           </div>
@@ -1245,8 +1245,8 @@ function confirmRecalcAll() {
   }
   showModal({
     icon: '🔧',
-    title: 'Recalculate all bonuses?',
-    message: 'This replays every player\'s match history and rewrites streak, combo, and multiplier points. The leaderboard may shift. Safe to run, but cannot be undone — proceed?',
+    title: 'Publish results?',
+    message: 'This awards points for all saved scores and pushes the updated leaderboard to every player. This is the step that makes saved scores go live.',
     actions: [
       { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
       { text: 'Recalculate', onclick: 'hideModal(); executeRecalcAll()', class: 'bg-ink-900 text-white' }
@@ -1369,12 +1369,35 @@ async function executeRecalcAll() {
 
   if (btn) btn.disabled = true
   if (btn) btn.classList.add('opacity-60', 'pointer-events-none')
-  if (label) label.textContent = 'Recalculating…'
+  if (label) label.textContent = 'Publishing…'
   if (spinner) spinner.classList.remove('hidden')
 
   try {
+    // Capture the pre-publish standings as the trend baseline FIRST.
+    // Because Save no longer writes prediction_results, current standings here
+    // are exactly the end of the previous matchday — the correct "before" state.
+    // ensureMatchdayBaseline guards against re-stamping the same matchday, so
+    // publishing twice in a row won't wipe the arrows.
+    const latestFinished = (allFixtures || [])
+      .filter(f => f.home_score !== null && f.away_score !== null)
+      .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))[0]
+    if (latestFinished) {
+      try { await ensureMatchdayBaseline(latestFinished.kickoff) }
+      catch (e) { console.warn('[publish] baseline stamp failed (continuing):', e) }
+    }
+
     const result = await BonusEngine.recalculateAllBonuses()
     const { users = 0, updated = 0, errors = 0 } = result || {}
+
+    // Refresh the admin's own league view (player surfaces refresh via realtime).
+    try {
+      if (activeLeagueId && typeof adminViewLeague === 'function') {
+        await adminViewLeague(activeLeagueId)
+      }
+      if (typeof loadAdminLeagueBrowser === 'function') loadAdminLeagueBrowser()
+    } catch (refreshErr) {
+      console.warn('[publish] post-recalc admin refresh failed:', refreshErr)
+    }
     if (errors > 0) {
       showToast(`Done with ${errors} error${errors === 1 ? '' : 's'}. ${updated} row${updated === 1 ? '' : 's'} updated across ${users} player${users === 1 ? '' : 's'}. Check console.`, 'error')
     } else if (updated === 0) {
@@ -1389,7 +1412,7 @@ async function executeRecalcAll() {
   } finally {
     if (btn) btn.disabled = false
     if (btn) btn.classList.remove('opacity-60', 'pointer-events-none')
-    if (label) label.textContent = 'Recalculate All Bonuses'
+    if (label) label.textContent = 'Publish Results'
     if (spinner) spinner.classList.add('hidden')
   }
 }
@@ -2601,7 +2624,7 @@ document.getElementById('csv-input').value = '';
       }
 
       showModal({
-        icon: '⚽', title: 'Confirm score?', message: 'Points will be calculated and pushed to all players in real time.',
+        icon: '⚽', title: 'Save score?', message: 'Saves the result only. The leaderboard will NOT change until you hit Publish.',
         actions: [
           { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
           { text: 'Confirm', onclick: `hideModal(); executeSaveScore('${id}')`, class: 'bg-brand-900 text-white' }
@@ -2682,41 +2705,18 @@ async function executeSaveScore(id) {
   pendingScores[id] = {}
   renderResults(); renderFixturesManage()
 
-  // ---- Award points to every prediction on this fixture ----
-  // Without this call, prediction_results stays empty and the leaderboard
-  // shows 0 for everyone. Engine handles streaks/combos/multipliers and
-  // heals downstream chains for out-of-order scoring.
+  // Save writes the fixture score ONLY. It deliberately does NOT award points.
+  // Points are written to prediction_results exclusively by Publish (executeRecalcAll),
+  // so the player-facing leaderboard does not move until you choose to publish.
   const finalHome = (s.home !== undefined) ? s.home : f?.home_score
   const finalAway = (s.away !== undefined) ? s.away : f?.away_score
   const bothSet = finalHome !== null && finalHome !== undefined
                   && finalAway !== null && finalAway !== undefined
 
-if (bothSet) {
-    showToast('Score saved — awarding points…', 'success')
-    try { await ensureMatchdayBaseline(f.kickoff) } catch (e) { console.warn('[baseline] failed:', e) }
-    try {
-      await awardPointsForFixture(id, Number(finalHome), Number(finalAway))
-      showToast('Points awarded to all players', 'success')
-
-      // Refresh whichever leaderboard surface is currently visible.
-      // `loadAll()` only refreshes fixtures/users/prize — it does NOT re-query
-      // prediction_results, so without these explicit calls the league
-      // leaderboard stays stale until the admin manually re-opens it.
-      try {
-        if (activeLeagueId && typeof adminViewLeague === 'function') {
-          await adminViewLeague(activeLeagueId)
-        }
-        // Defensive: refresh global leaderboard if a refresher exists.
-        if (typeof loadAdminLeagueBrowser === 'function') loadAdminLeagueBrowser()
-      } catch (refreshErr) {
-        console.warn('[score-save] post-award refresh failed:', refreshErr)
-      }
-    } catch (err) {
-      console.error('[score-save] awardPointsForFixture failed:', err)
-      showToast('Score saved, but points award failed. Try Recalculate All.', 'error')
-    }
+  if (bothSet) {
+    showToast('Score saved (not published). Hit Publish to update the leaderboard.', 'success')
   } else {
-    showToast('Score saved (incomplete — enter both scores to award points)', 'info')
+    showToast('Score saved (incomplete — enter both scores)', 'info')
   }
 }
 
