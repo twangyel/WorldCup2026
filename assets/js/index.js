@@ -371,12 +371,17 @@ function getAvatarHtml(name, avatarUrl, rank, size = 32) {
     
 
     // ============== MODAL ==============
-    function showModal({ icon, title, message, actions }) {
+    function showModal({ icon, title, message, messageHtml, actions }) {
       const overlay = document.getElementById('modal-overlay')
       const panel = document.getElementById('modal-content')
       document.getElementById('modal-icon').textContent = icon
       document.getElementById('modal-title').textContent = title
-      document.getElementById('modal-message').textContent = message
+      const msgEl = document.getElementById('modal-message')
+      if (messageHtml !== undefined) {
+        msgEl.innerHTML = messageHtml
+      } else {
+        msgEl.textContent = message
+      }
       document.getElementById('modal-actions').innerHTML = actions.map(b => `<button onclick="${b.onclick}" class="flex-1 py-4 rounded-2xl font-semibold text-sm tap ${b.class}">${b.text}</button>`).join('')
       overlay.classList.remove('hidden')
       requestAnimationFrame(() => panel.classList.add('shown'))
@@ -5872,6 +5877,7 @@ function switchTab(tab, pushHistory = true) {
   }
   if (tab === 'extras' && !previewMode) {
     if (typeof loadMyLeagues === 'function') loadMyLeagues()
+    if (typeof renderInventoryCard === 'function') renderInventoryCard()
   }
   if (tab === 'profile' && !previewMode) {
     renderBadges()

@@ -2133,7 +2133,9 @@
       justify-content: center;
       flex-direction: column;
       z-index: 5;
-      background: rgba(11,18,33,0.15);
+      background: rgba(11,18,33,0.90);
+      backdrop-filter: blur(10px) saturate(0.9);
+      -webkit-backdrop-filter: blur(10px) saturate(0.9);
       border-radius: 24px;
     }
     .inventory-lock-icon {
@@ -2331,6 +2333,247 @@
       margin-top: 4px;
       opacity: 0.7;
     }
+
+    /* ===== Premium Flip Cards (badge-card family) ===== */
+    .inv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .inv-flip {
+      position: relative;
+      aspect-ratio: 5 / 7;
+      perspective: 1200px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .inv-flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+    .inv-flip.flipped .inv-flip-inner {
+      transform: rotateY(180deg);
+    }
+    .inv-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 2px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 12px 12px;
+      box-shadow:
+        0 8px 24px rgba(10, 15, 13, 0.12),
+        0 2px 6px rgba(10, 15, 13, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .inv-face-back {
+      transform: rotateY(180deg);
+      background: #fff;
+      color: #1F2A26;
+      border: 1.5px solid #EEEDE7;
+      justify-content: space-between;
+    }
+
+    /* Front: BOOSTER (Double Points) — warm amber */
+    .inv-face-front.is-booster {
+      background:
+        linear-gradient(135deg, #FFC964 0%, #F5973C 55%, #E07A1F 100%);
+      color: #3A2410;
+    }
+    /* Front: INSURANCE (Streak Saver) — cool blue */
+    .inv-face-front.is-insurance {
+      background:
+        linear-gradient(135deg, #7EC8FF 0%, #4A9EE8 55%, #2E6FBF 100%);
+      color: #0E2238;
+    }
+    /* Diagonal sheen band — static on the card, animated on hover via ::after */
+    .inv-face-front::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg,
+        transparent 35%,
+        rgba(255, 255, 255, 0.28) 48%,
+        rgba(255, 255, 255, 0.10) 55%,
+        transparent 62%);
+      pointer-events: none;
+    }
+    /* Sliding sheen on hover/active */
+    .inv-face-front::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -60%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(115deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.45) 50%,
+        transparent 100%);
+      transform: skewX(-12deg);
+      transition: left 1100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      pointer-events: none;
+    }
+    .inv-flip:hover .inv-face-front::after,
+    .inv-flip:active .inv-face-front::after {
+      left: 110%;
+    }
+
+    /* Corner anchors — top WC26 / card mark, bottom WC26 */
+    .inv-corner {
+      position: absolute;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      opacity: 0.7;
+    }
+    .inv-corner.tl { top: 10px; left: 12px; }
+    .inv-corner.tr { top: 10px; right: 12px; display: flex; align-items: center; gap: 3px; }
+    .inv-corner.br { bottom: 10px; right: 12px; }
+    .inv-corner.bl { bottom: 10px; left: 12px; }
+
+    /* Top pill (BOOSTER / INSURANCE / ACTIVE / PLAYED) */
+    .inv-pill {
+      align-self: center;
+      margin-top: 22px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      background: rgba(255, 255, 255, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .inv-pill.active   { background: rgba(255,255,255,0.45); }
+    .inv-pill.played   { background: rgba(0,0,0,0.18); border-color: rgba(0,0,0,0.15); }
+
+    /* Hero glyph — large, centered */
+    .inv-glyph {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 56px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
+    }
+
+    /* Title block at bottom of front */
+    .inv-title {
+      text-align: center;
+      font-size: 13.5px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+    .inv-subtitle {
+      text-align: center;
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.75;
+      margin-top: 3px;
+      margin-bottom: 18px;
+    }
+
+    /* Back face content */
+    .inv-back-pill {
+      align-self: flex-start;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      background: #F4F1E8;
+      color: #6B5A3E;
+      margin-bottom: 8px;
+    }
+    .inv-back-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .inv-back-rule {
+      font-size: 10.5px;
+      line-height: 1.4;
+      color: #4A5560;
+    }
+    .inv-back-hint {
+      font-size: 9.5px;
+      line-height: 1.35;
+      color: #6B7785;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #EEEDE7;
+      font-style: italic;
+    }
+    .inv-back-meta {
+      font-size: 10px;
+      color: #1F2A26;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+    .inv-play-btn {
+      width: 100%;
+      padding: 9px 0;
+      border-radius: 2px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: #0A0F0D;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 200ms ease;
+    }
+    .inv-play-btn:active {
+      transform: scale(0.96);
+      box-shadow: 0 0 0 4px rgba(212, 162, 76, 0.18);
+    }
+
+    /* Spent / Played state — flat, quiet, no flip */
+    .inv-flip.is-spent { cursor: default; }
+    .inv-flip.is-spent .inv-flip-inner { transform: none !important; }
+    .inv-flip.is-spent .inv-face-front {
+      filter: saturate(0.25) brightness(0.95);
+      opacity: 0.7;
+    }
+    .inv-flip.is-spent .inv-face-front::after { display: none; }
+
+    /* Active state — subtle one-shot pulse on entry */
+    .inv-flip.is-active .inv-face-front {
+      animation: invActivePulse 1600ms cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+    }
+    @keyframes invActivePulse {
+      0%   { box-shadow: 0 8px 24px rgba(10,15,13,0.12), 0 0 0 0 rgba(255,255,255,0.5); }
+      50%  { box-shadow: 0 8px 24px rgba(10,15,13,0.12), 0 0 0 10px rgba(255,255,255,0); }
+      100% { box-shadow: 0 8px 24px rgba(10,15,13,0.12), 0 0 0 0 rgba(255,255,255,0); }
+    }
+
+    /* Locked state (teaser) — same cards, but inert.
+       Cards recede behind the Coming Soon veil rather than competing with it. */
+    .inv-flip.is-locked { cursor: default; pointer-events: none; }
+    .inv-flip.is-locked .inv-flip-inner { transform: none !important; }
+    .inv-flip.is-locked .inv-face-front {
+      filter: blur(4px) saturate(0.4) brightness(0.55);
+      opacity: 0.55;
+    }
+    .inv-flip.is-locked .inv-face-front::after { display: none; }
 
 </style>
 
@@ -3592,20 +3835,9 @@
               <span id="inventory-total-count" class="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full">0 items</span>
             </div>
 
-            <!-- Boosters -->
-            <div class="mt-4">
-              <div class="inventory-section-title">⚡ Boosters</div>
-              <div id="inventory-boosters-list" class="space-y-2">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-
-            <!-- Insurance -->
-            <div class="mt-4">
-              <div class="inventory-section-title">🛡️ Insurance</div>
-              <div id="inventory-insurance-list" class="space-y-2">
-                <!-- Populated by JS -->
-              </div>
+            <!-- Boosters + Insurance as a 2-col flip-card grid -->
+            <div id="inventory-card-grid" class="inv-grid">
+              <!-- Populated by JS -->
             </div>
 
             <!-- Empty state (shown when no items) -->
@@ -3626,23 +3858,33 @@
               </div>
             </div>
 
-            <!-- Ghost items -->
-            <div class="space-y-2 relative z-10">
-              <div class="inventory-item inventory-ghost">
-                <div class="inventory-item-icon booster">⚡</div>
-                <div class="inventory-item-info">
-                  <div class="inventory-item-name">Double Points</div>
-                  <div class="inventory-item-desc">2× points on next prediction</div>
+            <!-- Same flip-card grid as live, but locked. No flip, no sheen, dimmed. -->
+            <div class="inv-grid relative z-10">
+              <div class="inv-flip is-locked" aria-hidden="true">
+                <div class="inv-flip-inner">
+                  <div class="inv-face inv-face-front is-booster">
+                    <span class="inv-corner tl">WC 26</span>
+                    <span class="inv-corner tr">⚡</span>
+                    <span class="inv-pill">BOOSTER</span>
+                    <div class="inv-glyph">⚡</div>
+                    <div class="inv-title">Double Points</div>
+                    <div class="inv-subtitle">One-time use</div>
+                    <span class="inv-corner br">WC 26</span>
+                  </div>
                 </div>
-                <div class="inventory-item-count">0</div>
               </div>
-              <div class="inventory-item inventory-ghost">
-                <div class="inventory-item-icon insurance">🛡️</div>
-                <div class="inventory-item-info">
-                  <div class="inventory-item-name">Streak Saver</div>
-                  <div class="inventory-item-desc">Protects your streak on a wrong call</div>
+              <div class="inv-flip is-locked" aria-hidden="true">
+                <div class="inv-flip-inner">
+                  <div class="inv-face inv-face-front is-insurance">
+                    <span class="inv-corner tl">WC 26</span>
+                    <span class="inv-corner tr">🛡</span>
+                    <span class="inv-pill">INSURANCE</span>
+                    <div class="inv-glyph">🛡️</div>
+                    <div class="inv-title">Streak Saver</div>
+                    <div class="inv-subtitle">One-time use</div>
+                    <span class="inv-corner br">WC 26</span>
+                  </div>
                 </div>
-                <div class="inventory-item-count">0</div>
               </div>
             </div>
 
@@ -4666,6 +4908,7 @@ async function renderInventoryCard() {
     // Show live state
     if (liveSection) {
       liveSection.classList.remove('hidden');
+      await checkAndIssueStarterCards();
       await loadPlayerInventory();
       renderInventoryItems();
     }
@@ -4765,94 +5008,259 @@ async function renderInventoryCard() {
     }
 
     /**
-     * Render inventory items in the live card
+     * Render inventory as a 2-col grid of premium flip cards.
+     * Each card has a front face (badge-card style) and a back face with the
+     * full rule, a strategic hint, and a Play button that opens a match picker.
      */
     function renderInventoryItems() {
-      const boostersList = document.getElementById('inventory-boosters-list');
-      const insuranceList = document.getElementById('inventory-insurance-list');
+      const grid = document.getElementById('inventory-card-grid');
       const emptyState = document.getElementById('inventory-empty');
       const totalCount = document.getElementById('inventory-total-count');
-
-      if (!boostersList || !insuranceList) return;
-
-      // Clear lists
-      boostersList.innerHTML = '';
-      insuranceList.innerHTML = '';
-
-      const doubleCard = INVENTORY_CONFIG.cards.double_points;
-      const streakCard = INVENTORY_CONFIG.cards.streak_saver;
+      if (!grid) return;
 
       const doubleCount = _inventoryState.double_points || 0;
       const streakCount = _inventoryState.streak_saver || 0;
-      const total = doubleCount + streakCount;
+      const totalAvailable = doubleCount + streakCount;
 
-      // Update total count badge
       if (totalCount) {
-        totalCount.textContent = total + ' item' + (total !== 1 ? 's' : '');
+        totalCount.textContent = totalAvailable + ' item' + (totalAvailable !== 1 ? 's' : '');
       }
 
-      // Render Double Points (Booster)
-      const doubleEl = document.createElement('div');
-      doubleEl.className = 'inventory-item';
-      doubleEl.innerHTML = `
-        <div class="inventory-item-icon booster">${doubleCard.emoji}</div>
-        <div class="inventory-item-info">
-          <div class="inventory-item-name">${doubleCard.name}</div>
-          <div class="inventory-item-desc">${doubleCard.desc}</div>
-        </div>
-        <div class="inventory-item-count ${doubleCount === 0 ? 'zero' : ''}">${doubleCount}</div>
-        ${doubleCount > 0 ? '<button class="inventory-use-btn" onclick="useInventoryCard(\'double_points\')">Use</button>' : ''}
-      `;
-      boostersList.appendChild(doubleEl);
+      grid.innerHTML = '';
+      grid.appendChild(buildFlipCard('double_points', doubleCount));
+      grid.appendChild(buildFlipCard('streak_saver', streakCount));
 
-      // Render Streak Saver (Insurance)
-      const streakEl = document.createElement('div');
-      streakEl.className = 'inventory-item';
-      streakEl.innerHTML = `
-        <div class="inventory-item-icon insurance">${streakCard.emoji}</div>
-        <div class="inventory-item-info">
-          <div class="inventory-item-name">${streakCard.name}</div>
-          <div class="inventory-item-desc">${streakCard.desc}</div>
-        </div>
-        <div class="inventory-item-count ${streakCount === 0 ? 'zero' : ''}">${streakCount}</div>
-        ${streakCount > 0 ? '<button class="inventory-use-btn" onclick="useInventoryCard(\'streak_saver\')">Use</button>' : ''}
-      `;
-      insuranceList.appendChild(streakEl);
+      // Empty state only matters if there are zero rows at all — but we always
+      // show 2 cards now (spent ones included), so we keep this hidden unless
+      // the player genuinely has no rows.
+      if (emptyState) emptyState.classList.add('hidden');
+    }
 
-      // Show/hide empty state
-      if (emptyState) {
-        emptyState.classList.toggle('hidden', total > 0);
+    /**
+     * Build a single flip card element. The available-vs-spent state is
+     * decided here, plus all click handlers.
+     */
+    function buildFlipCard(cardId, quantity) {
+      const isBooster   = cardId === 'double_points';
+      const slotClass   = isBooster ? 'is-booster' : 'is-insurance';
+      const slotMark    = isBooster ? '⚡' : '🛡'; // top-right corner mark
+      const slotPill    = isBooster ? 'BOOSTER' : 'INSURANCE';
+      const heroGlyph   = isBooster ? '⚡' : '🛡️';
+      const cardName    = isBooster ? 'Double Points' : 'Streak Saver';
+      const cardTagline = isBooster ? 'One-time use' : 'One-time use';
+      const ruleText    = isBooster
+        ? 'Doubles every base point you earn on the match you choose. Stage multipliers, streak bonuses and combo bonuses still apply on top.'
+        : 'Protects your streak from breaking on the matchday you choose. If you miss a call that day, your streak count is preserved.';
+      const hintText    = isBooster
+        ? 'Best on knockout matches with a high stage multiplier.'
+        : 'Best on a matchday with tricky games while you have a 3+ streak going.';
+
+      const isAvailable = quantity > 0;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'inv-flip' + (isAvailable ? '' : ' is-spent');
+      wrap.setAttribute('role', 'button');
+      wrap.setAttribute('tabindex', '0');
+      wrap.setAttribute('aria-label', cardName + (isAvailable ? ' — tap to inspect' : ' — already played'));
+
+      wrap.innerHTML = `
+        <div class="inv-flip-inner">
+          <div class="inv-face inv-face-front ${slotClass}">
+            <span class="inv-corner tl">WC 26</span>
+            <span class="inv-corner tr">${slotMark}</span>
+            <span class="inv-pill ${isAvailable ? '' : 'played'}">${isAvailable ? slotPill : 'PLAYED'}</span>
+            <div class="inv-glyph">${heroGlyph}</div>
+            <div class="inv-title">${cardName}</div>
+            <div class="inv-subtitle">${isAvailable ? cardTagline : 'Used'}</div>
+            <span class="inv-corner br">WC 26</span>
+          </div>
+          <div class="inv-face inv-face-back">
+            <div>
+              <span class="inv-back-pill">${slotPill}</span>
+              <div class="inv-back-title">${cardName}</div>
+              <div class="inv-back-rule">${ruleText}</div>
+              <div class="inv-back-hint">${hintText}</div>
+            </div>
+            <button class="inv-play-btn" data-action="play">Play Card</button>
+          </div>
+        </div>
+      `;
+
+      // Flip on tap of the card (but not the Play button itself).
+      wrap.addEventListener('click', (e) => {
+        if (!isAvailable) return;
+        if (e.target.closest('[data-action="play"]')) return;
+        wrap.classList.toggle('flipped');
+      });
+      // Keyboard accessibility.
+      wrap.addEventListener('keydown', (e) => {
+        if (!isAvailable) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          wrap.classList.toggle('flipped');
+        }
+      });
+      // Play button → open the match picker.
+      const playBtn = wrap.querySelector('[data-action="play"]');
+      if (playBtn) {
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCardTargetPicker(cardId);
+        });
       }
+
+      return wrap;
+    }
+
+    /**
+     * Open a picker so the player chooses which match (Double Points) or
+     * matchday (Streak Saver) to spend the card on. Both go through showModal
+     * to keep the bottom-sheet aesthetic consistent.
+     */
+    function openCardTargetPicker(cardId) {
+      const isBooster = cardId === 'double_points';
+      const cardName  = isBooster ? 'Double Points' : 'Streak Saver';
+      const emoji     = isBooster ? '⚡' : '🛡️';
+
+      // Only matches that are still open for prediction are eligible.
+      const now = new Date();
+      const open = (typeof fixtures !== 'undefined' && Array.isArray(fixtures) ? fixtures : [])
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+
+      if (open.length === 0) {
+        showToast('No open matches to apply this card to right now.', 'info');
+        return;
+      }
+
+      if (isBooster) {
+        // Double Points: pick a specific match.
+        const optionsHtml = open.slice(0, 8).map(f => {
+          const k = new Date(f.kickoff);
+          const when = k.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            + ' · ' + k.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+          return `<button class="w-full text-left px-3 py-2.5 mb-1.5 rounded-xl border border-paper-border bg-white hover:bg-paper-50 tap"
+                          onclick="confirmCardPlay('double_points', '${f.id}')">
+                    <div class="text-[13px] font-bold text-ink-900">${f.home_team} vs ${f.away_team}</div>
+                    <div class="text-[11px] text-ink-500 mt-0.5">${f.stage || ''} · ${when}</div>
+                  </button>`;
+        }).join('');
+
+        showModal({
+          icon: emoji,
+          title: 'Choose your match',
+          messageHtml: '<div class="text-xs text-ink-500 mb-3">Double Points will apply to the match you pick. Choose carefully — this card can\'t be used again.</div>'
+                   + '<div class="max-h-72 overflow-y-auto -mx-1 px-1">' + optionsHtml + '</div>',
+          actions: [
+            { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
+          ]
+        });
+      } else {
+        // Streak Saver: pick a matchday (calendar date).
+        const days = {};
+        open.forEach(f => {
+          const key = new Date(f.kickoff).toDateString();
+          if (!days[key]) days[key] = [];
+          days[key].push(f);
+        });
+        const dayKeys = Object.keys(days).slice(0, 8);
+
+        const optionsHtml = dayKeys.map(key => {
+          const dayDate = new Date(key);
+          const label = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+          const matchCount = days[key].length;
+          return `<button class="w-full text-left px-3 py-2.5 mb-1.5 rounded-xl border border-paper-border bg-white hover:bg-paper-50 tap"
+                          onclick="confirmCardPlay('streak_saver', '${encodeURIComponent(key)}')">
+                    <div class="text-[13px] font-bold text-ink-900">${label}</div>
+                    <div class="text-[11px] text-ink-500 mt-0.5">${matchCount} match${matchCount === 1 ? '' : 'es'}</div>
+                  </button>`;
+        }).join('');
+
+        showModal({
+          icon: emoji,
+          title: 'Choose a matchday',
+          messageHtml: '<div class="text-xs text-ink-500 mb-3">Streak Saver will protect your streak across every match on the day you pick.</div>'
+                   + '<div class="max-h-72 overflow-y-auto -mx-1 px-1">' + optionsHtml + '</div>',
+          actions: [
+            { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
+          ]
+        });
+      }
+    }
+
+    /**
+     * Final confirmation step + actual consume. Called from the picker buttons.
+     * target = fixture_id (Double Points) or encoded matchday key (Streak Saver).
+     */
+    async function confirmCardPlay(cardId, target) {
+      hideModal();
+      const isBooster = cardId === 'double_points';
+      const decodedTarget = decodeURIComponent(target);
+
+      // Resolve a human-readable summary for the confirmation step.
+      let summary = '';
+      if (isBooster) {
+        const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === decodedTarget);
+        summary = f ? `${f.home_team} vs ${f.away_team}` : 'the selected match';
+      } else {
+        const d = new Date(decodedTarget);
+        summary = d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      }
+
+      showModal({
+        icon: isBooster ? '⚡' : '🛡️',
+        title: 'Play this card?',
+        messageHtml: `<div class="text-sm text-ink-700">You're about to play <b>${isBooster ? 'Double Points' : 'Streak Saver'}</b> on <b>${summary}</b>. This can't be undone.</div>`,
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+          { text: 'Play Card', onclick: `executeCardPlay('${cardId}', '${target}')`, class: 'bg-ink-900 text-white' }
+        ]
+      });
+    }
+
+    /**
+     * Commit: consume the card and stash the target locally. The actual
+     * scoring effect (doubling, streak protection) will be applied by the
+     * bonus engine in a later pass — for now we record the play so it's
+     * visible and recoverable.
+     */
+    async function executeCardPlay(cardId, target) {
+      hideModal();
+      const decodedTarget = decodeURIComponent(target);
+
+      // Record the target locally so a future engine pass can apply the effect.
+      // Mirrors the existing localStorage pattern used by consumeInventoryCard.
+      try {
+        localStorage.setItem('active_card_' + cardId, JSON.stringify({
+          cardId,
+          target: decodedTarget,
+          activatedAt: new Date().toISOString(),
+          used: false
+        }));
+      } catch (e) { /* non-fatal */ }
+
+      await consumeInventoryCard(cardId);
     }
 
     /**
      * Use an inventory card (placeholder - implement game logic here)
      */
 function useInventoryCard(cardId) {
-  const card = INVENTORY_CONFIG.cards[cardId];
-  if (!card) return;
-
+  // Legacy entry point — now routes through the new picker so any old
+  // call site continues to work.
   const currentQty = _inventoryState[cardId] || 0;
   if (currentQty <= 0) {
-    showToast('You don\'t have any ' + card.name + ' cards', 'error');
+    const card = INVENTORY_CONFIG.cards[cardId];
+    showToast('You don\'t have any ' + (card ? card.name : 'cards') + ' cards', 'error');
     return;
   }
-
-  showModal({
-    icon: card.emoji,
-    title: 'Use ' + card.name,
-    message: 'Are you sure you want to use your ' + card.name + ' card? This will apply to your next prediction.',
-    actions: [
-      { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
-      { text: 'Use Card', onclick: "confirmUseCard('" + cardId + "')", class: 'bg-brand-900 text-white' }
-    ]
-  });
+  openCardTargetPicker(cardId);
 }
 
-// Separate function to handle the actual card consumption
+// Kept for back-compat with any older code paths.
 async function confirmUseCard(cardId) {
   hideModal();
-  await consumeInventoryCard(cardId);
+  openCardTargetPicker(cardId);
 }
 
     /**
@@ -4983,14 +5391,8 @@ async function confirmUseCard(cardId) {
       const state = await getInventoryFeatureState();
       if (state !== 'live') return;
 
-      // Check localStorage flag to avoid re-checking every load
-      const issuedKey = 'inventory_starter_issued_' + currentUser.id;
-      if (localStorage.getItem(issuedKey) === 'true') {
-        return;
-      }
-
+      // No localStorage gate: issueStarterCards already checks the DB.
       await issueStarterCards(currentUser.id);
-      localStorage.setItem(issuedKey, 'true');
     }
 
     // ============================================================
