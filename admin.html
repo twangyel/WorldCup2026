@@ -1389,6 +1389,84 @@ async function executeRecalcAll() {
     const result = await BonusEngine.recalculateAllBonuses()
     const { users = 0, updated = 0, errors = 0 } = result || {}
 
+    // ───────── Forward-stamp baseline for the NEXT matchday ─────────
+    // Captures post-recalc standings (= true end-of-this-matchday state) and
+    // writes it as the baseline keyed to the next upcoming fixture's date.
+    // When that matchday publishes later, ensureMatchdayBaseline will find
+    // this snapshot already there and no-op — so trend arrows are immune to
+    // batched saves, mistimed publishes, or partial prediction_results.
+    try {
+      const nextUpcoming = (allFixtures || [])
+        .filter(f => f.home_score === null && f.away_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0]
+
+      if (nextUpcoming) {
+        const justPublishedKey = latestFinished
+          ? new Date(latestFinished.kickoff).toDateString()
+          : null
+        const nextKey = new Date(nextUpcoming.kickoff).toDateString()
+
+        // Skip if next fixture shares a calendar date with what we just
+        // published — same key would clobber the baseline we just stamped.
+        // The next same-day publish will run ensureMatchdayBaseline normally.
+        if (nextKey !== justPublishedKey) {
+          // Fetch the most recent existing snapshot for comparison
+          const { data: prevSnap } = await supabaseClient
+            .from('rank_snapshots')
+            .select('match_key, ranks')
+            .order('stamped_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          const postStats = await _adminFetchOverallStandings()
+          if (postStats && postStats.length > 0) {
+            const postRanks = {}
+            postStats.forEach((s, i) => { if (s.user_id) postRanks[s.user_id] = i + 1 })
+
+            // ── Sanity check: warn if new baseline matches the previous one ──
+            if (prevSnap && prevSnap.ranks) {
+              const prevKeys = Object.keys(prevSnap.ranks)
+              const newKeys = Object.keys(postRanks)
+              const identical =
+                prevKeys.length === newKeys.length &&
+                newKeys.every(uid => prevSnap.ranks[uid] === postRanks[uid])
+
+              if (identical) {
+                console.warn(
+                  `⚠️ [forward-stamp] new baseline for "${nextKey}" is IDENTICAL to ` +
+                  `previous baseline "${prevSnap.match_key}". ` +
+                  `This usually means prediction_results was missing recent matchday data ` +
+                  `when standings were aggregated. Trend arrows for the next matchday may be wrong. ` +
+                  `Check prediction_results for the just-published fixture(s).`
+                )
+              } else {
+                const moved = newKeys.filter(uid => prevSnap.ranks[uid] !== postRanks[uid]).length
+                console.log(
+                  `[forward-stamp] ${moved} of ${newKeys.length} users changed rank ` +
+                  `since previous baseline "${prevSnap.match_key}"`
+                )
+              }
+            }
+
+            const { error: fwdErr } = await supabaseClient.rpc('stamp_rank_snapshot', {
+              p_match_key: nextKey,
+              p_ranks: postRanks
+            })
+            if (fwdErr) {
+              console.warn('[forward-stamp] failed (non-fatal):', fwdErr.message)
+            } else {
+              console.log(`[forward-stamp] ✓ baseline for "${nextKey}" — ${postStats.length} users`)
+            }
+          }
+        } else {
+          console.log(`[forward-stamp] skipped — next fixture shares date "${nextKey}" with just-published`)
+        }
+      }
+    } catch (e) {
+      console.warn('[forward-stamp] threw (non-fatal):', e)
+    }
+    // ────────────────────────────────────────────────────────────────
+
     // Refresh the admin's own league view (player surfaces refresh via realtime).
     try {
       if (activeLeagueId && typeof adminViewLeague === 'function') {
@@ -2639,7 +2717,7 @@ async function ensureMatchdayBaseline(fixtureKickoff) {
   // What matchday is the current baseline keyed to?
   const { data: latest, error: snapErr } = await supabaseClient
     .from('rank_snapshots')
-    .select('match_key, stamped_at')
+    .select('match_key, stamped_at, ranks')
     .order('stamped_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -2666,6 +2744,28 @@ async function ensureMatchdayBaseline(fixtureKickoff) {
 
   const ranks = {};
   stats.forEach((s, i) => { if (s.user_id) ranks[s.user_id] = i + 1; });
+
+  // ── Sanity check: warn if this baseline is identical to the previous one ──
+  // Identical ranks across a matchday usually means prediction_results was
+  // missing data when standings were aggregated. Trend arrows will be wrong.
+  if (latest && latest.ranks) {
+    const prevKeys = Object.keys(latest.ranks);
+    const newKeys = Object.keys(ranks);
+    const identical =
+      prevKeys.length === newKeys.length &&
+      newKeys.every(uid => latest.ranks[uid] === ranks[uid]);
+    if (identical) {
+      console.warn(
+        `⚠️ [baseline] new stamp for "${targetKey}" is IDENTICAL to ` +
+        `previous baseline "${latest.match_key}". ` +
+        `prediction_results may be missing data from the matchday between them. ` +
+        `Trend arrows on this matchday may be wrong.`
+      );
+    } else {
+      const moved = newKeys.filter(uid => latest.ranks[uid] !== ranks[uid]).length;
+      console.log(`[baseline] ${moved} of ${newKeys.length} users moved since "${latest.match_key}"`);
+    }
+  }
 
   const { error } = await supabaseClient.rpc('stamp_rank_snapshot', {
     p_match_key: targetKey,        // baseline FOR this matchday
