@@ -2492,17 +2492,62 @@ recentEl.innerHTML = finished.map(f => {
       if (_snapshotCache && Date.now() - _snapshotCacheAt < SNAPSHOT_CACHE_MS) {
         return _snapshotCache
       }
-      const { data, error } = await supabaseClient
-        .from('rank_snapshots')
-        .select('match_key, ranks, stamped_at')
-        .order('stamped_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (error) {
-        console.warn('[trend] snapshot fetch failed:', error.message)
-        return null
+
+      // Determine which baseline the leaderboard SHOULD diff against:
+      // it's the baseline keyed to the CURRENT matchday — i.e. the date of
+      // the latest finished fixture. The forward-stamp step at end of each
+      // publish creates baselines for FUTURE matchdays; we must not pick
+      // those, or every trend would be (current vs current) = no arrows.
+      let currentMatchKey = null
+      try {
+        const latestFinished = (fixtures || [])
+          .filter(f => f.home_score !== null && f.away_score !== null)
+          .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))[0]
+        if (latestFinished) {
+          currentMatchKey = new Date(latestFinished.kickoff).toDateString()
+        }
+      } catch (e) { /* fixtures not loaded yet — fall through to fallback */ }
+
+      let snapshot = null
+
+      if (currentMatchKey) {
+        const { data, error } = await supabaseClient
+          .from('rank_snapshots')
+          .select('match_key, ranks, stamped_at')
+          .eq('match_key', currentMatchKey)
+          .maybeSingle()
+        if (error) {
+          console.warn('[trend] snapshot fetch by match_key failed:', error.message)
+        } else if (data) {
+          snapshot = data
+        }
       }
-      _snapshotCache = data || null
+
+      // Fallback: legacy "latest by stamped_at" — only when we can't determine
+      // the current matchday (e.g. fixtures not yet loaded) or no matching
+      // baseline exists. Logs a warning so the missing baseline is visible.
+      if (!snapshot) {
+        const { data, error } = await supabaseClient
+          .from('rank_snapshots')
+          .select('match_key, ranks, stamped_at')
+          .order('stamped_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (error) {
+          console.warn('[trend] snapshot fetch (fallback) failed:', error.message)
+          return null
+        }
+        snapshot = data || null
+        if (snapshot && currentMatchKey) {
+          console.warn(
+            `[trend] no baseline for current matchday "${currentMatchKey}"; ` +
+            `falling back to most recent stamp "${snapshot.match_key}". ` +
+            `Arrows may be off until the missing baseline is created.`
+          )
+        }
+      }
+
+      _snapshotCache = snapshot
       _snapshotCacheAt = Date.now()
       return _snapshotCache
     }
