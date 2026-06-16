@@ -1335,10 +1335,18 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
     const showHotTakes = locked && !previewMode && (hotTakesByFixture[f.id]?.length > 0)
     const hotTakesBlock = showHotTakes
       ? `<div class="px-5 pb-3">
-          <button id="hot-takes-btn-${f.id}" onclick="toggleHotTakes('${f.id}')"
-                  class="w-full text-xs font-semibold text-ink-600 hover:text-ink-900 tap py-2 border-t border-paper-border/60">
-            See all picks (${hotTakesByFixture[f.id].length})
-          </button>
+          <div class="flex items-center gap-2 border-t border-paper-border/60 pt-1">
+            <button id="hot-takes-btn-${f.id}" onclick="toggleHotTakes('${f.id}')"
+                    class="flex-1 text-xs font-semibold text-ink-600 hover:text-ink-900 tap py-2">
+              See all picks (${hotTakesByFixture[f.id].length})
+            </button>
+            ${isAdmin() ? `<button onclick="sharePickList('${f.id}')"
+                    class="text-xs font-bold text-brand-700 hover:text-brand-900 tap py-2 px-3 rounded-lg"
+                    style="background:rgba(212,162,76,0.10);"
+                    title="Share pick list to WhatsApp">
+              📤 Share
+            </button>` : ''}
+          </div>
           <div id="hot-takes-${f.id}" class="hidden mt-1"></div>
         </div>`
       : ''
@@ -3313,6 +3321,251 @@ async function shareMatchHighlight(fixtureId) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
 }
 
+
+// ---- Canvas PNG generator for the pick-list share ----
+async function generatePickListCardBlob(fixtureId) {
+  const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
+    .find(f => f.id === fixtureId)
+  if (!fixture) throw new Error('Fixture not found')
+ 
+  const picks = hotTakesByFixture[fixtureId] || []
+  if (!picks.length) throw new Error('No picks for this fixture')
+ 
+  const finished = fixture.home_score !== null && fixture.away_score !== null
+ 
+  // Summary line (only meaningful when finished)
+  const exact = picks.filter(p => p.base_points === 5).length
+  const correctResult = picks.filter(p => p.base_points === 2 || p.base_points === 3).length
+  const pointsWon = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
+ 
+  // Preload flags hi-res
+  const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
+  const [homeImg, awayImg] = await Promise.all([
+    loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
+    loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
+  ])
+ 
+  // ----- Layout constants -----
+  const WIDTH       = 1080
+  const HEADER_H    = 130
+  const SCORE_H     = 240
+  const STATS_H     = finished ? 110 : 60
+  const SEC_LABEL_H = 60
+  const ROW_H       = 58
+  const FOOTER_H    = 80
+  const PAD_BOTTOM  = 30
+ 
+  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + (picks.length * ROW_H) + FOOTER_H + PAD_BOTTOM
+ 
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH; canvas.height = HEIGHT
+  const ctx = canvas.getContext('2d')
+ 
+  // ----- Background (matches match-highlight card) -----
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
+  bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'
+  for (let yy = 0; yy < HEIGHT; yy += 32) for (let xx = 0; xx < WIDTH; xx += 32) {
+    ctx.beginPath(); ctx.arc(xx, yy, 1.5, 0, Math.PI * 2); ctx.fill()
+  }
+  const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
+  glow.addColorStop(0, 'rgba(212,162,76,0.30)'); glow.addColorStop(1, 'rgba(212,162,76,0)')
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, WIDTH, HEIGHT)
+ 
+  const cx = WIDTH / 2
+ 
+  // ----- Header -----
+  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 32px system-ui, sans-serif'
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+  ctx.fillText(`📋 ${fixture.stage || 'Match'} · Pick List`, 60, 75)
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - 60, 75)
+  ctx.textBaseline = 'alphabetic'
+ 
+  // ----- Score block with flags -----
+  let y = HEADER_H
+  const flagY = y + 40, fw = 96, fh = 64
+  const leftX = cx - 220, rightX = cx + 220
+ 
+  function drawFlag(img, name, x) {
+    if (img) {
+      ctx.save()
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.clip()
+      ctx.drawImage(img, x - fw / 2, flagY, fw, fh)
+      ctx.restore()
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.stroke()
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(x, flagY + fh / 2, 38, 0, Math.PI * 2); ctx.stroke()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 28px system-ui, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(teamCodeFallback(name), x, flagY + fh / 2)
+      ctx.textBaseline = 'alphabetic'
+    }
+    ctx.fillStyle = '#fff'; ctx.font = '24px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(truncateForCanvas(ctx, name, 280), x, flagY + fh + 36)
+  }
+  drawFlag(homeImg, fixture.home_team, leftX)
+  drawFlag(awayImg, fixture.away_team, rightX)
+ 
+  // Center score (or "vs" if locked but not played)
+  if (finished) {
+    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 80px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
+    ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 22px system-ui, sans-serif'
+    ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 56)
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 56px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText('vs', cx, flagY + fh / 2 + 12)
+    ctx.fillStyle = '#60A5FA'; ctx.font = 'bold 20px system-ui, sans-serif'
+    ctx.fillText('LOCKED', cx, flagY + fh / 2 + 52)
+  }
+ 
+  // ----- Summary stats -----
+  y = HEADER_H + SCORE_H
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(WIDTH - 60, y); ctx.stroke()
+ 
+  if (finished) {
+    const stats = [
+      ['PREDICTIONS', picks.length, '#fff'],
+      ['EXACT', exact, '#fff'],
+      ['RESULT', correctResult, '#fff'],
+      ['POINTS WON', pointsWon, '#F4C430']
+    ]
+    const stepW = (WIDTH - 120) / 4
+    stats.forEach((st, i) => {
+      const sx = 60 + stepW * i + stepW / 2
+      ctx.fillStyle = st[2]; ctx.font = 'bold 44px system-ui, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(String(st[1]), sx, y + 50)
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 18px system-ui, sans-serif'
+      ctx.fillText(st[0], sx, y + 82)
+    })
+  } else {
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 28px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(`${picks.length} ${picks.length === 1 ? 'pick' : 'picks'} locked in`, cx, y + 38)
+  }
+  ctx.beginPath(); ctx.moveTo(60, y + STATS_H - 10); ctx.lineTo(WIDTH - 60, y + STATS_H - 10); ctx.stroke()
+ 
+  // ----- Section label -----
+  y = HEADER_H + SCORE_H + STATS_H
+  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 24px system-ui, sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText(finished ? '🏅 ALL PICKS · sorted by points' : '🔒 ALL PICKS · sorted by submission', 60, y + 36)
+  y += SEC_LABEL_H
+ 
+  // ----- Rows -----
+  picks.forEach((p, i) => {
+    const rowY = y + i * ROW_H
+    const win = (p.final_points || 0) > 0
+ 
+    // Row background — gold tint for scorers, faint stripe for others
+    const rowFill = finished
+      ? (win ? 'rgba(212,162,76,0.13)' : (i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
+      : (i % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)')
+    ctx.fillStyle = rowFill
+    ctx.strokeStyle = win ? 'rgba(212,162,76,0.35)' : 'rgba(255,255,255,0)'
+    ctx.lineWidth = 1.2
+    roundRect(ctx, 60, rowY + 4, WIDTH - 120, ROW_H - 8, 10); ctx.fill(); if (win) ctx.stroke()
+ 
+    const cyl = rowY + ROW_H / 2
+    ctx.textBaseline = 'middle'
+ 
+    // Position number (subtle, left)
+    ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.fillText(String(i + 1), 100, cyl)
+ 
+    // Name + bonus emojis
+    let nameLabel = p.name || 'Anonymous'
+    if ((p.combo_bonus || 0) > 0) nameLabel += ' ⚡'
+    if ((p.streak_bonus || 0) > 0) nameLabel += ' 🔥'
+    ctx.font = win ? 'bold 24px system-ui, sans-serif' : '22px system-ui, sans-serif'
+    ctx.fillStyle = win ? '#fff' : 'rgba(255,255,255,0.82)'
+    ctx.textAlign = 'left'
+    ctx.fillText(truncateForCanvas(ctx, nameLabel, 600), 120, cyl)
+ 
+    // Predicted score (middle-right)
+    ctx.font = 'bold 26px system-ui, sans-serif'
+    ctx.fillStyle = win ? '#F4C430' : 'rgba(255,255,255,0.85)'
+    ctx.textAlign = 'right'
+    ctx.fillText(`${p.home}–${p.away}`, WIDTH - 180, cyl)
+ 
+    // Points badge (rightmost)
+    if (finished) {
+      ctx.font = 'bold 22px system-ui, sans-serif'
+      ctx.fillStyle = win ? '#4ADE80' : 'rgba(255,255,255,0.35)'
+      ctx.textAlign = 'right'
+      ctx.fillText(`+${p.final_points || 0}`, WIDTH - 84, cyl)
+    }
+ 
+    ctx.textBaseline = 'alphabetic'
+  })
+ 
+  // ----- Footer -----
+  ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'
+  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
+ 
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
+  })
+}
+ 
+ 
+// ---- Admin share (mirrors shareMatchHighlight's 3-path fallback) ----
+async function sharePickList(fixtureId) {
+  const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
+    .find(f => f.id === fixtureId)
+  if (!fixture) { showToast('Match not found', 'info'); return }
+ 
+  const picks = hotTakesByFixture[fixtureId] || []
+  if (!picks.length) { showToast('No picks to share yet', 'info'); return }
+ 
+  let blob = null
+  try { blob = await generatePickListCardBlob(fixtureId) }
+  catch (e) { console.warn('[sharePickList] image gen failed:', e) }
+ 
+  const finished = fixture.home_score !== null && fixture.away_score !== null
+  const scoreLine = finished
+    ? `${fixture.home_team} ${fixture.home_score}–${fixture.away_score} ${fixture.away_team}`
+    : `${fixture.home_team} vs ${fixture.away_team} (locked)`
+  const text = `📋 WC 2026 Prediction League — Pick List\n${scoreLine} (${fixture.stage || ''})\n${picks.length} picks in\n\nJoin 👇\nhttps://wcpredictionleague.vercel.app`
+ 
+  // WhatsApp drops captions when files are attached — copy first so admin can paste.
+  let captionCopied = false
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      captionCopied = true
+    }
+  } catch (e) { console.warn('[sharePickList] clipboard copy failed:', e) }
+ 
+  if (blob && navigator.canShare) {
+    const file = new File([blob], `wcpl-picks-${Date.now()}.png`, { type: 'image/png' })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'WC 2026 Prediction League · Pick List', text })
+        showToast(captionCopied ? 'Shared · caption copied, long-press to paste' : 'Shared!', 'success')
+        return
+      }
+      catch (e) { if (e.name === 'AbortError') return; console.warn('[sharePickList] native share failed:', e) }
+    }
+  }
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `wcpl-picks-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('Image saved · attach it in WhatsApp', 'success')
+    setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'), 250)
+    return
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+ 
+ 
 // Canvas helper: rounded rectangle path (canvas roundRect isn't universal yet)
 function roundRect(ctx, x, y, w, h, r) {
   if (w < 2 * r) r = w / 2
