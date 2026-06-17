@@ -570,11 +570,72 @@
       <!-- SETTINGS -->
       <!-- LEAGUES -->
       <div id="atab-leagues" class="atab hidden space-y-4">
+
+        <!-- ============ CREATE PRIVATE LEAGUE ============ -->
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="font-bold text-lg tracking-tight">Private Leagues</h2>
-              <p class="text-xs text-ink-500 mt-0.5">All leagues created by players</p>
+              <h2 class="font-bold text-lg tracking-tight">Create Private League</h2>
+              <p class="text-xs text-ink-500 mt-0.5">Admin-only. Players join via invite code after paying.</p>
+            </div>
+            <span class="text-[10px] font-bold text-purple-700 bg-purple-100 px-2.5 py-1 rounded-full">ADMIN</span>
+          </div>
+
+          <div class="space-y-3">
+
+            <!-- Name -->
+            <div>
+              <label class="text-xs font-semibold text-ink-700 mb-1 block">League Name</label>
+              <input type="text" id="new-pl-name" maxlength="60" placeholder="e.g. Thimphu Office League"
+                class="w-full px-4 py-3 rounded-2xl border border-paper-border bg-white text-[15px] focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+            </div>
+
+            <!-- Entry fee -->
+            <div>
+              <label class="text-xs font-semibold text-ink-700 mb-1 block">Entry Fee (Nu.)</label>
+              <input type="number" id="new-pl-fee" value="1000" min="0" step="50"
+                class="w-full px-4 py-3 rounded-2xl border border-paper-border bg-white text-[15px] focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+              <p class="text-[11px] text-ink-400 mt-1">Default Nu. 1000. Players pay this to join.</p>
+            </div>
+
+            <!-- Invite code override -->
+            <div>
+              <label class="text-xs font-semibold text-ink-700 mb-1 block">Invite Code <span class="text-ink-400 font-normal">(optional)</span></label>
+              <input type="text" id="new-pl-code" maxlength="12" placeholder="Leave blank to auto-generate"
+                class="w-full px-4 py-3 rounded-2xl border border-paper-border bg-white text-[15px] uppercase tracking-wider font-bold placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+            </div>
+
+            <!-- Prize pool override -->
+            <div class="bg-paper rounded-2xl p-4 border border-paper-border">
+              <div class="flex items-center justify-between">
+                <div class="min-w-0 mr-3">
+                  <div class="font-semibold text-sm">Override Prize Pool</div>
+                  <div class="text-[11px] text-ink-500 mt-0.5">Off: auto = paid_members × entry_fee. On: fixed amount.</div>
+                </div>
+                <div id="pl-override-switch" class="switch" onclick="togglePrizePoolOverride()"></div>
+              </div>
+              <div id="pl-override-input-wrap" class="mt-3 hidden">
+                <input type="number" id="new-pl-prize-override" min="0" step="100" placeholder="Manual prize pool amount"
+                  class="w-full px-4 py-3 rounded-2xl border border-paper-border bg-white text-[15px] focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+              </div>
+            </div>
+
+            <!-- Submit -->
+            <button onclick="adminCreateLeague()" id="admin-create-league-btn"
+              class="w-full bg-gradient-to-r from-ink-900 to-brand-900 text-white font-semibold py-3.5 rounded-2xl tap text-sm shadow-lg shadow-ink-900/20 hover:shadow-ink-900/30 transition-shadow">
+              Create League (Draft)
+            </button>
+
+            <p class="text-[11px] text-ink-400 text-center">League will be created in <b>Draft</b> status. Activate it from the list below when you're ready for players to join.</p>
+          </div>
+        </div>
+
+        <!-- ============ ALL PRIVATE LEAGUES LIST ============ -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-bold text-lg tracking-tight">All Private Leagues</h2>
+              <p class="text-xs text-ink-500 mt-0.5">Draft, active, and archived leagues</p>
             </div>
             <button onclick="loadAdminLeagueBrowser()" class="text-xs font-semibold text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full tap">↻ Refresh</button>
           </div>
@@ -585,6 +646,7 @@
             </div>
           </div>
         </div>
+
       </div>
 
       <div id="atab-settings" class="atab hidden space-y-4">
@@ -600,6 +662,19 @@
               <div class="text-[11px] text-ink-400 mt-1">When disabled, all users see "Coming Soon"</div>
             </div>
             <div id="private-leagues-switch" class="switch" onclick="togglePrivateLeagues()"></div>
+          </div>
+
+          <!-- Private Leagues v2 Toggle (NEW: admin-only create, per-league payments) -->
+          <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border mt-4">
+            <div class="min-w-0 mr-3">
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-sm">Private Leagues v2</span>
+                <span class="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded uppercase tracking-wider">NEW</span>
+              </div>
+              <div class="text-xs text-ink-500 mt-0.5">Admin-only create · per-league payments</div>
+              <div class="text-[11px] text-ink-400 mt-1">When ON, only admins create leagues. Players join via invite code and pay separately per league.</div>
+            </div>
+            <div id="private-leagues-v2-switch" class="switch" onclick="togglePrivateLeaguesV2()"></div>
           </div>
 
           <!-- Inventory Toggle -->
@@ -3281,87 +3356,542 @@ async function adminViewLeague(leagueId) {
     showToast('Admin access only', 'error');
     return;
   }
+  if (!leagueId) return;
   activeLeagueId = leagueId;
 
-  // Show the league leaderboard inline in the admin leagues tab
-  // instead of trying to call switchTab() which doesn't exist in admin.html
   const container = document.getElementById('admin-league-browser');
   if (!container) return;
 
-  // Show loading state
+  // Loading state.
   container.innerHTML = `<div class="text-center py-6">
     <div class="flex items-center justify-center gap-2 text-sm text-ink-500">
       <span class="w-4 h-4 border-2 border-ink-300 border-t-brand-500 rounded-full animate-spin"></span>
-      Loading league leaderboard...
+      Loading league…
     </div>
   </div>`;
 
-  // Load the league leaderboard data
-  const [{ data: stats }, { data: league }] = await Promise.all([
-    getLeagueLeaderboard(leagueId),
-    supabaseClient.from('leagues').select('name, invite_code').eq('id', leagueId).single()
-  ]);
+  // Fetch league + memberships (with payment + profile) + leaderboard in parallel.
+  const leaguePromise = supabaseClient
+    .from('leagues')
+    .select('*')
+    .eq('id', leagueId)
+    .maybeSingle();
 
-  if (!stats?.length) {
-    container.innerHTML = `
-      <div class="card p-5 mb-4">
-        <div class="flex items-center gap-3 mb-4">
-          <button onclick="loadAdminLeagueBrowser()" class="text-ink-400 hover:text-ink-700 tap">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-          </button>
-          <div>
-            <h3 class="font-bold text-lg">${league?.name || 'League'}</h3>
-            <p class="text-xs text-ink-500">Code: ${league?.invite_code || '---'}</p>
-          </div>
-        </div>
-        <div class="text-center py-8">
-          <div class="text-4xl mb-2">👥</div>
-          <div class="font-semibold text-sm">No members yet</div>
-          <p class="text-xs text-ink-500 mt-1">Invite friends to join this league</p>
-        </div>
-      </div>`;
+  const membershipsPromise = supabaseClient
+    .from('league_memberships')
+    .select(`
+      id, user_id, joined_at, payment_status, payment_proof_url,
+      payment_pending, entry_fee_paid, paid_at,
+      profile:user_id ( id, full_name, name, department, avatar_url )
+    `)
+    .eq('league_id', leagueId)
+    .order('joined_at', { ascending: true });
+
+  const leaderboardPromise = (typeof getLeagueLeaderboard === 'function')
+    ? getLeagueLeaderboard(leagueId)
+    : Promise.resolve({ data: [], error: null });
+
+  const [
+    { data: league, error: leagueErr },
+    { data: memberships, error: memErr },
+    { data: leaderboard }
+  ] = await Promise.all([leaguePromise, membershipsPromise, leaderboardPromise]);
+
+  if (leagueErr || !league) {
+    container.innerHTML = `<div class="text-center py-6 text-red-500 text-sm">Failed to load league</div>`;
     return;
   }
+  if (memErr) {
+    console.error('[ADMIN] memberships error:', memErr);
+  }
 
-  // Render the league leaderboard
-  container.innerHTML = `
-    <div class="card p-5 mb-4">
-      <div class="flex items-center gap-3 mb-4">
-        <button onclick="loadAdminLeagueBrowser()" class="text-ink-400 hover:text-ink-700 tap p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-        </button>
-        <div class="flex-1 min-w-0">
-          <h3 class="font-bold text-lg truncate">${league?.name || 'League'}</h3>
-          <p class="text-xs text-ink-500">Code: ${league?.invite_code || '---'} · ${stats.length} member${stats.length !== 1 ? 's' : ''}</p>
-        </div>
-      </div>
-      <div class="space-y-2">
-        ${stats.map((s, i) => {
-          const rank = i + 1;
-          const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0);
-          const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
-          const rankDisplay = medal
-            ? `<div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold text-sm shrink-0">${medal}</div>`
-            : `<div class="w-8 h-8 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500 shrink-0">${rank}</div>`;
-          const initials = (s.name || 'A').split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase();
-          return `
-          <div class="flex items-center gap-3 p-3 rounded-2xl ${rank <= 3 ? 'bg-brand-50/50 border border-brand-100' : 'bg-paper border border-paper-border'}">
-            ${rankDisplay}
-            <div class="w-9 h-9 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
-            <div class="flex-1 min-w-0">
-              <div class="font-semibold text-sm truncate">${s.name || 'Anonymous'}</div>
-              <div class="text-xs text-ink-500">${correct} correct · ${s.exact || 0} exact</div>
+  const memberships_ = memberships || [];
+  const totalMembers = memberships_.length;
+  const paidMembers  = memberships_.filter(m => m.payment_status === 'paid').length;
+  const pool = _computePrizePool(league, paidMembers);
+
+  // Status badge.
+  let statusBadge;
+  if (league.status === 'active') {
+    statusBadge = `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVE</span>`;
+  } else if (league.status === 'archived') {
+    statusBadge = `<span class="text-[10px] font-bold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full">ARCHIVED</span>`;
+  } else {
+    statusBadge = `<span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">DRAFT</span>`;
+  }
+
+  // Activate/Archive button depends on status.
+  let statusBtn = '';
+  if (league.status === 'draft') {
+    statusBtn = `<button onclick="adminActivateLeague('${league.id}')" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-full tap">Activate</button>`;
+  } else if (league.status === 'active') {
+    statusBtn = `<button onclick="adminArchiveLeague('${league.id}')" class="text-[11px] font-bold text-ink-600 bg-ink-100 hover:bg-ink-200 px-3 py-1.5 rounded-full tap">Archive</button>`;
+  } else if (league.status === 'archived') {
+    statusBtn = `<button onclick="adminActivateLeague('${league.id}')" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-full tap">Reactivate</button>`;
+  }
+
+  // Build member rows.
+  const memberRowsHtml = memberships_.length
+    ? memberships_.map(m => {
+        const p = m.profile || {};
+        const displayName = p.full_name || p.name || 'Anonymous';
+        const initials = (displayName || 'A').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase();
+        const joinedDate = m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+        const isPaid = m.payment_status === 'paid';
+        const isPending = m.payment_status === 'pending';
+
+        let payBadge;
+        if (isPaid)        payBadge = `<span class="text-[10px] font-bold text-white bg-emerald-500 px-2 py-0.5 rounded-full">✓ PAID</span>`;
+        else if (isPending) payBadge = `<span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">PENDING</span>`;
+        else                payBadge = `<span class="text-[10px] font-bold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full">UNPAID</span>`;
+
+        const proofLink = m.payment_proof_url
+          ? `<a href="${m.payment_proof_url}" target="_blank" rel="noopener" class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full tap">PROOF</a>`
+          : '';
+
+        const togglePayBtn = isPaid
+          ? `<button onclick="adminToggleMembershipPayment('${m.id}', '${league.id}', 'unpaid')" class="text-[10px] font-bold text-ink-600 bg-ink-100 hover:bg-ink-200 px-2 py-0.5 rounded-full tap">Mark Unpaid</button>`
+          : `<button onclick="adminToggleMembershipPayment('${m.id}', '${league.id}', 'paid')" class="text-[10px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-2 py-0.5 rounded-full tap">Mark Paid</button>`;
+
+        const safeName = (displayName || '').replace(/'/g, "\\'");
+        const removeBtn = `<button onclick="adminRemoveMembership('${m.id}', '${league.id}', '${safeName}')" class="text-ink-400 hover:text-red-500 p-1 tap" title="Remove from league">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>`;
+
+        return `
+          <div class="p-3 rounded-2xl bg-paper border border-paper-border">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-xs shrink-0">${initials}</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-sm truncate">${displayName}</span>
+                  ${payBadge}
+                </div>
+                <div class="text-[11px] text-ink-500 truncate">
+                  ${p.department ? p.department + ' · ' : ''}Joined ${joinedDate}
+                  ${m.entry_fee_paid != null ? ' · ' + _formatNu(m.entry_fee_paid) : ''}
+                </div>
+              </div>
+              ${removeBtn}
             </div>
-            <div class="text-right shrink-0">
-              <div class="font-bold text-brand-700">${s.points || 0}</div>
-              <div class="text-[10px] text-ink-400 uppercase tracking-wider font-semibold">pts</div>
+            <div class="flex items-center gap-2 mt-2 pl-13 flex-wrap">
+              ${togglePayBtn}
+              ${proofLink}
             </div>
           </div>`;
+      }).join('')
+    : `<div class="text-center py-6">
+         <div class="text-3xl mb-2 opacity-40">👥</div>
+         <div class="text-sm font-semibold text-ink-700">No members yet</div>
+         <p class="text-[11px] text-ink-400 mt-1">Share the invite code: <b>${league.invite_code || '—'}</b></p>
+       </div>`;
+
+  // Build leaderboard section (uses existing all-time points; per-league scoring scope is a later stage).
+  const stats = leaderboard || [];
+  const leaderboardHtml = stats.length
+    ? `<div class="space-y-2">
+        ${stats.slice(0, 50).map((s, i) => {
+          const rank = i + 1;
+          const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+          const rankBox = medal
+            ? `<div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold text-sm shrink-0">${medal}</div>`
+            : `<div class="w-8 h-8 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-xs text-ink-500 shrink-0">${rank}</div>`;
+          const initials = (s.name || 'A').split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase();
+          return `
+            <div class="flex items-center gap-3 p-2.5 rounded-xl ${rank <= 3 ? 'bg-brand-50/50 border border-brand-100' : 'bg-paper border border-paper-border'}">
+              ${rankBox}
+              <div class="w-8 h-8 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-[11px] shrink-0">${initials}</div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm truncate">${s.name || 'Anonymous'}</div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="font-bold text-brand-700 text-sm">${s.points || 0}</div>
+                <div class="text-[9px] text-ink-400 uppercase tracking-wider font-semibold">pts</div>
+              </div>
+            </div>`;
         }).join('')}
+       </div>`
+    : `<div class="text-center py-4 text-[11px] text-ink-400">No leaderboard data yet.</div>`;
+
+  // Edit panel — pre-populated with current values; hidden until Edit clicked.
+  const overrideOn = league.prize_pool_override !== null && league.prize_pool_override !== undefined;
+  const editPanelHtml = `
+    <div id="league-edit-panel" class="hidden bg-paper rounded-2xl p-4 border border-paper-border space-y-3 mt-3">
+      <div>
+        <label class="text-xs font-semibold text-ink-700 mb-1 block">League Name</label>
+        <input type="text" id="edit-pl-name" maxlength="60" value="${(league.name || '').replace(/"/g, '&quot;')}"
+          class="w-full px-3 py-2.5 rounded-xl border border-paper-border bg-white text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-ink-700 mb-1 block">Entry Fee (Nu.)</label>
+        <input type="number" id="edit-pl-fee" min="0" step="50" value="${league.entry_fee || 0}"
+          class="w-full px-3 py-2.5 rounded-xl border border-paper-border bg-white text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none">
+      </div>
+      <div class="bg-white rounded-xl p-3 border border-paper-border">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0 mr-3">
+            <div class="font-semibold text-xs">Override Prize Pool</div>
+            <div class="text-[10px] text-ink-500 mt-0.5">Off = auto (paid × fee). On = fixed.</div>
+          </div>
+          <div id="edit-pl-override-switch" class="switch ${overrideOn ? 'on' : ''}" onclick="adminToggleEditOverride()"></div>
+        </div>
+        <div id="edit-pl-override-input-wrap" class="mt-2 ${overrideOn ? '' : 'hidden'}">
+          <input type="number" id="edit-pl-prize-override" min="0" step="100" value="${overrideOn ? league.prize_pool_override : ''}" placeholder="Manual amount"
+            class="w-full px-3 py-2.5 rounded-xl border border-paper-border bg-white text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="adminSaveLeagueEdits('${league.id}')" id="edit-pl-save-btn"
+          class="flex-1 bg-gradient-to-r from-ink-900 to-brand-900 text-white font-semibold py-2.5 rounded-xl tap text-sm shadow-md">
+          Save Changes
+        </button>
+        <button onclick="adminHideEditPanel()"
+          class="px-4 bg-paper border border-paper-border text-ink-700 font-semibold py-2.5 rounded-xl tap text-sm">
+          Cancel
+        </button>
       </div>
     </div>`;
 
-  showToast('Viewing league: ' + (league?.name || 'League'), 'info');
+  // Pool display line.
+  const poolLine = pool.isOverride
+    ? `<span class="text-purple-700 font-semibold">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(override)</span>`
+    : `<span class="text-ink-900 font-semibold">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(auto)</span>`;
+
+  // Render the full drawer.
+  container.innerHTML = `
+    <div class="card p-5 mb-4">
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-3">
+        <button onclick="loadAdminLeagueBrowser()" class="text-ink-400 hover:text-ink-700 tap p-1" title="Back to list">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="font-bold text-lg truncate">${league.name || 'Untitled'}</h3>
+            ${statusBadge}
+          </div>
+          <p class="text-[11px] text-ink-500 truncate mt-0.5">
+            Code: <span class="font-mono font-bold">${league.invite_code || '—'}</span>
+            · Fee: ${_formatNu(league.entry_fee || 0)}
+            · Pool: ${poolLine}
+          </p>
+        </div>
+      </div>
+
+      <!-- Action row -->
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="adminShowEditPanel()" class="text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-full tap">✎ Edit</button>
+        ${statusBtn}
+        <button onclick="adminRegenerateInviteCode('${league.id}')" class="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full tap">🔁 New Code</button>
+        <button onclick="adminDeleteLeague('${league.id}', ${JSON.stringify(league.name || '').replace(/"/g, '&quot;')})" class="text-[11px] font-bold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full tap">🗑 Delete</button>
+      </div>
+
+      ${editPanelHtml}
+    </div>
+
+    <!-- Members card -->
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h4 class="font-bold text-sm tracking-tight">Members</h4>
+          <p class="text-[11px] text-ink-500 mt-0.5">${totalMembers} total · ${paidMembers} paid</p>
+        </div>
+      </div>
+      <div class="space-y-2">
+        ${memberRowsHtml}
+      </div>
+    </div>
+
+    <!-- Leaderboard card -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h4 class="font-bold text-sm tracking-tight">Leaderboard</h4>
+          <p class="text-[11px] text-ink-500 mt-0.5">Members ranked by points</p>
+        </div>
+      </div>
+      ${leaderboardHtml}
+    </div>
+  `;
+}
+
+// Toggle the edit panel visibility (called from "✎ Edit" button).
+function adminShowEditPanel() {
+  const panel = document.getElementById('league-edit-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden');
+}
+
+function adminHideEditPanel() {
+  const panel = document.getElementById('league-edit-panel');
+  if (panel) panel.classList.add('hidden');
+}
+
+// Toggle the override switch inside the edit panel.
+function adminToggleEditOverride() {
+  const sw = document.getElementById('edit-pl-override-switch');
+  const wrap = document.getElementById('edit-pl-override-input-wrap');
+  if (!sw || !wrap) return;
+  const on = !sw.classList.contains('on');
+  sw.classList.toggle('on', on);
+  wrap.classList.toggle('hidden', !on);
+  if (!on) {
+    const input = document.getElementById('edit-pl-prize-override');
+    if (input) input.value = '';
+  }
+}
+
+// Save edits made in the edit panel.
+async function adminSaveLeagueEdits(leagueId) {
+  if (!isAdmin()) return;
+  if (!leagueId) return;
+
+  const btn = document.getElementById('edit-pl-save-btn');
+  if (btn?.disabled) return;
+
+  const name = (document.getElementById('edit-pl-name')?.value || '').trim();
+  if (!name) {
+    showToast('League name required', 'warning');
+    return;
+  }
+  if (name.length > 60) {
+    showToast('Name too long (max 60)', 'warning');
+    return;
+  }
+
+  const feeRaw = (document.getElementById('edit-pl-fee')?.value || '').trim();
+  const entryFee = Number(feeRaw);
+  if (!Number.isFinite(entryFee) || entryFee < 0) {
+    showToast('Entry fee must be 0 or higher', 'warning');
+    return;
+  }
+
+  const overrideOn = document.getElementById('edit-pl-override-switch')?.classList.contains('on');
+  let prizePoolOverride = null;
+  if (overrideOn) {
+    const ovRaw = (document.getElementById('edit-pl-prize-override')?.value || '').trim();
+    if (ovRaw === '') {
+      showToast('Enter override amount or turn off override', 'warning');
+      return;
+    }
+    const n = Number(ovRaw);
+    if (!Number.isFinite(n) || n < 0) {
+      showToast('Override must be 0 or higher', 'warning');
+      return;
+    }
+    prizePoolOverride = n;
+  }
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+
+  const { error } = await supabaseClient
+    .from('leagues')
+    .update({
+      name: name,
+      entry_fee: entryFee,
+      prize_pool_override: prizePoolOverride
+    })
+    .eq('id', leagueId);
+
+  btn.disabled = false;
+  btn.textContent = orig;
+
+  if (error) {
+    console.error('[ADMIN] adminSaveLeagueEdits error:', error);
+    showToast(error.message || 'Save failed', 'error');
+    return;
+  }
+
+  showToast('League updated', 'success');
+  await adminViewLeague(leagueId); // refresh drawer
+}
+
+// Regenerate the invite code (existing shared links will break).
+async function adminRegenerateInviteCode(leagueId) {
+  if (!isAdmin()) return;
+  if (!leagueId) return;
+
+  if (!confirm('Generate a new invite code? Old shared links will stop working.')) return;
+
+  let newCode = '';
+  let attempts = 0;
+  do {
+    newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { data: existing } = await supabaseClient
+      .from('leagues')
+      .select('id')
+      .eq('invite_code', newCode)
+      .maybeSingle();
+    if (!existing) break;
+    attempts++;
+    newCode = '';
+  } while (attempts < 10);
+
+  if (!newCode) {
+    showToast('Failed to generate unique code, try again', 'error');
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('leagues')
+    .update({ invite_code: newCode })
+    .eq('id', leagueId);
+
+  if (error) {
+    console.error('[ADMIN] adminRegenerateInviteCode error:', error);
+    showToast(error.message || 'Failed', 'error');
+    return;
+  }
+
+  showToast(`New code: ${newCode}`, 'success');
+  await adminViewLeague(leagueId);
+}
+
+// Delete a league. Refuses if any paid memberships exist (would orphan paid players).
+async function adminDeleteLeague(leagueId, leagueName) {
+  if (!isAdmin()) return;
+  if (!leagueId) return;
+
+  // Safety: refuse delete if any paid memberships exist.
+  const { count: paidCount, error: countErr } = await supabaseClient
+    .from('league_memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', leagueId)
+    .eq('payment_status', 'paid');
+
+  if (countErr) {
+    console.error('[ADMIN] paid count check failed:', countErr);
+    showToast('Could not verify members — delete aborted', 'error');
+    return;
+  }
+  if ((paidCount || 0) > 0) {
+    showToast(`Cannot delete: ${paidCount} paid member(s). Refund and mark unpaid first.`, 'error');
+    return;
+  }
+
+  const label = leagueName || 'this league';
+  if (!confirm(`Delete "${label}"? This cannot be undone. All memberships and chat messages for this league will be removed.`)) return;
+
+  // Delete memberships first (no ON DELETE CASCADE assumed for league_memberships → leagues).
+  // Note: league_chat_messages was created with ON DELETE CASCADE in Stage 1, so it auto-cleans.
+  const { error: memErr } = await supabaseClient
+    .from('league_memberships')
+    .delete()
+    .eq('league_id', leagueId);
+
+  if (memErr) {
+    console.error('[ADMIN] delete memberships error:', memErr);
+    showToast('Failed to delete memberships', 'error');
+    return;
+  }
+
+  const { error: leagueErr } = await supabaseClient
+    .from('leagues')
+    .delete()
+    .eq('id', leagueId);
+
+  if (leagueErr) {
+    console.error('[ADMIN] delete league error:', leagueErr);
+    showToast(leagueErr.message || 'Failed to delete league', 'error');
+    return;
+  }
+
+  showToast(`Deleted "${label}"`, 'success');
+  activeLeagueId = null;
+  await loadAdminLeagueBrowser();
+  if (typeof loadLeagueStats === 'function') loadLeagueStats();
+}
+
+// Toggle a membership's payment status between paid and unpaid.
+// `target` is the desired new status: 'paid' or 'unpaid'.
+async function adminToggleMembershipPayment(membershipId, leagueId, target) {
+  if (!isAdmin()) return;
+  if (!membershipId || !leagueId) return;
+  if (target !== 'paid' && target !== 'unpaid') return;
+
+  // Snapshot entry_fee at moment of paid for audit trail.
+  let entryFee = null;
+  if (target === 'paid') {
+    const { data: lg } = await supabaseClient
+      .from('leagues')
+      .select('entry_fee')
+      .eq('id', leagueId)
+      .maybeSingle();
+    entryFee = lg?.entry_fee ?? null;
+  }
+
+  const patch = (target === 'paid')
+    ? { payment_status: 'paid', paid_at: new Date().toISOString(), entry_fee_paid: entryFee, payment_pending: null }
+    : { payment_status: 'unpaid', paid_at: null };
+
+  const { error } = await supabaseClient
+    .from('league_memberships')
+    .update(patch)
+    .eq('id', membershipId);
+
+  if (error) {
+    console.error('[ADMIN] adminToggleMembershipPayment error:', error);
+    showToast(error.message || 'Update failed', 'error');
+    return;
+  }
+
+  showToast(target === 'paid' ? 'Marked as paid' : 'Marked as unpaid', 'success');
+  await adminViewLeague(leagueId);
+}
+
+// Remove a member from a league (delete the membership row).
+async function adminRemoveMembership(membershipId, leagueId, userName) {
+  if (!isAdmin()) return;
+  if (!membershipId || !leagueId) return;
+
+  if (!confirm(`Remove ${userName || 'this member'} from the league? This cannot be undone.`)) return;
+
+  const { error } = await supabaseClient
+    .from('league_memberships')
+    .delete()
+    .eq('id', membershipId);
+
+  if (error) {
+    console.error('[ADMIN] adminRemoveMembership error:', error);
+    showToast(error.message || 'Remove failed', 'error');
+    return;
+  }
+
+  showToast(`Removed ${userName || 'member'}`, 'success');
+  await adminViewLeague(leagueId);
+}
+
+// Internal: format a number as Nu. xxx (Bhutanese Ngultrum).
+function _formatNu(n) {
+  const num = Number(n) || 0;
+  return 'Nu. ' + num.toLocaleString('en-IN');
+}
+
+// Internal: compute the displayed prize pool for a league.
+// If `prize_pool_override` is set, return it. Otherwise compute
+// auto = paid_member_count × entry_fee.
+function _computePrizePool(league, paidCount) {
+  if (league.prize_pool_override !== null && league.prize_pool_override !== undefined) {
+    return { amount: Number(league.prize_pool_override) || 0, isOverride: true };
+  }
+  const auto = (Number(paidCount) || 0) * (Number(league.entry_fee) || 0);
+  return { amount: auto, isOverride: false };
+}
+
+// Toggle the manual prize-pool input on the Create form.
+function togglePrizePoolOverride() {
+  const sw = document.getElementById('pl-override-switch');
+  const wrap = document.getElementById('pl-override-input-wrap');
+  if (!sw || !wrap) return;
+  const on = !sw.classList.contains('on');
+  sw.classList.toggle('on', on);
+  wrap.classList.toggle('hidden', !on);
+  if (!on) {
+    const input = document.getElementById('new-pl-prize-override');
+    if (input) input.value = '';
+  }
 }
 
 async function loadAdminLeagueBrowser() {
@@ -3369,10 +3899,14 @@ async function loadAdminLeagueBrowser() {
   const container = document.getElementById('admin-league-browser');
   if (!container) return;
   container.classList.remove('hidden');
+
+  // Pull ONLY private leagues (the global league row is excluded from this list).
   const { data: leagues, error } = await supabaseClient
     .from('leagues')
-    .select('*, creator:created_by (full_name, name)')
+    .select('*')
+    .eq('is_private', true)
     .order('created_at', { ascending: false });
+
   if (error) {
     container.innerHTML = `<div class="text-center py-4 text-red-500 text-sm">Failed to load leagues</div>`;
     return;
@@ -3382,49 +3916,307 @@ async function loadAdminLeagueBrowser() {
       <div class="text-center py-6">
         <div class="text-3xl mb-2 opacity-40">🏆</div>
         <div class="text-sm font-semibold text-ink-700">No private leagues yet</div>
+        <div class="text-[11px] text-ink-400 mt-1">Use the form above to create one.</div>
       </div>`;
     return;
   }
+
   const leagueIds = leagues.map(l => l.id);
+
+  // Pull all memberships in one shot; split paid vs total in JS.
   const { data: memberships } = await supabaseClient
     .from('league_memberships')
-    .select('league_id')
+    .select('league_id, payment_status')
     .in('league_id', leagueIds);
-  const memberCounts = {};
+
+  const totalCounts = {};
+  const paidCounts  = {};
   (memberships || []).forEach(m => {
-    memberCounts[m.league_id] = (memberCounts[m.league_id] || 0) + 1;
+    totalCounts[m.league_id] = (totalCounts[m.league_id] || 0) + 1;
+    if (m.payment_status === 'paid') {
+      paidCounts[m.league_id] = (paidCounts[m.league_id] || 0) + 1;
+    }
   });
-  const creatorIds = [...new Set(leagues.map(l => l.created_by))];
-  const { data: creators } = await supabaseClient
-    .from('profiles')
-    .select('id, full_name, name')
-    .in('id', creatorIds);
+
+  // Pull creator names.
+  const creatorIds = [...new Set(leagues.map(l => l.created_by).filter(Boolean))];
   const creatorMap = {};
-  (creators || []).forEach(c => {
-    creatorMap[c.id] = c.full_name || c.name || 'Unknown';
-  });
+  if (creatorIds.length) {
+    const { data: creators } = await supabaseClient
+      .from('profiles')
+      .select('id, full_name, name')
+      .in('id', creatorIds);
+    (creators || []).forEach(c => {
+      creatorMap[c.id] = c.full_name || c.name || 'Unknown';
+    });
+  }
+
   container.innerHTML = leagues.map(l => {
-    const memberCount = memberCounts[l.id] || 0;
+    const total = totalCounts[l.id] || 0;
+    const paid  = paidCounts[l.id]  || 0;
     const creatorName = creatorMap[l.created_by] || 'Unknown';
     const isActive = activeLeagueId === l.id;
+    const pool = _computePrizePool(l, paid);
+
+    // Status badge styling.
+    let statusBadge;
+    if (l.status === 'active') {
+      statusBadge = `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVE</span>`;
+    } else if (l.status === 'archived') {
+      statusBadge = `<span class="text-[10px] font-bold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full">ARCHIVED</span>`;
+    } else {
+      statusBadge = `<span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">DRAFT</span>`;
+    }
+
+    // Action buttons by status.
+    let actions = '';
+    if (l.status === 'draft') {
+      actions = `<button onclick="event.stopPropagation(); adminActivateLeague('${l.id}')" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full tap">Activate</button>`;
+    } else if (l.status === 'active') {
+      actions = `<button onclick="event.stopPropagation(); adminArchiveLeague('${l.id}')" class="text-[11px] font-bold text-ink-600 bg-ink-100 hover:bg-ink-200 px-2.5 py-1 rounded-full tap">Archive</button>`;
+    }
+
+    const poolLine = pool.isOverride
+      ? `<span class="font-semibold text-purple-700">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(override)</span>`
+      : `<span class="font-semibold text-ink-900">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(auto)</span>`;
+
     return `
-    <div class="flex items-center gap-3 p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" 
+    <div class="p-3 rounded-2xl border ${isActive ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap"
          onclick="adminViewLeague('${l.id}')">
-      <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
-        ${(l.name || 'L').substring(0, 2).toUpperCase()}
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
+          ${(l.name || 'L').substring(0, 2).toUpperCase()}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-sm truncate">${l.name || 'Untitled'}</span>
+            ${statusBadge}
+          </div>
+          <div class="text-[11px] text-ink-500 mt-0.5 truncate">
+            Code: ${l.invite_code || '—'} · by ${creatorName}
+          </div>
+        </div>
+        ${actions}
       </div>
-      <div class="flex-1 min-w-0">
-        <div class="font-semibold text-sm truncate">${l.name}</div>
-        <div class="text-[11px] text-ink-500">
-          ${memberCount} member${memberCount !== 1 ? 's' : ''} · Code: ${l.invite_code} · by ${creatorName}
+      <div class="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+        <div class="bg-white rounded-xl px-2 py-1.5 border border-paper-border">
+          <div class="text-ink-400">Members</div>
+          <div class="font-semibold text-ink-900">${paid}/${total} paid</div>
+        </div>
+        <div class="bg-white rounded-xl px-2 py-1.5 border border-paper-border">
+          <div class="text-ink-400">Entry</div>
+          <div class="font-semibold text-ink-900">${_formatNu(l.entry_fee || 0)}</div>
+        </div>
+        <div class="bg-white rounded-xl px-2 py-1.5 border border-paper-border">
+          <div class="text-ink-400">Prize</div>
+          <div>${poolLine}</div>
         </div>
       </div>
-      ${isActive ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">VIEWING</span>' : ''}
-      <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-      </svg>
     </div>`;
   }).join('');
+}
+
+// Create a new private league as admin.
+async function adminCreateLeague() {
+  if (!isAdmin()) {
+    showToast('Admin only', 'error');
+    return;
+  }
+  const btn = document.getElementById('admin-create-league-btn');
+  if (btn?.disabled) return;
+
+  const name = (document.getElementById('new-pl-name')?.value || '').trim();
+  if (!name) {
+    showToast('Enter a league name', 'warning');
+    return;
+  }
+  if (name.length > 60) {
+    showToast('Name too long (max 60 chars)', 'warning');
+    return;
+  }
+
+  const feeRaw = (document.getElementById('new-pl-fee')?.value || '').trim();
+  const entryFee = Number(feeRaw);
+  if (!Number.isFinite(entryFee) || entryFee < 0) {
+    showToast('Entry fee must be 0 or higher', 'warning');
+    return;
+  }
+
+  const codeRaw = (document.getElementById('new-pl-code')?.value || '').trim().toUpperCase();
+  if (codeRaw && !/^[A-Z0-9]{4,12}$/.test(codeRaw)) {
+    showToast('Invite code: 4–12 letters/numbers only', 'warning');
+    return;
+  }
+
+  // Prize pool override only if the switch is on.
+  const overrideOn = document.getElementById('pl-override-switch')?.classList.contains('on');
+  let prizePoolOverride = null;
+  if (overrideOn) {
+    const overrideRaw = (document.getElementById('new-pl-prize-override')?.value || '').trim();
+    if (overrideRaw === '') {
+      showToast('Enter override amount or turn off override', 'warning');
+      return;
+    }
+    const n = Number(overrideRaw);
+    if (!Number.isFinite(n) || n < 0) {
+      showToast('Override must be 0 or higher', 'warning');
+      return;
+    }
+    prizePoolOverride = n;
+  }
+
+  // Resolve invite code: explicit OR auto-generated with uniqueness check.
+  let inviteCode = codeRaw;
+  if (!inviteCode) {
+    let attempts = 0;
+    do {
+      inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { data: existing } = await supabaseClient
+        .from('leagues')
+        .select('id')
+        .eq('invite_code', inviteCode)
+        .maybeSingle();
+      if (!existing) break;
+      attempts++;
+      inviteCode = '';
+    } while (attempts < 10);
+    if (!inviteCode) {
+      showToast('Failed to generate unique code, try again', 'error');
+      return;
+    }
+  } else {
+    // User-provided code must also be unique.
+    const { data: existing } = await supabaseClient
+      .from('leagues')
+      .select('id')
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+    if (existing) {
+      showToast('That invite code is already taken', 'warning');
+      return;
+    }
+  }
+
+  const user = (typeof getUser === 'function') ? getUser() : null;
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Creating...';
+
+  const { data: league, error } = await supabaseClient
+    .from('leagues')
+    .insert({
+      name: name,
+      invite_code: inviteCode,
+      entry_fee: entryFee,
+      is_private: true,
+      status: 'draft',
+      prize_pool_override: prizePoolOverride,
+      chat_enabled: true,
+      created_by: user?.id || null,
+      scoring_rules: {}
+    })
+    .select()
+    .single();
+
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+
+  if (error) {
+    console.error('[ADMIN] adminCreateLeague error:', error);
+    showToast(error.message || 'Failed to create league', 'error');
+    return;
+  }
+
+  showToast(`Created "${league.name}" (DRAFT). Code: ${league.invite_code}`, 'success');
+
+  // Reset the form.
+  document.getElementById('new-pl-name').value = '';
+  document.getElementById('new-pl-fee').value = '1000';
+  document.getElementById('new-pl-code').value = '';
+  const sw = document.getElementById('pl-override-switch');
+  const wrap = document.getElementById('pl-override-input-wrap');
+  if (sw) sw.classList.remove('on');
+  if (wrap) wrap.classList.add('hidden');
+  const ovInput = document.getElementById('new-pl-prize-override');
+  if (ovInput) ovInput.value = '';
+
+  await loadAdminLeagueBrowser();
+  if (typeof loadLeagueStats === 'function') loadLeagueStats();
+}
+
+// Flip a draft league to active (sets activated_at if not already set).
+async function adminActivateLeague(leagueId) {
+  if (!isAdmin()) return;
+  if (!leagueId) return;
+
+  if (!confirm('Activate this league? Players will be able to join and pay.')) return;
+
+  // Read current row to know whether activated_at is already set.
+  const { data: current, error: readErr } = await supabaseClient
+    .from('leagues')
+    .select('id, status, activated_at, name')
+    .eq('id', leagueId)
+    .maybeSingle();
+
+  if (readErr || !current) {
+    showToast('League not found', 'error');
+    return;
+  }
+  if (current.status === 'active') {
+    showToast('Already active', 'info');
+    return;
+  }
+
+  const patch = { status: 'active' };
+  if (!current.activated_at) patch.activated_at = new Date().toISOString();
+
+  const { error } = await supabaseClient
+    .from('leagues')
+    .update(patch)
+    .eq('id', leagueId);
+
+  if (error) {
+    console.error('[ADMIN] adminActivateLeague error:', error);
+    showToast(error.message || 'Failed to activate', 'error');
+    return;
+  }
+
+  showToast(`Activated "${current.name}"`, 'success');
+  await loadAdminLeagueBrowser();
+}
+
+// Archive a league. Reversible by activating again.
+async function adminArchiveLeague(leagueId) {
+  if (!isAdmin()) return;
+  if (!leagueId) return;
+
+  if (!confirm('Archive this league? Members will no longer see it as active.')) return;
+
+  const { data: current, error: readErr } = await supabaseClient
+    .from('leagues')
+    .select('id, name')
+    .eq('id', leagueId)
+    .maybeSingle();
+
+  if (readErr || !current) {
+    showToast('League not found', 'error');
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('leagues')
+    .update({ status: 'archived' })
+    .eq('id', leagueId);
+
+  if (error) {
+    console.error('[ADMIN] adminArchiveLeague error:', error);
+    showToast(error.message || 'Failed to archive', 'error');
+    return;
+  }
+
+  showToast(`Archived "${current.name}"`, 'success');
+  await loadAdminLeagueBrowser();
 }
 
     init()
@@ -3447,10 +4239,13 @@ async function loadAdminLeagueBrowser() {
     }
 window.setSystemSettings = async function(payload) {
   try {
+    // Spread all fields from payload so new flags (e.g. private_leagues_v2_enabled)
+    // can be written without code changes here. Previously this only wrote
+    // private_leagues_enabled, which silently dropped any other field passed in.
     const { data, error } = await supabaseClient
       .from('system_settings')
       .upsert(
-        { id: 1, private_leagues_enabled: payload.private_leagues_enabled },
+        { id: 1, ...payload },
         { onConflict: 'id' }
       )
       .select()
@@ -3461,7 +4256,7 @@ window.setSystemSettings = async function(payload) {
   }
 }
 
-    let systemSettings = { private_leagues_enabled: false }
+    let systemSettings = { private_leagues_enabled: false, private_leagues_v2_enabled: false }
 
     async function loadSystemSettings() {
       try {
@@ -3493,6 +4288,12 @@ window.setSystemSettings = async function(payload) {
         }
       }
 
+      // v2 switch visual state
+      const swV2 = document.getElementById('private-leagues-v2-switch')
+      if (swV2) {
+        swV2.classList.toggle('on', !!systemSettings.private_leagues_v2_enabled)
+      }
+
       loadLeagueStats()
     }
 
@@ -3513,6 +4314,38 @@ window.setSystemSettings = async function(payload) {
       systemSettings.private_leagues_enabled = newValue
       renderSettings()
       showToast(newValue ? 'Private leagues enabled!' : 'Private leagues disabled', 'success')
+    }
+
+    // Toggle the v2 (admin-only create + per-league payment) behavior flag.
+    async function togglePrivateLeaguesV2() {
+      const newValue = !systemSettings.private_leagues_v2_enabled
+
+      // Warn admin before flipping ON — the user experience changes meaningfully.
+      if (newValue) {
+        const ok = confirm(
+          'Enable Private Leagues v2?\n\n' +
+          '• Only admins will be able to create private leagues.\n' +
+          '• Users will only see leagues with status "active".\n' +
+          '• User payment flow per league comes in the next update.\n\n' +
+          'You can turn this off again at any time.'
+        )
+        if (!ok) return
+      }
+
+      const { error } = await setSystemSettings({ private_leagues_v2_enabled: newValue })
+      if (error) {
+        const msg = error.message || ''
+        if (msg.includes('Admin access required') || msg.includes('admin')) {
+          showToast('Admin access required.', 'error')
+        } else {
+          showToast(error.message || 'Failed to update setting', 'error')
+        }
+        return
+      }
+
+      systemSettings.private_leagues_v2_enabled = newValue
+      renderSettings()
+      showToast(newValue ? 'Private Leagues v2 ENABLED' : 'Private Leagues v2 disabled', 'success')
     }
 
     async function loadLeagueStats() {

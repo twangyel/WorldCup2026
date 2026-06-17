@@ -909,8 +909,11 @@ function showPaymentGate() {
                 .from('profiles').select('*').eq('id', user.id).single()
               if (fresh && cached) Object.assign(cached, fresh)
             } catch (e) { /* ignore */ }
-            showToast('🎉 Private league access granted by admin!', 'success')
-            if (typeof loadMyLeagues === 'function') loadMyLeagues()
+            // Stage 4c: skip v1-flag toast/refresh when v2 is on — the flag is dead in v2.
+            if (!privateLeaguesV2Enabled) {
+              showToast('🎉 Private league access granted by admin!', 'success')
+              if (typeof loadMyLeagues === 'function') loadMyLeagues()
+            }
           }
           if (payload.new?.private_leagues_access === false && payload.old?.private_leagues_access === true) {
             const cached = (typeof getProfile === 'function') ? getProfile() : null
@@ -920,9 +923,12 @@ function showPaymentGate() {
                 .from('profiles').select('*').eq('id', user.id).single()
               if (fresh && cached) Object.assign(cached, fresh)
             } catch (e) { /* ignore */ }
-            showToast('Private league access has been revoked', 'info')
-            if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('revoked')
-            if (typeof loadMyLeagues === 'function') loadMyLeagues()
+            // Stage 4c: in v2 mode, the flag is dead — don't toast, don't lockout, don't refresh.
+            if (!privateLeaguesV2Enabled) {
+              showToast('Private league access has been revoked', 'info')
+              if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('revoked')
+              if (typeof loadMyLeagues === 'function') loadMyLeagues()
+            }
           }
         })
         .subscribe()
@@ -1006,6 +1012,21 @@ document.addEventListener('DOMContentLoaded', function() {
   renderBadges()
   startCountdownTicker()
   setupRealtime()
+
+  // Stage 4c: resolve scopes once after login. Safe no-op when v2 is OFF.
+  // Need to wait for v2 flag to be read first (setupRealtime reads it via
+  // checkPrivateLeaguesV2Enabled in its system-settings setup); we re-read
+  // here defensively so this works regardless of init order.
+  try {
+    if (typeof checkPrivateLeaguesV2Enabled === 'function') {
+      await checkPrivateLeaguesV2Enabled()
+    }
+    if (typeof initScopeOnLogin === 'function') {
+      await initScopeOnLogin()
+    }
+  } catch (e) {
+    console.warn('[Stage 4c] scope init failed:', e)
+  }
 }async function loadGateFee() {
       try {
         let fee = 500
@@ -2257,8 +2278,16 @@ async function loadHome() {
 
   // Prize pool dashboard
   try {
-    const breakdown = await fetchPrizeBreakdown()
-    if (breakdown && breakdown.gross > 0) {
+    // Stage 4d: scope-aware breakdown. Falls back to global if helper missing.
+    const breakdown = (typeof fetchPrizeBreakdownForScope === 'function')
+      ? await fetchPrizeBreakdownForScope(currentScope)
+      : await fetchPrizeBreakdown()
+    // For private scopes, render even at zero so users see "0 paid yet" state.
+    // For global, keep the original "gross > 0" guard.
+    const shouldRender = breakdown && (
+      breakdown._scopeType === 'private' || breakdown.gross > 0
+    )
+    if (shouldRender) {
       renderPrizeDashboard(breakdown)
     } else {
       document.getElementById('home-prize-dashboard').classList.add('hidden')
@@ -4188,29 +4217,39 @@ async function loadLeaderboard() {
   // 5) System settings — private leagues toggle (realtime sync from admin panel)
   supabaseClient.channel('system-settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, (payload) => {
-      const newVal = payload.new?.private_leagues_enabled
-      if (typeof newVal !== 'boolean') return
+      // Stage 4a: track both v1 and v2 flags. v2 has its own master gate, so
+      // v1 going off should NOT lock users out of v2.
+      const newV1 = payload.new?.private_leagues_enabled
+      const newV2 = payload.new?.private_leagues_v2_enabled
 
-      const oldVal = privateLeaguesEnabled
-      privateLeaguesEnabled = newVal
-      console.log('[Realtime] Private leagues toggled:', oldVal, '→', newVal)
+      if (typeof newV1 === 'boolean') {
+        const oldV1 = privateLeaguesEnabled
+        privateLeaguesEnabled = newV1
+        if (oldV1 !== newV1) console.log('[Realtime] v1 private leagues:', oldV1, '→', newV1)
 
-      // Always re-render leagues UI if user is on profile tab
+        // Show toast only when v2 is NOT taking over (avoids confusing toast spam when admin is mid-flipping flags)
+        if (_systemSettingsInitialized && oldV1 !== newV1 && !privateLeaguesV2Enabled) {
+          showToast(newV1 ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
+        }
+      }
+
+      if (typeof newV2 === 'boolean') {
+        const oldV2 = privateLeaguesV2Enabled
+        privateLeaguesV2Enabled = newV2
+        if (oldV2 !== newV2) console.log('[Realtime] v2 private leagues:', oldV2, '→', newV2)
+      }
+
+      // Always re-render leagues UI if user is on profile/extras tab
       const profileTab = document.getElementById('tab-profile')
-      if (profileTab && !profileTab.classList.contains('hidden')) {
+      const extrasTab  = document.getElementById('tab-extras')
+      if ((profileTab && !profileTab.classList.contains('hidden')) ||
+          (extrasTab  && !extrasTab.classList.contains('hidden'))) {
         loadMyLeagues()
       }
 
-      // If toggled OFF, kick everyone out of league views immediately
-      if (newVal === false) {
+      // Lockout only if v1 went off AND v2 is also off. If v2 is on, users keep their access.
+      if (newV1 === false && !privateLeaguesV2Enabled) {
         if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('disabled')
-      }
-
-      // Show toast — fire whenever local cache disagreed with the new value
-      // (Supabase doesn't always send accurate payload.old; we trust our own cache)
-      // FIX: Only toast after initial load is complete, not on login/realtime connect
-      if (_systemSettingsInitialized && oldVal !== newVal) {
-        showToast(newVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
       }
     })
     .subscribe((status) => {
@@ -4224,20 +4263,36 @@ async function loadLeaderboard() {
     if (document.visibilityState !== 'visible') return
     try {
       const { data } = await getSystemSettings()
-      const dbVal = !!(data?.private_leagues_enabled)
-      if (dbVal !== privateLeaguesEnabled) {
-        const oldVal = privateLeaguesEnabled
-        privateLeaguesEnabled = dbVal
-        console.log('[Poll] Private leagues drift detected:', oldVal, '→', dbVal)
-        // FIX: Only toast after initial load is complete
-        if (_systemSettingsInitialized) {
-          showToast(dbVal ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
+      const dbV1 = !!(data?.private_leagues_enabled)
+      const dbV2 = !!(data?.private_leagues_v2_enabled)
+
+      const v1Changed = dbV1 !== privateLeaguesEnabled
+      const v2Changed = dbV2 !== privateLeaguesV2Enabled
+
+      if (v1Changed) {
+        const oldV1 = privateLeaguesEnabled
+        privateLeaguesEnabled = dbV1
+        console.log('[Poll] v1 drift:', oldV1, '→', dbV1)
+        if (_systemSettingsInitialized && !dbV2) {
+          showToast(dbV1 ? '🎉 Private leagues are now enabled!' : '🚫 Private leagues have been disabled', 'info')
         }
-        if (dbVal === false && typeof enforceLeagueAccessLockout === 'function') {
-          enforceLeagueAccessLockout('disabled')
-        }
+      }
+      if (v2Changed) {
+        const oldV2 = privateLeaguesV2Enabled
+        privateLeaguesV2Enabled = dbV2
+        console.log('[Poll] v2 drift:', oldV2, '→', dbV2)
+      }
+
+      // Lockout only if BOTH flags are off
+      if (v1Changed && dbV1 === false && !dbV2 && typeof enforceLeagueAccessLockout === 'function') {
+        enforceLeagueAccessLockout('disabled')
+      }
+
+      if (v1Changed || v2Changed) {
         const profileTab = document.getElementById('tab-profile')
-        if (profileTab && !profileTab.classList.contains('hidden')) {
+        const extrasTab  = document.getElementById('tab-extras')
+        if ((profileTab && !profileTab.classList.contains('hidden')) ||
+            (extrasTab  && !extrasTab.classList.contains('hidden'))) {
           loadMyLeagues()
         }
       }
@@ -4245,6 +4300,118 @@ async function loadLeaderboard() {
       // silent
     }
   }, 15000)
+
+  // ============================================================
+  // Stage 4a: realtime channels for v2 private leagues
+  // ============================================================
+  // These keep the user-facing UI fresh when:
+  //   - Admin activates / archives / edits / deletes a league
+  //   - Admin marks a membership paid / unpaid
+  //   - A new member joins or leaves
+  //
+  // Both channels re-render whatever league surface is currently visible.
+  // They run regardless of which flag (v1/v2) is on; the renderers themselves
+  // decide what to show.
+  if (window._v2LeaguesChannel) {
+    try { window._v2LeaguesChannel.unsubscribe() } catch (_) {}
+  }
+  window._v2LeaguesChannel = supabaseClient.channel('v2-leagues')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'leagues' }, (payload) => {
+      const changedId = payload.new?.id || payload.old?.id
+      console.log('[Realtime] leagues change:', payload.eventType, changedId)
+
+      // Refresh the user's leagues list if visible
+      const profileTab = document.getElementById('tab-profile')
+      const extrasTab  = document.getElementById('tab-extras')
+      if ((profileTab && !profileTab.classList.contains('hidden')) ||
+          (extrasTab  && !extrasTab.classList.contains('hidden'))) {
+        if (typeof loadMyLeagues === 'function') loadMyLeagues()
+      }
+
+      // Stage 4c: a status flip (active ↔ archived/draft) or league delete
+      // can add/remove a scope from this user's list. Refresh scopes so the
+      // switcher stays accurate.
+      if (typeof refreshScopes === 'function') refreshScopes()
+
+      // Stage 4d: if the changed league IS the user's current private scope,
+      // refresh Home prize pool when visible (covers entry_fee / prize_pool_override edits).
+      if (changedId && currentScope?.type === 'private' && currentScope.id === changedId) {
+        const homeTab = document.getElementById('tab-home')
+        if (homeTab && !homeTab.classList.contains('hidden') &&
+            typeof loadHomePrizePoolOnly === 'function') {
+          loadHomePrizePoolOnly()
+        }
+      }
+
+      // If user is currently viewing this specific league, refresh that view too
+      if (changedId && activeLeagueId === changedId) {
+        if (typeof loadLeagueLeaderboardView === 'function') {
+          loadLeagueLeaderboardView(activeLeagueId)
+        }
+      }
+    })
+    .subscribe((status) => {
+      console.log('[Realtime] v2 leagues channel status:', status)
+    })
+
+  if (window._v2MembershipsChannel) {
+    try { window._v2MembershipsChannel.unsubscribe() } catch (_) {}
+  }
+  window._v2MembershipsChannel = supabaseClient.channel('v2-memberships')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, (payload) => {
+      const me = (typeof getUser === 'function') ? getUser() : null
+      const leagueId  = payload.new?.league_id || payload.old?.league_id
+      const memberUid = payload.new?.user_id  || payload.old?.user_id
+      const concernsMe =
+        (me && memberUid === me.id) ||
+        (Array.isArray(myLeagues) && leagueId && myLeagues.some(l => l && l.id === leagueId))
+
+      if (!concernsMe) return
+
+      console.log('[Realtime] memberships change concerns me:', payload.eventType, leagueId)
+
+      // Notify the user when their own payment status flips to paid
+      if (me && memberUid === me.id &&
+          payload.eventType === 'UPDATE' &&
+          payload.new?.payment_status === 'paid' &&
+          payload.old?.payment_status !== 'paid') {
+        showToast('✅ Your league entry has been verified', 'success')
+      }
+
+      // Stage 4c: refresh scopes when MY membership row changes — covers
+      // newly-paid (adds a scope), unmarked-paid (removes a scope), and
+      // delete (removes a scope).
+      if (me && memberUid === me.id) {
+        if (typeof refreshScopes === 'function') refreshScopes()
+      }
+
+      // Stage 4d: if this membership change affects the user's current
+      // private scope league, refresh Home prize pool (paid count moved).
+      if (leagueId && currentScope?.type === 'private' && currentScope.id === leagueId) {
+        const homeTab = document.getElementById('tab-home')
+        if (homeTab && !homeTab.classList.contains('hidden') &&
+            typeof loadHomePrizePoolOnly === 'function') {
+          loadHomePrizePoolOnly()
+        }
+      }
+
+      // Refresh visible league surface
+      const profileTab = document.getElementById('tab-profile')
+      const extrasTab  = document.getElementById('tab-extras')
+      if ((profileTab && !profileTab.classList.contains('hidden')) ||
+          (extrasTab  && !extrasTab.classList.contains('hidden'))) {
+        if (typeof loadMyLeagues === 'function') loadMyLeagues()
+      }
+
+      if (leagueId && activeLeagueId === leagueId) {
+        if (typeof loadLeagueLeaderboardView === 'function') {
+          loadLeagueLeaderboardView(activeLeagueId)
+        }
+      }
+    })
+    .subscribe((status) => {
+      console.log('[Realtime] v2 memberships channel status:', status)
+    })
 
   // Fallback: poll prize pool every 10 seconds in case realtime fails
   if (prizePollInterval) clearInterval(prizePollInterval)
@@ -4258,8 +4425,15 @@ async function loadLeaderboard() {
     // Lightweight prize pool refresh without re-rendering everything
     async function loadHomePrizePoolOnly() {
       try {
-        const breakdown = await fetchPrizeBreakdown()
-        if (!breakdown || breakdown.gross <= 0) return
+        // Stage 4d: pull breakdown for the active scope (global by default, or
+        // the user's currently-selected private league).
+        const breakdown = (typeof fetchPrizeBreakdownForScope === 'function')
+          ? await fetchPrizeBreakdownForScope(currentScope)
+          : await fetchPrizeBreakdown()
+        if (!breakdown) return
+        // Allow zero-pool private leagues to render (e.g. brand new, no paid members yet);
+        // for global we keep the original "gross > 0" guard to avoid flashing an empty pool.
+        if (breakdown._scopeType !== 'private' && (!breakdown.gross || breakdown.gross <= 0)) return
         renderPrizeDashboard(breakdown, true)
       } catch (e) { /* silent */ }
     }
@@ -4315,6 +4489,78 @@ async function loadLeaderboard() {
       } catch (e) { return null }
     }
 
+    // ============================================================
+    // Stage 4d: scope-aware prize breakdown
+    // ============================================================
+    // Returns the SAME breakdown shape as fetchPrizeBreakdown() so the existing
+    // renderPrizeDashboard() can display it without changes. The breakdown is
+    // adjusted per-scope:
+    //   - global  → identical to fetchPrizeBreakdown()
+    //   - private → uses the league's entry_fee + paid member count, or the
+    //               admin's prize_pool_override if set. Splits come from global
+    //               prize_settings (no per-league split config in 4d).
+    //               No house fee deducted (private leagues are pure-pot).
+    async function fetchPrizeBreakdownForScope(scope) {
+      const s = scope || currentScope || { type: 'global' };
+      if (s.type !== 'private' || !s.id) {
+        // Default / global → legacy path.
+        const b = await fetchPrizeBreakdown();
+        if (b) b._scopeName = 'Prize Pool';
+        return b;
+      }
+
+      try {
+        // Pull league + paid member count + global splits in parallel.
+        const [
+          { data: league },
+          { count: paidCount },
+          { data: settings }
+        ] = await Promise.all([
+          supabaseClient.from('leagues').select('id, name, entry_fee, prize_pool_override').eq('id', s.id).maybeSingle(),
+          supabaseClient.from('league_memberships').select('id', { count: 'exact', head: true })
+            .eq('league_id', s.id).eq('payment_status', 'paid'),
+          supabaseClient.from('prize_settings').select('currency, split_1st, split_2nd, split_3rd').eq('id', 1).maybeSingle()
+        ]);
+
+        if (!league) return null;
+
+        const fee = Number(league.entry_fee) || 0;
+        const count = Number(paidCount) || 0;
+        const hasOverride = league.prize_pool_override !== null && league.prize_pool_override !== undefined;
+        const gross = hasOverride ? (Number(league.prize_pool_override) || 0) : (count * fee);
+        // Private leagues: no platform house fee; net == gross.
+        const net = gross;
+
+        const cur = (settings && settings.currency) || 'Nu.';
+        const s1 = Number(settings?.split_1st) || 50;
+        const s2 = Number(settings?.split_2nd) || 30;
+        const s3 = Number(settings?.split_3rd) || 20;
+        const totalSplit = (s1 + s2 + s3) || 100;
+
+        return {
+          currency: cur,
+          paidCount: count,
+          entryFee: fee,
+          manualOverride: hasOverride,
+          gross,
+          housePct: 0,
+          houseFee: 0,
+          houseNote: 'Organizing & hosting',
+          net,
+          splits: [
+            { place: '1st', emoji: '🥇', pct: s1 / totalSplit * 100, amount: net * s1 / totalSplit },
+            { place: '2nd', emoji: '🥈', pct: s2 / totalSplit * 100, amount: net * s2 / totalSplit },
+            { place: '3rd', emoji: '🥉', pct: s3 / totalSplit * 100, amount: net * s3 / totalSplit }
+          ],
+          _scopeName: `${league.name || 'League'} Prize Pool`,
+          _scopeType: 'private'
+        };
+      } catch (e) {
+        console.warn('[Stage 4d] fetchPrizeBreakdownForScope error:', e);
+        return null;
+      }
+    }
+
     function fmtMoney(cur, n) {
       return `${cur} ${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
     }
@@ -4342,7 +4588,7 @@ async function loadLeaderboard() {
 
       host.innerHTML = `
         <div class="prize-dash">
-          <div class="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">Prize Pool</div>
+          <div class="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">${b._scopeName || 'Prize Pool'}</div>
           <div class="prize-dash-amount ${animate ? 'prize-amount-anim' : ''}">${fmtMoney(b.currency, b.net)}</div>
           <div class="text-xs opacity-70 mt-0.5 mb-2.5">After ${b.housePct > 0 ? `${b.housePct}% organizer fee` : 'no deductions'} · ${b.paidCount} ${b.paidCount === 1 ? 'player' : 'players'} in</div>
 
@@ -6176,6 +6422,8 @@ function switchTab(tab, pushHistory = true) {
   if (tab === 'extras' && !previewMode) {
     if (typeof loadMyLeagues === 'function') loadMyLeagues()
     if (typeof renderInventoryCard === 'function') renderInventoryCard()
+    // Stage 4c: ensure switcher state matches latest scopes when user opens Extras.
+    if (typeof renderScopeSwitcher === 'function') renderScopeSwitcher()
   }
   if (tab === 'profile' && !previewMode) {
     renderBadges()
@@ -6300,14 +6548,14 @@ async function getSystemSettings() {
   try {
     const { data, error } = await supabaseClient
       .from('system_settings')
-      .select('private_leagues_enabled')
+      .select('private_leagues_enabled, private_leagues_v2_enabled')
       .eq('id', 1)
       .single();
     if (error) throw error;
-    return { data: data || { private_leagues_enabled: false }, error: null };
+    return { data: data || { private_leagues_enabled: false, private_leagues_v2_enabled: false }, error: null };
   } catch (err) {
     console.warn('getSystemSettings failed, defaulting to false:', err);
-    return { data: { private_leagues_enabled: false }, error: err };
+    return { data: { private_leagues_enabled: false, private_leagues_v2_enabled: false }, error: err };
   }
 }
 
@@ -6375,6 +6623,12 @@ async function joinLeagueByCode(inviteCode) {
 
   if (leagueError || !league) throw new Error('Invalid invite code');
 
+  // Stage 4a: when v2 is enabled, only active leagues are joinable.
+  // Draft/archived leagues remain invisible to users even if they know the code.
+  if (privateLeaguesV2Enabled && league.status && league.status !== 'active') {
+    throw new Error('This league is not currently open for joining');
+  }
+
   // Check if already a member
   const { data: existing, error: existingError } = await supabaseClient
     .from('league_memberships')
@@ -6396,6 +6650,229 @@ async function joinLeagueByCode(inviteCode) {
   return { data: league, error: null };
 }
 
+// ============================================================
+// Stage 4b: pay-to-join flow for v2 private leagues
+// ============================================================
+// Validation-only lookup. Returns the league row if it can be joined,
+// otherwise throws a user-friendly error. Does NOT create a membership row;
+// that happens in submitLeaguePayment() after proof upload.
+async function lookupLeagueByCodeForJoin(inviteCode) {
+  const user = getUser();
+  if (!user) throw new Error('Not authenticated');
+  if (!inviteCode) throw new Error('Enter an invite code');
+
+  const { data: league, error: leagueError } = await supabaseClient
+    .from('leagues')
+    .select('*')
+    .eq('invite_code', String(inviteCode).toUpperCase())
+    .maybeSingle();
+
+  if (leagueError) throw leagueError;
+  if (!league) throw new Error('Invalid invite code');
+  if (league.status && league.status !== 'active') {
+    throw new Error('This league is not currently open for joining');
+  }
+
+  const { data: existing } = await supabaseClient
+    .from('league_memberships')
+    .select('id, payment_status')
+    .eq('league_id', league.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.payment_status === 'paid')    throw new Error('You are already a paid member of this league');
+    if (existing.payment_status === 'pending') throw new Error('Your payment is awaiting verification');
+    throw new Error('You are already a member of this league');
+  }
+
+  return league;
+}
+
+// Holds the league + file the user is about to submit. Reset on modal close.
+let _pendingLeaguePayment = { league: null, file: null };
+
+function showLeaguePaymentModal(league) {
+  if (!league) return;
+  _pendingLeaguePayment = { league, file: null };
+
+  // Populate league info.
+  const nameEl = document.getElementById('lp-league-name');
+  const feeEl  = document.getElementById('lp-fee-amount');
+  if (nameEl) nameEl.textContent = league.name || 'Untitled league';
+  const fee = Number(league.entry_fee) || 0;
+  if (feeEl) feeEl.textContent = 'Nu. ' + fee.toLocaleString('en-IN');
+
+  // Reset file picker UI.
+  const fileInput = document.getElementById('lp-payment-file');
+  if (fileInput) fileInput.value = '';
+  const preview = document.getElementById('lp-upload-preview');
+  if (preview) { preview.src = ''; preview.classList.add('hidden'); }
+  const placeholder = document.getElementById('lp-upload-placeholder');
+  if (placeholder) placeholder.classList.remove('hidden');
+  const clearBtn = document.getElementById('lp-upload-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+
+  // Re-enable submit in case it was disabled from a previous attempt.
+  const submitBtn = document.getElementById('lp-submit-btn');
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit for Verification'; }
+
+  // Show modal.
+  const overlay = document.getElementById('league-payment-modal-overlay');
+  const panel   = document.getElementById('league-payment-modal-content');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  if (panel) requestAnimationFrame(() => panel.classList.add('shown'));
+}
+
+function hideLeaguePaymentModal() {
+  const overlay = document.getElementById('league-payment-modal-overlay');
+  const panel   = document.getElementById('league-payment-modal-content');
+  if (panel) panel.classList.remove('shown');
+  if (overlay) overlay.classList.add('hidden');
+  _pendingLeaguePayment = { league: null, file: null };
+}
+
+// Backdrop tap closes the modal.
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('league-payment-modal-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', e => {
+      if (e.target.id === 'league-payment-modal-overlay') hideLeaguePaymentModal();
+    });
+  }
+});
+
+function handleLeaguePaymentFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('Please upload an image file', 'error');
+    input.value = '';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('File too large. Max 5MB.', 'error');
+    input.value = '';
+    return;
+  }
+  _pendingLeaguePayment.file = file;
+
+  const preview     = document.getElementById('lp-upload-preview');
+  const placeholder = document.getElementById('lp-upload-placeholder');
+  const clearBtn    = document.getElementById('lp-upload-clear');
+  if (preview)     { preview.src = URL.createObjectURL(file); preview.classList.remove('hidden'); }
+  if (placeholder) placeholder.classList.add('hidden');
+  if (clearBtn)    clearBtn.classList.remove('hidden');
+}
+
+function clearLeaguePaymentFile(e) {
+  if (e) e.preventDefault();
+  _pendingLeaguePayment.file = null;
+  const fileInput   = document.getElementById('lp-payment-file');
+  const preview     = document.getElementById('lp-upload-preview');
+  const placeholder = document.getElementById('lp-upload-placeholder');
+  const clearBtn    = document.getElementById('lp-upload-clear');
+  if (fileInput)   fileInput.value = '';
+  if (preview)     { preview.src = ''; preview.classList.add('hidden'); }
+  if (placeholder) placeholder.classList.remove('hidden');
+  if (clearBtn)    clearBtn.classList.add('hidden');
+}
+
+// Upload proof + create the membership row with payment_status='pending'.
+// Uses bucket 'league-payment-proofs' (separate from global 'payment-proofs').
+async function submitLeaguePayment() {
+  const league = _pendingLeaguePayment.league;
+  const file   = _pendingLeaguePayment.file;
+  const btn    = document.getElementById('lp-submit-btn');
+  if (btn?.disabled) return;
+  if (!league) { showToast('Something went wrong, try again', 'error'); return; }
+  if (!file)   { showToast('Please attach a payment screenshot', 'warning'); return; }
+
+  const user = getUser();
+  if (!user) { showToast('Not authenticated', 'error'); return; }
+
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = 'Uploading...';
+
+  try {
+    // Re-validate at submit time so we fail loudly if the league was archived /
+    // the user got auto-joined another way mid-flow.
+    const { data: freshLeague } = await supabaseClient
+      .from('leagues')
+      .select('id, status, entry_fee, name')
+      .eq('id', league.id)
+      .maybeSingle();
+    if (!freshLeague) { showToast('League no longer exists', 'error'); btn.disabled = false; btn.textContent = origLabel; return; }
+    if (freshLeague.status !== 'active') { showToast('League is no longer open', 'error'); btn.disabled = false; btn.textContent = origLabel; return; }
+
+    const { data: dup } = await supabaseClient
+      .from('league_memberships')
+      .select('id')
+      .eq('league_id', league.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (dup) { showToast('You already have a membership for this league', 'warning'); btn.disabled = false; btn.textContent = origLabel; return; }
+
+    // Upload proof. Path: {leagueId}/{userId}/{timestamp}.{ext}
+    const fileExt  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const fileName = `${league.id}/${user.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabaseClient
+      .storage
+      .from('league-payment-proofs')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (uploadError) {
+      console.error('[Stage 4b] proof upload error:', uploadError);
+      showToast('Upload failed: ' + (uploadError.message || 'unknown'), 'error');
+      btn.disabled = false; btn.textContent = origLabel;
+      return;
+    }
+
+    const { data: urlData } = supabaseClient
+      .storage
+      .from('league-payment-proofs')
+      .getPublicUrl(fileName);
+    const publicUrl = urlData?.publicUrl || null;
+
+    btn.textContent = 'Submitting...';
+
+    // Insert membership in pending state. entry_fee_paid is captured at the
+    // fee in effect when the user submitted, even if admin edits it later.
+    const { error: insertError } = await supabaseClient
+      .from('league_memberships')
+      .insert({
+        league_id: league.id,
+        user_id: user.id,
+        payment_status: 'pending',
+        payment_proof_url: publicUrl,
+        entry_fee_paid: Number(freshLeague.entry_fee) || 0,
+        payment_pending: new Date().toISOString()
+      });
+
+    if (insertError) {
+      console.error('[Stage 4b] membership insert error:', insertError);
+      showToast(insertError.message || 'Could not submit, try again', 'error');
+      btn.disabled = false; btn.textContent = origLabel;
+      // Note: the proof file may now be orphaned in storage. Admin can clean
+      // up later. A SECURITY DEFINER RPC in a future stage will make this
+      // transactional.
+      return;
+    }
+
+    showToast(`Submitted! Admin will verify your payment for "${freshLeague.name}".`, 'success');
+    hideLeaguePaymentModal();
+    if (typeof loadMyLeagues === 'function') await loadMyLeagues();
+  } catch (e) {
+    console.error('[Stage 4b] submitLeaguePayment error:', e);
+    showToast('Something went wrong', 'error');
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+}
+
 async function getMyLeagues() {
   const user = getUser();
   if (!user) return { data: [], error: null };
@@ -6404,18 +6881,31 @@ async function getMyLeagues() {
     .from('league_memberships')
     .select(`
       league_id,
+      payment_status,
+      payment_proof_url,
+      joined_at,
       leagues:league_id (
         id,
         name,
         invite_code,
-        created_by
+        created_by,
+        entry_fee,
+        status,
+        prize_pool_override,
+        is_private
       )
     `)
     .eq('user_id', user.id);
 
   if (error) return { data: [], error };
-  // Flatten the result
-  const leagues = data.map(row => row.leagues).filter(Boolean);
+  // Flatten: merge membership payment fields onto each league object using
+  // underscore-prefixed names so they don't collide with league columns.
+  const leagues = data.map(row => row.leagues ? ({
+    ...row.leagues,
+    _payment_status: row.payment_status || null,
+    _payment_proof_url: row.payment_proof_url || null,
+    _joined_at: row.joined_at || null
+  }) : null).filter(Boolean);
   return { data: leagues, error: null };
 }
 
@@ -6449,12 +6939,233 @@ async function leaveLeague(leagueId) {
 let myLeagues = []
 let activeLeagueId = null
 let privateLeaguesEnabled = false
+let privateLeaguesV2Enabled = false  // Stage 4a: admin-only create + per-league payments
 let _systemSettingsInitialized = false  // prevents toast on first load / login
 
 async function checkPrivateLeaguesEnabled() {
     const { data } = await getSystemSettings()
     privateLeaguesEnabled = data?.private_leagues_enabled || false
     return privateLeaguesEnabled
+}
+
+// Stage 4a: read the v2 master switch from system_settings.
+// When TRUE, the new private league behaviour is active (admin-only create,
+// active-only league visibility, per-league payments coming in 4b).
+// When FALSE, everything runs the legacy path — zero user-visible change.
+async function checkPrivateLeaguesV2Enabled() {
+    const { data } = await getSystemSettings()
+    privateLeaguesV2Enabled = data?.private_leagues_v2_enabled === true
+    return privateLeaguesV2Enabled
+}
+
+// ============================================================
+// Stage 4c: scope state + switcher
+// ============================================================
+// A "scope" is one of:
+//   { type: 'global', name: 'Global League' }
+//   { type: 'private', id: '<leagueId>', name: '<leagueName>' }
+//
+// On login (when v2 is on), we resolve which scopes the user belongs to:
+//   - global: they're paid for the global league (profile.fee_paid === true)
+//   - private: they have a paid membership in an active private league
+//
+// `currentScope` drives which leaderboard view the switcher routes to.
+// `availableScopes` drives whether the switcher is shown (hidden if 0 or 1).
+let currentScope = { type: 'global', name: 'Global League' };
+let availableScopes = [];
+
+const SCOPE_STORAGE_KEY = 'wc_current_scope_v1';
+
+// Resolve the set of scopes the current user has access to.
+async function resolveUserScopes() {
+  const scopes = [];
+  const user = (typeof getUser === 'function') ? getUser() : null;
+  const profile = (typeof getProfile === 'function') ? getProfile() : null;
+  if (!user) return scopes;
+
+  // Global scope — gated by fee_paid (same gate the rest of the app uses).
+  if (profile?.fee_paid === true) {
+    scopes.push({ type: 'global', name: 'Global League' });
+  }
+
+  // Private scopes — only paid memberships in active leagues count.
+  try {
+    const { data, error } = await supabaseClient
+      .from('league_memberships')
+      .select(`
+        league_id, payment_status,
+        leagues:league_id ( id, name, status )
+      `)
+      .eq('user_id', user.id)
+      .eq('payment_status', 'paid');
+
+    if (error) {
+      console.warn('[Stage 4c] resolveUserScopes error:', error);
+    } else {
+      (data || []).forEach(row => {
+        const lg = row.leagues;
+        if (lg && lg.status === 'active') {
+          scopes.push({ type: 'private', id: lg.id, name: lg.name || 'Untitled' });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('[Stage 4c] resolveUserScopes exception:', e);
+  }
+
+  return scopes;
+}
+
+// Save current scope to localStorage (survives reload).
+function _persistScope(scope) {
+  try {
+    localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify(scope));
+  } catch (_) { /* private browsing or quota: ignore */ }
+}
+
+function _loadPersistedScope() {
+  try {
+    const raw = localStorage.getItem(SCOPE_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) { return null; }
+}
+
+// Switch active scope. If switching to a private scope, jumps to its leaderboard
+// using the existing selectLeague pathway. If switching to global, clears the
+// active league and re-renders the global leaderboard if visible.
+function setCurrentScope(scope) {
+  if (!scope || !scope.type) return;
+  currentScope = scope;
+  _persistScope(scope);
+
+  if (scope.type === 'private' && scope.id) {
+    activeLeagueId = scope.id;
+    if (typeof switchTab === 'function') {
+      switchTab('leaderboard');
+    }
+  } else {
+    // Global
+    activeLeagueId = null;
+    const lbTab = document.getElementById('tab-leaderboard');
+    if (lbTab && !lbTab.classList.contains('hidden')) {
+      if (typeof loadLeaderboard === 'function') loadLeaderboard();
+    }
+  }
+
+  // Stage 4d: refresh Home prize pool to reflect the new scope.
+  // If Home tab is currently visible we trigger a full reload; otherwise the
+  // next switchTab('home') will pick up the new scope automatically.
+  const homeTab = document.getElementById('tab-home');
+  if (homeTab && !homeTab.classList.contains('hidden')) {
+    if (typeof loadHome === 'function') loadHome();
+  }
+
+  renderScopeSwitcher();
+}
+
+// Pick a sensible default scope: prefer last-persisted (if still valid),
+// else first available, else global.
+function _pickDefaultScope() {
+  const saved = _loadPersistedScope();
+  if (saved) {
+    const stillValid = availableScopes.find(s =>
+      s.type === saved.type && (s.type === 'global' || s.id === saved.id)
+    );
+    if (stillValid) return stillValid;
+  }
+  if (availableScopes.length > 0) return availableScopes[0];
+  return { type: 'global', name: 'Global League' };
+}
+
+// Refresh available scopes (called from realtime hooks too).
+async function refreshScopes() {
+  if (!privateLeaguesV2Enabled) {
+    availableScopes = [];
+    renderScopeSwitcher();
+    return;
+  }
+  availableScopes = await resolveUserScopes();
+
+  // If current scope is no longer valid (e.g. league archived), fall back to default.
+  const stillValid = availableScopes.find(s =>
+    s.type === currentScope.type && (currentScope.type === 'global' || s.id === currentScope.id)
+  );
+  if (!stillValid) {
+    currentScope = _pickDefaultScope();
+    _persistScope(currentScope);
+  }
+  renderScopeSwitcher();
+}
+
+// One-time init on login. Picks default scope and renders the switcher.
+async function initScopeOnLogin() {
+  if (!privateLeaguesV2Enabled) {
+    // v2 off → hide switcher entirely, leave state as default global.
+    const card = document.getElementById('scope-switcher-card');
+    if (card) card.classList.add('hidden');
+    return;
+  }
+  availableScopes = await resolveUserScopes();
+  currentScope = _pickDefaultScope();
+  _persistScope(currentScope);
+  renderScopeSwitcher();
+}
+
+// Show/hide the switcher card based on count of available scopes,
+// and populate the dropdown menu.
+function renderScopeSwitcher() {
+  const card = document.getElementById('scope-switcher-card');
+  const nameEl = document.getElementById('scope-current-name');
+  const iconEl = document.getElementById('scope-current-icon');
+  const menu = document.getElementById('scope-menu');
+  if (!card || !nameEl || !menu) return;
+
+  // Update current scope label regardless of switcher visibility.
+  nameEl.textContent = currentScope.name || (currentScope.type === 'global' ? 'Global League' : 'League');
+  if (iconEl) iconEl.textContent = currentScope.type === 'global' ? '🌐' : '🏆';
+
+  // Show switcher only if 2+ scopes available and v2 is on.
+  if (!privateLeaguesV2Enabled || availableScopes.length < 2) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+
+  // Build menu items.
+  menu.innerHTML = availableScopes.map(s => {
+    const isCurrent = s.type === currentScope.type &&
+                      (s.type === 'global' || s.id === currentScope.id);
+    const icon = s.type === 'global' ? '🌐' : '🏆';
+    const safeName = (s.name || '').replace(/'/g, "\\'");
+    const scopeArg = s.type === 'global'
+      ? `{type:'global',name:'${safeName}'}`
+      : `{type:'private',id:'${s.id}',name:'${safeName}'}`;
+    return `
+      <button onclick="_selectScopeFromMenu(${scopeArg})"
+        class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl tap text-left transition ${isCurrent ? 'bg-brand-50 border border-brand-100' : 'bg-paper hover:bg-white border border-paper-border'}">
+        <span class="text-base">${icon}</span>
+        <span class="flex-1 font-semibold text-sm truncate">${escapeHtml(s.name || '')}</span>
+        ${isCurrent ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-0.5 rounded-full">CURRENT</span>' : ''}
+      </button>`;
+  }).join('');
+}
+
+// Internal helper used by menu buttons (keeps onclick payloads safe).
+function _selectScopeFromMenu(scope) {
+  hideScopeMenu();
+  setCurrentScope(scope);
+}
+
+function toggleScopeMenu() {
+  const menu = document.getElementById('scope-menu');
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+}
+
+function hideScopeMenu() {
+  const menu = document.getElementById('scope-menu');
+  if (menu) menu.classList.add('hidden');
 }
 
 function showCreateLeagueModal() {
@@ -6495,6 +7206,14 @@ function hasAdminLeagueAccess(profile) {
 async function canAccessLeagues() {
     const profile = getProfile();
     if (!profile) return { allowed: false, reason: 'not_authenticated' };
+
+    // Stage 4c: in v2 mode, access is per-membership (enforced by DB queries
+    // that filter on user_id). The legacy private_leagues_access flag is dead.
+    // If the user is authenticated and v2 is on, allow — the per-league
+    // membership checks downstream do the real gating.
+    if (privateLeaguesV2Enabled) {
+        return { allowed: true, reason: 'v2' };
+    }
 
     const enabled = await checkPrivateLeaguesEnabled();
     if (!enabled) return { allowed: false, reason: 'disabled' };
@@ -6591,6 +7310,16 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 
 async function handleCreateLeagueClick() {
+    // Stage 4a: in v2 mode, league creation is admin-only. Use the admin panel.
+    if (privateLeaguesV2Enabled) {
+        if (typeof isAdmin === 'function' && isAdmin()) {
+            showToast('Use the Admin → Leagues panel to create private leagues', 'info');
+        } else {
+            showToast('Only the admin can create private leagues. Ask for an invite code to join an existing one.', 'info');
+        }
+        return;
+    }
+
     const access = await canAccessLeagues();
 
     if (!access.allowed) {
@@ -6636,6 +7365,25 @@ async function handleCreateLeague() {
 }
 
 async function handleJoinLeague() {
+    // Stage 4b: v2 path uses payment modal instead of immediate join.
+    if (privateLeaguesV2Enabled) {
+        const code = (document.getElementById('league-join-code').value || '').trim();
+        if (!code) {
+            showToast('Enter an invite code', 'warning');
+            return;
+        }
+        try {
+            const league = await lookupLeagueByCodeForJoin(code);
+            // Clear the input so a re-attempt isn't pre-filled with a stale code.
+            document.getElementById('league-join-code').value = '';
+            showLeaguePaymentModal(league);
+        } catch (err) {
+            showToast(err.message || 'Could not join', 'error');
+        }
+        return;
+    }
+
+    // ---- Legacy v1 path below (unchanged) ----
     const access = await canAccessLeagues();
     if (!access.allowed) {
         if (access.reason === 'disabled') {
@@ -6676,6 +7424,56 @@ function selectLeague(leagueId) {
   switchTab('leaderboard')
 }
 
+// Stage 4a: shared renderer for the "My Leagues" list inside the Extras card.
+// Used by the v2 path in loadMyLeagues. Mirrors the legacy v1 rendering so
+// users see a consistent visual.
+// Stage 4b: extended to show payment status badges (PENDING / UNPAID) when v2
+// is enabled and the membership carries a non-paid status.
+async function _renderMyLeaguesList(container) {
+  if (!container) return
+  const { data, error } = await getMyLeagues()
+  if (error) {
+    console.error('_renderMyLeaguesList error:', error)
+    container.innerHTML = `<div class="text-center text-xs text-ink-500 py-4">Couldn't load your leagues. Try refresh.</div>`
+    return
+  }
+  myLeagues = data || []
+  if (!myLeagues.length) {
+    container.innerHTML = `
+      <div class="text-center py-6">
+        <div class="text-3xl mb-2 opacity-40">🏆</div>
+        <div class="text-sm font-semibold text-ink-700">You're not in any private league yet</div>
+        <p class="text-xs text-ink-500 mt-1">Enter an invite code above to join one.</p>
+      </div>`
+    return
+  }
+  container.innerHTML = myLeagues.map(l => {
+    // Stage 4b: payment status badge (only when v2 is on AND membership isn't paid)
+    let payBadge = ''
+    if (privateLeaguesV2Enabled) {
+      if (l._payment_status === 'pending') {
+        payBadge = '<span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full ml-2">PENDING</span>'
+      } else if (l._payment_status === 'unpaid' || l._payment_status == null) {
+        payBadge = '<span class="text-[10px] font-bold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full ml-2">UNPAID</span>'
+      }
+    }
+    return `
+    <div class="flex items-center gap-3 p-3 rounded-2xl border ${activeLeagueId === l.id ? 'border-brand-500 bg-brand-50' : 'border-paper-border bg-paper'} tap" onclick="selectLeague('${l.id}')">
+      <div class="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center font-bold text-sm shrink-0">${escapeHtml((l.name || 'L').substring(0, 2).toUpperCase())}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center flex-wrap">
+          <span class="font-semibold text-sm truncate">${escapeHtml(l.name || '')}</span>${payBadge}
+        </div>
+        <div class="text-[11px] text-ink-500 font-mono tracking-wider">${escapeHtml(l.invite_code || '')}</div>
+      </div>
+      ${activeLeagueId === l.id ? '<span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-2 py-1 rounded-full">ACTIVE</span>' : ''}
+      <button onclick="event.stopPropagation(); shareLeagueById('${l.id}')" class="text-ink-400 p-1.5 tap" title="Share">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+      </button>
+    </div>`
+  }).join('')
+}
+
 async function loadMyLeagues() {
     const container = document.getElementById('my-leagues-list')
     const createBtn = document.getElementById('create-league-btn')
@@ -6683,13 +7481,42 @@ async function loadMyLeagues() {
 
     // Check system setting
     const enabled = await checkPrivateLeaguesEnabled()
+    // Stage 4a: independent v2 flag read alongside the master enable flag.
+    const v2 = await checkPrivateLeaguesV2Enabled()
+
+    // Stage 4a: when v2 is ON, it is its own master switch — completely independent
+    // of the legacy v1 flag. Take the v2 path FIRST, before any v1 gating runs.
+    // This means admins can disable v1 (the legacy "Coming Soon" mode) without
+    // breaking the v2 feature.
+    if (v2) {
+        if (createBtn) {
+            const userIsAdmin = (typeof isAdmin === 'function') && isAdmin()
+            if (userIsAdmin) {
+                // Admin keeps a visible affordance but it routes them to admin panel.
+                createBtn.textContent = '⚙ Admin'
+                createBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'hidden')
+                createBtn.classList.add('tap')
+                createBtn.onclick = () => showToast('Use Admin → Leagues to create', 'info')
+            } else {
+                // Non-admin: button hidden entirely.
+                createBtn.classList.add('hidden')
+                createBtn.onclick = null
+            }
+        }
+        if (joinWrap) joinWrap.classList.remove('hidden')
+        // Render the user's leagues list (no v1 access gate; anyone authenticated can browse their own).
+        await _renderMyLeaguesList(container)
+        return
+    }
+
+    // ---- Legacy v1 path below (only runs when v2 is OFF) ----
 
     if (!enabled) {
         // Show Coming Soon state
         if (createBtn) {
             createBtn.textContent = 'Coming Soon'
             createBtn.classList.add('opacity-50', 'cursor-not-allowed')
-            createBtn.classList.remove('tap')
+            createBtn.classList.remove('tap', 'hidden')
             createBtn.onclick = () => showToast('Private leagues are coming soon!', 'info')
         }
         if (joinWrap) joinWrap.classList.add('hidden')
@@ -6705,7 +7532,7 @@ async function loadMyLeagues() {
     // Reset button state when enabled
     if (createBtn) {
         createBtn.textContent = '+ Create'
-        createBtn.classList.remove('opacity-50', 'cursor-not-allowed')
+        createBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'hidden')
         createBtn.classList.add('tap')
         createBtn.onclick = handleCreateLeagueClick
     }
