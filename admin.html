@@ -155,6 +155,7 @@
     .split-sum-bad { color: #B91C1C; }
   </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -1237,10 +1238,15 @@ async function setInventoryState(newState) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, (payload) => {
           playChime()
           if (payload.eventType === 'UPDATE' && payload.new.home_score !== null && (payload.new.home_score !== payload.old?.home_score || payload.new.away_score !== payload.old?.away_score)) {
-            showToast(`Result entered: ${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`, 'result')
+            const msg = `${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`
+            addNotification('result', 'Result entered', msg)
+            showToast(`Result entered: ${msg}`, 'result')
           } else if (payload.eventType === 'INSERT') {
-            showToast(`Fixture added: ${payload.new.home_team} vs ${payload.new.away_team}`, 'fixture')
+            const msg = `${payload.new.home_team} vs ${payload.new.away_team}`
+            addNotification('fixture', 'Fixture added', msg)
+            showToast(`Fixture added: ${msg}`, 'fixture')
           } else {
+            addNotification('fixture', 'Fixture updated', 'Schedule changed')
             showToast('Fixture schedule updated', 'fixture')
           }
           loadAll()
@@ -1249,7 +1255,18 @@ async function setInventoryState(newState) {
       supabaseClient.channel('admin-predictions')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, (payload) => {
           playChime()
-          showToast('New prediction submitted', 'general')
+          // Look up user name from already-loaded allUsers array
+          const userId = payload.new?.user_id
+          const user = allUsers.find(u => u.id === userId)
+          const userName = user?.name || user?.email || 'Unknown player'
+          // Get fixture info if available
+          const fixture = allFixtures.find(f => f.id === payload.new?.fixture_id)
+          const fixtureName = fixture
+            ? `${fixture.home_team} vs ${fixture.away_team}`
+            : `Match #${payload.new?.fixture_id?.slice(0, 6)}`
+          // Add to notification bell (was missing!)
+          addNotification('general', 'New prediction', `${userName} predicted ${fixtureName}`)
+          showToast(`New prediction: ${userName} — ${fixtureName}`, 'general')
         }).subscribe()
 
       // Auto-refresh when bonus rows land. awardPointsWithBonuses writes
