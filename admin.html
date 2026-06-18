@@ -1318,60 +1318,72 @@ async function setInventoryState(newState) {
         }).subscribe()
 
       // Stage v3: notify admin when private league memberships change.
-      // INSERT with payment_status='pending' = someone submitted a payment proof.
-      // DELETE = membership was removed (often by admin themselves; only notify
-      //         if it was the *user* leaving — we detect by checking the
-      //         current admin's session against the deleted row).
-      supabaseClient.channel('admin-league-memberships')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'league_memberships' }, async (payload) => {
-          const row = payload.new || {}
-          // Skip notifications for admin-initiated INSERTs (admin can create
-          // memberships from the drawer); only notify on user-initiated joins.
-          // Heuristic: payment_status='pending' indicates the v2 pay-to-join
-          // flow which is always user-initiated.
-          if (row.payment_status !== 'pending') return
-          let memberName = 'Someone'
-          let leagueName = 'a private league'
-          try {
-            if (row.user_id) {
-              const { data: p } = await supabaseClient
-                .from('profiles')
-                .select('name, full_name')
-                .eq('id', row.user_id)
-                .maybeSingle()
-              memberName = (p?.full_name || p?.name || memberName).trim() || memberName
+      //   INSERT pending = user submitted a payment proof (notify)
+      //   UPDATE / DELETE = silent (admin just acted, or self-resolved) but
+      //                     refresh the drawer if it's open on this league.
+      //
+      // Robust cleanup: live-reload preserves the WebSocket, so a previously
+      // subscribed channel survives the page reload even when our window
+      // reference is gone. We have to query the client's own channel
+      // registry by topic name and tear down any match before subscribing.
+      // Otherwise Supabase throws "cannot add postgres_changes callbacks
+      // after subscribe()" because channel() returns the existing object.
+      try {
+        if (typeof supabaseClient.getChannels === 'function') {
+          supabaseClient.getChannels().forEach(ch => {
+            if (ch.topic === 'realtime:admin-league-memberships') {
+              supabaseClient.removeChannel(ch)
             }
-          } catch (_) {}
-          try {
-            if (row.league_id) {
-              const { data: lg } = await supabaseClient
-                .from('leagues')
-                .select('name')
-                .eq('id', row.league_id)
-                .maybeSingle()
-              if (lg?.name) leagueName = lg.name
+          })
+        }
+        if (window._adminLeagueMembershipsChannel) {
+          try { supabaseClient.removeChannel(window._adminLeagueMembershipsChannel) } catch (_) {}
+          window._adminLeagueMembershipsChannel = null
+        }
+      } catch (e) {
+        console.warn('[admin realtime] memberships channel cleanup warning:', e)
+      }
+      window._adminLeagueMembershipsChannel = supabaseClient.channel('admin-league-memberships')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, async (payload) => {
+          const eventType = payload.eventType
+          if (eventType === 'INSERT') {
+            const row = payload.new || {}
+            // Only notify on user-initiated joins (payment_status='pending')
+            if (row.payment_status !== 'pending') return
+            let memberName = 'Someone'
+            let leagueName = 'a private league'
+            try {
+              if (row.user_id) {
+                const { data: p } = await supabaseClient
+                  .from('profiles')
+                  .select('name, full_name')
+                  .eq('id', row.user_id)
+                  .maybeSingle()
+                memberName = (p?.full_name || p?.name || memberName).trim() || memberName
+              }
+            } catch (_) {}
+            try {
+              if (row.league_id) {
+                const { data: lg } = await supabaseClient
+                  .from('leagues')
+                  .select('name')
+                  .eq('id', row.league_id)
+                  .maybeSingle()
+                if (lg?.name) leagueName = lg.name
+              }
+            } catch (_) {}
+            playChime()
+            const message = `${memberName} submitted payment proof for ${leagueName}`
+            showToast(message, 'payment')
+            addNotification('payment', 'Payment Submitted', message)
+            if (activeLeagueId === row.league_id && typeof adminViewLeague === 'function') {
+              adminViewLeague(activeLeagueId)
             }
-          } catch (_) {}
-          playChime()
-          const title = 'Payment Submitted'
-          const message = `${memberName} submitted payment proof for ${leagueName}`
-          showToast(message, 'payment')
-          addNotification('payment', title, message)
-          // If the league drawer is open for the affected league, refresh it
-          if (activeLeagueId === row.league_id && typeof adminViewLeague === 'function') {
-            adminViewLeague(activeLeagueId)
+            return
           }
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'league_memberships' }, (payload) => {
-          // Membership update — usually admin marking paid/unpaid. Keep the
-          // drawer fresh but don't toast (the admin just clicked the button).
-          if (activeLeagueId === (payload.new?.league_id) && typeof adminViewLeague === 'function') {
-            adminViewLeague(activeLeagueId)
-          }
-        })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'league_memberships' }, (payload) => {
-          // Membership removed. Refresh the open drawer.
-          if (activeLeagueId === (payload.old?.league_id) && typeof adminViewLeague === 'function') {
+          // UPDATE or DELETE: silent drawer refresh
+          const affected = payload.new?.league_id || payload.old?.league_id
+          if (affected && activeLeagueId === affected && typeof adminViewLeague === 'function') {
             adminViewLeague(activeLeagueId)
           }
         }).subscribe()

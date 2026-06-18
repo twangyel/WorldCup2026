@@ -2340,15 +2340,13 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
       margin-top: 14px;
-      min-height: 320px;
     }
     .inv-flip {
       position: relative;
-      aspect-ratio: 5 / 7;
+      aspect-ratio: 5 / 8.5;
       perspective: 1200px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      min-height: 280px;
     }
     .inv-flip-inner {
       position: relative;
@@ -2366,12 +2364,11 @@
       inset: 0;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      border-radius: 16px;
+      border-radius: 2px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       padding: 14px 12px 12px;
-      min-height: 280px;
       box-shadow:
         0 8px 24px rgba(10, 15, 13, 0.12),
         0 2px 6px rgba(10, 15, 13, 0.06),
@@ -2383,7 +2380,6 @@
       color: #1F2A26;
       border: 1.5px solid #EEEDE7;
       justify-content: space-between;
-      padding-bottom: 16px;
     }
 
     /* Front: BOOSTER (Double Points) — warm amber */
@@ -2753,7 +2749,6 @@
   </script>
 
 
-<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 </head>
@@ -3855,23 +3850,23 @@
 
       <!-- EXTRAS --><div id="tab-extras" class="tab-content hidden space-y-3">
 
-        <!-- 1. EXTRAS HEADER -->
-        <div class="relative overflow-hidden rounded-3xl border border-white/20 p-4"
+        <!-- Header -->
+        <div class="relative overflow-hidden rounded-3xl border border-white/20 px-4 py-3"
              style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.92) 0%, rgba(11, 18, 33, 0.88) 100%);
                     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
                     box-shadow: 0 8px 32px rgba(11, 18, 33, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);">
           <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full opacity-25"
                style="background: radial-gradient(circle, rgba(212, 162, 76, 0.6), transparent 70%);"></div>
           <div class="relative flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">⭐</div>
+            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">⭐</div>
             <div class="flex-1 min-w-0">
-              <h2 class="text-base font-bold text-white">Extras</h2>
-              <p class="text-[11px] text-white/60 mt-0">Leagues, rules, prizes & more</p>
+              <h2 class="text-base font-bold text-white leading-tight">Extras</h2>
+              <p class="text-[11px] text-white/60 mt-0.5">Leagues, rules, prizes & more</p>
             </div>
           </div>
         </div>
 
-        <!-- 2. SCOPE SWITCHER -->
+        <!-- Scope Switcher (Stage 4c — hidden by default; shown by JS when user has 2+ scopes) -->
         <div id="scope-switcher-card" class="hidden bg-white rounded-3xl shadow-card border border-paper-border p-4">
           <div class="flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
@@ -3891,7 +3886,8 @@
           </div>
         </div>
 
-        <!-- 3. PRIVATE LEAGUES -->
+
+        <!-- My Leagues Card (moved from Profile) -->
         <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5" id="leagues-card"
              style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
                     backdrop-filter: blur(24px) saturate(160%);
@@ -3928,77 +3924,8 @@
           </div>
         </div>
 
-        <!-- 4. YOUR INVENTORY -->
-        <div id="inventory-card" class="inventory-card hidden" style="min-height: 420px;">
-          <!-- LIVE STATE -->
-          <div id="inventory-live" class="hidden">
-            <div class="flex items-center justify-between mb-1">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xl border border-white/20 shadow-sm">🎒</div>
-                <div>
-                  <h3 class="font-bold tracking-tight text-ink-900">Your Inventory</h3>
-                  <p class="text-[11px] text-ink-500 mt-0.5">Boosters & Insurance cards</p>
-                </div>
-              </div>
-              <span id="inventory-total-count" class="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full">0 items</span>
-            </div>
-            <div id="inventory-card-grid" class="inv-grid">
-              <!-- Populated by JS -->
-            </div>
-            <div id="inventory-empty" class="inventory-empty hidden">
-              <div class="inventory-empty-icon">📭</div>
-              <div class="inventory-empty-text">Your inventory is empty</div>
-              <div class="inventory-empty-sub">Complete predictions to earn cards</div>
-            </div>
-          </div>
 
-          <!-- TEASER STATE -->
-          <div id="inventory-teaser" class="hidden inventory-teaser" style="margin:-20px;border-radius:24px;padding:20px;min-height:420px;">
-            <div class="flex items-center gap-3 mb-4 relative z-10">
-              <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">🎒</div>
-              <div>
-                <h3 class="font-bold tracking-tight text-white">Your Inventory</h3>
-                <p class="text-[11px] text-white/50 mt-0.5">Boosters & Insurance cards</p>
-              </div>
-            </div>
-            <div class="inv-grid relative z-10">
-              <div class="inv-flip is-locked" aria-hidden="true">
-                <div class="inv-flip-inner">
-                  <div class="inv-face inv-face-front is-booster">
-                    <span class="inv-corner tl">WC 26</span>
-                    <span class="inv-corner tr">⚡</span>
-                    <span class="inv-pill">BOOSTER</span>
-                    <div class="inv-glyph">⚡</div>
-                    <div class="inv-title">Double Points</div>
-                    <div class="inv-subtitle">One-time use</div>
-                    <span class="inv-corner br">WC 26</span>
-                  </div>
-                </div>
-              </div>
-              <div class="inv-flip is-locked" aria-hidden="true">
-                <div class="inv-flip-inner">
-                  <div class="inv-face inv-face-front is-insurance">
-                    <span class="inv-corner tl">WC 26</span>
-                    <span class="inv-corner tr">🛡</span>
-                    <span class="inv-pill">INSURANCE</span>
-                    <div class="inv-glyph">🛡️</div>
-                    <div class="inv-title">Streak Saver</div>
-                    <div class="inv-subtitle">One-time use</div>
-                    <span class="inv-corner br">WC 26</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="inventory-coming-soon">
-              <div class="inventory-lock-icon">🔒</div>
-              <div class="inventory-teaser-text">Coming Soon</div>
-              <div class="inventory-teaser-sub">Gain the edge in predictions</div>
-              <div class="inventory-countdown" id="inventory-teaser-countdown">--d --h --m</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 5. QUICK ACCESS -->
+        <!-- Quick Actions Grid -->
         <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
           <h3 class="font-bold mb-3 tracking-tight text-ink-900">Quick Access</h3>
           <div class="grid grid-cols-2 gap-2.5">
@@ -4030,7 +3957,7 @@
                 <div class="text-[11px] text-ink-500 mt-0.5">Achievements & streaks</div>
               </div>
             </button>
-            <button onclick="switchTab('extras'); setTimeout(()=>{document.getElementById('inventory-card')?.scrollIntoView({behavior:'smooth', block:'center'})}, 250)" id="quick-inventory-btn" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
+            <button onclick="switchTab('profile'); setTimeout(()=>{document.getElementById('inventory-card')?.scrollIntoView({behavior:'smooth', block:'center'})}, 250)" id="quick-inventory-btn" class="flex flex-col items-start gap-2 p-4 rounded-2xl bg-paper border border-paper-border hover:bg-white transition tap text-left">
               <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl">🎒</div>
               <div>
                 <div class="text-sm font-bold text-ink-900">Inventory</div>
@@ -4040,7 +3967,7 @@
           </div>
         </div>
 
-        <!-- 6. HELP CARD -->
+        <!-- Help / Info card -->
         <div class="bg-white rounded-3xl shadow-card border border-paper-border p-5">
           <div class="flex items-start gap-3">
             <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl shrink-0">💡</div>
@@ -4176,52 +4103,84 @@
         </a>
       </div>
     </div>
-  </div><!-- Share Rank Card (Glassmorphism) -->
-  <div id="share-rank-card" class="hidden">
-    <div class="relative overflow-hidden rounded-3xl border border-white/15 p-5" 
-         style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.9) 0%, rgba(11, 18, 33, 0.85) 100%); 
-                backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
-                box-shadow: 0 8px 32px rgba(11, 18, 33, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);">
+  </div>
+        <!-- Your Inventory Card -->
+        <div id="inventory-card" class="inventory-card hidden">
+          <!-- LIVE STATE -->
+          <div id="inventory-live" class="hidden">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xl border border-white/20 shadow-sm">🎒</div>
+                <div>
+                  <h3 class="font-bold tracking-tight text-ink-900">Your Inventory</h3>
+                  <p class="text-[11px] text-ink-500 mt-0.5">Boosters & Insurance cards</p>
+                </div>
+              </div>
+              <span id="inventory-total-count" class="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full">0 items</span>
+            </div>
 
-      <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full opacity-30" 
-           style="background: radial-gradient(circle, rgba(212, 162, 76, 0.5), transparent 70%);"></div>
+            <!-- Boosters + Insurance as a 2-col flip-card grid -->
+            <div id="inventory-card-grid" class="inv-grid">
+              <!-- Populated by JS -->
+            </div>
 
-      <div class="relative">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl backdrop-blur-sm border border-white/10">🏆</div>
-            <div>
-              <div class="text-sm font-bold text-white/90">Your Standing</div>
-              <div class="text-xs text-white/50 mt-0.5" id="share-rank-subtitle">Share your progress</div>
+            <!-- Empty state (shown when no items) -->
+            <div id="inventory-empty" class="inventory-empty hidden">
+              <div class="inventory-empty-icon">📭</div>
+              <div class="inventory-empty-text">Your inventory is empty</div>
+              <div class="inventory-empty-sub">Complete predictions to earn cards</div>
             </div>
           </div>
-          <div class="text-right">
-            <div class="text-2xl font-bold text-gold" id="share-rank-value" style="font-variant-numeric: tabular-nums;">—</div>
+
+          <!-- TEASER STATE -->
+          <div id="inventory-teaser" class="hidden inventory-teaser" style="margin:-20px;border-radius:24px;padding:20px;">
+            <div class="flex items-center gap-3 mb-4 relative z-10">
+              <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">🎒</div>
+              <div>
+                <h3 class="font-bold tracking-tight text-white">Your Inventory</h3>
+                <p class="text-[11px] text-white/50 mt-0.5">Boosters & Insurance cards</p>
+              </div>
+            </div>
+
+            <!-- Same flip-card grid as live, but locked. No flip, no sheen, dimmed. -->
+            <div class="inv-grid relative z-10">
+              <div class="inv-flip is-locked" aria-hidden="true">
+                <div class="inv-flip-inner">
+                  <div class="inv-face inv-face-front is-booster">
+                    <span class="inv-corner tl">WC 26</span>
+                    <span class="inv-corner tr">⚡</span>
+                    <span class="inv-pill">BOOSTER</span>
+                    <div class="inv-glyph">⚡</div>
+                    <div class="inv-title">Double Points</div>
+                    <div class="inv-subtitle">One-time use</div>
+                    <span class="inv-corner br">WC 26</span>
+                  </div>
+                </div>
+              </div>
+              <div class="inv-flip is-locked" aria-hidden="true">
+                <div class="inv-flip-inner">
+                  <div class="inv-face inv-face-front is-insurance">
+                    <span class="inv-corner tl">WC 26</span>
+                    <span class="inv-corner tr">🛡</span>
+                    <span class="inv-pill">INSURANCE</span>
+                    <div class="inv-glyph">🛡️</div>
+                    <div class="inv-title">Streak Saver</div>
+                    <div class="inv-subtitle">One-time use</div>
+                    <span class="inv-corner br">WC 26</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Coming Soon Overlay -->
+            <div class="inventory-coming-soon">
+              <div class="inventory-lock-icon">🔒</div>
+              <div class="inventory-teaser-text">Coming Soon</div>
+              <div class="inventory-teaser-sub">Gain the edge in predictions</div>
+              <div class="inventory-countdown" id="inventory-teaser-countdown">--d --h --m</div>
+            </div>
           </div>
         </div>
-
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex-1 bg-white/5 rounded-xl p-3 border border-white/10 text-center">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Points</div>
-            <div class="text-lg font-bold text-white" id="share-points-value" style="font-variant-numeric: tabular-nums;">—</div>
-          </div>
-          <div class="flex-1 bg-white/5 rounded-xl p-3 border border-white/10 text-center">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Exact</div>
-            <div class="text-lg font-bold text-white" id="share-exact-value" style="font-variant-numeric: tabular-nums;">—</div>
-          </div>
-          <div class="flex-1 bg-white/5 rounded-xl p-3 border border-white/10 text-center">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Streak</div>
-            <div class="text-lg font-bold text-white" id="share-streak-value" style="font-variant-numeric: tabular-nums;">—</div>
-          </div>
-        </div>
-
-        <button onclick="shareRankOnWhatsApp()" class="w-full flex items-center justify-center gap-2 bg-emerald-500/90 hover:bg-emerald-500 text-white font-semibold py-3.5 rounded-2xl tap border border-white/10 transition backdrop-blur-sm">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.13 1.58 5.943L0 24l6.335-1.652a11.897 11.897 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          <span>Share on WhatsApp</span>
-        </button>
-      </div>
-    </div>
-  </div>
 
   
 <!-- Prediction History (Glassmorphism Accordion) -->
@@ -5448,16 +5407,17 @@ async function confirmUseCard(cardId) {
 
   <!-- ===== INVENTORY TAB HOOK ===== -->
   <script>
-    // Hook into tab switching to render inventory when Extras is shown
+    // Hook into tab switching to render inventory when the Me (profile) tab is shown.
+    // Inventory was moved from Extras → Me, so we observe tab-profile now.
     (function() {
-      const extrasTab = document.getElementById('tab-extras');
-      if (!extrasTab) return;
+      const profileTab = document.getElementById('tab-profile');
+      if (!profileTab) return;
 
-      // Use MutationObserver to detect when Extras tab becomes visible
+      // Use MutationObserver to detect when the Me tab becomes visible
       const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
           if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-            const isVisible = !extrasTab.classList.contains('hidden');
+            const isVisible = !profileTab.classList.contains('hidden');
             if (isVisible && typeof renderInventoryCard === 'function') {
               renderInventoryCard();
             }
@@ -5465,7 +5425,7 @@ async function confirmUseCard(cardId) {
         });
       });
 
-      observer.observe(extrasTab, { attributes: true, attributeFilter: ['class'] });
+      observer.observe(profileTab, { attributes: true, attributeFilter: ['class'] });
     })();
   </script>
 

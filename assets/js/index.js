@@ -8008,7 +8008,7 @@ async function getLeagueMembers(leagueId) {
 
     const { data: memberships, error: membershipError } = await supabaseClient
         .from('league_memberships')
-        .select('user_id')
+        .select('user_id, joined_at')
         .eq('league_id', leagueId);
     
     if (membershipError) {
@@ -8043,7 +8043,8 @@ async function getLeagueMembers(leagueId) {
             id: row.user_id,
             name: p.full_name || p.name || 'Anonymous',
             department: p.department || '',
-            avatar_url: p.avatar_url || null
+            avatar_url: p.avatar_url || null,
+            joined_at: row.joined_at || null
         };
     });
     
@@ -8070,6 +8071,29 @@ async function getLeagueLeaderboard(leagueId) {
         console.error('getLeagueLeaderboard: results error', resultsError)
     }
 
+    // ===== Option A: only count predictions for matches that kicked off
+    // after the member joined this league. Late joiners aren't credited for
+    // matches that happened before they were in the league.
+    //
+    // Build a per-user join cutoff map. If joined_at is missing for any
+    // reason, fall back to epoch (i.e. count everything) — failing open is
+    // safer than zeroing out a real player.
+    const joinedAt = {}
+    members.forEach(m => {
+        joinedAt[m.id] = m.joined_at ? new Date(m.joined_at).getTime() : 0
+    })
+
+    // Build a fixture_id → kickoff_ms map from the global fixtures array.
+    // If a fixture isn't in the local cache, we skip the row (safer than
+    // counting it without knowing whether it qualifies).
+    const allFixtures = (typeof window !== 'undefined' && window.fixtures)
+        ? window.fixtures
+        : (typeof fixtures !== 'undefined' ? fixtures : [])
+    const kickoffById = {}
+    ;(allFixtures || []).forEach(f => {
+        kickoffById[f.id] = f.kickoff ? new Date(f.kickoff).getTime() : null
+    })
+
     // Aggregate stats per user
     const stats = {}
     members.forEach(m => {
@@ -8086,6 +8110,12 @@ async function getLeagueLeaderboard(leagueId) {
     ;(results || []).forEach(r => {
         const s = stats[r.user_id]
         if (!s) return
+        // Only count this prediction if the fixture's kickoff is at or after
+        // the user's join time for this league.
+        const ko = kickoffById[r.fixture_id]
+        if (ko == null) return                  // unknown fixture → skip
+        if (ko < joinedAt[r.user_id]) return    // pre-join match → skip
+
         s.points += r.final_points || r.points_awarded || 0
         // Tier classification must use base_points (final_points includes stage multiplier)
         const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)

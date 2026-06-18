@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Bracket Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0a0e1a;
+            --bg-card: #111827;
+            --bg-elevated: #1a2035;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-gold: #fbbf24;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-subtle: rgba(148, 163, 184, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .admin-header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .admin-header h1 i { color: var(--accent-gold); }
+        .phase-control {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .phase-select {
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-green), #16a34a);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--accent-red), #dc2626);
+            color: white;
+        }
+
+        .round-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .round-header {
+            background: var(--bg-elevated);
+            padding: 16px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .round-header i { color: var(--accent-gold); }
+        .matches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            padding: 20px;
+        }
+        .match-admin-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .match-admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .team-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .team-input-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            width: 24px;
+        }
+        .team-input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+        .team-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+        .flag-input {
+            width: 50px;
+            text-align: center;
+        }
+        .result-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .result-section label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 8px;
+        }
+        .result-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .result-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-dark);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .result-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+        }
+        .result-btn.selected {
+            background: var(--accent-green);
+            color: white;
+            border-color: var(--accent-green);
+        }
+        .result-btn.completed {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px 24px;
+            min-width: 150px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--accent-gold);
+        }
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left: 3px solid var(--accent-green); }
+        .toast.error { border-left: 3px solid var(--accent-red); }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="admin-header">
+        <h1><i class="fas fa-cog"></i> Bracket Manager</h1>
+        <div class="phase-control">
+            <label>Phase:</label>
+            <select class="phase-select" id="phaseSelect">
+                <option value="locked">Locked</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+            </select>
+            <button class="btn btn-primary" onclick="updatePhase()">
+                <i class="fas fa-save"></i> Update Phase
+            </button>
+        </div>
+    </div>
+
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-value" id="totalPlayers">0</div>
+            <div class="stat-label">Total Players</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="lockedBrackets">0</div>
+            <div class="stat-label">Locked Brackets</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="completedMatches">0</div>
+            <div class="stat-label">Matches Completed</div>
+        </div>
+    </div>
+
+    <div id="roundsContainer"></div>
+
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMsg">Saved successfully</span>
+    </div>
+
+    <script>
+        // Admin panel JS - connects to your Supabase instance
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+        // Initialize with your existing supabaseClient if available
+        // or create new connection
+
+        let bracketMatches = [];
+
+        async function loadBracketData() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('knockout_brackets')
+                    .select('*')
+                    .order('match_number', { ascending: true });
+
+                if (error) throw error;
+                bracketMatches = data;
+                renderRounds();
+                loadStats();
+            } catch (err) {
+                console.error('Load error:', err);
+                showToast('Failed to load bracket data', 'error');
+            }
+        }
+
+        function renderRounds() {
+            const container = document.getElementById('roundsContainer');
+            const rounds = {
+                r16: { name: 'Round of 16', icon: 'fa-futbol' },
+                qf: { name: 'Quarter-Finals', icon: 'fa-futbol' },
+                sf: { name: 'Semi-Finals', icon: 'fa-futbol' },
+                final: { name: 'Final', icon: 'fa-crown' }
+            };
+
+            container.innerHTML = '';
+
+            Object.entries(rounds).forEach(([roundKey, roundInfo]) => {
+                const roundMatches = bracketMatches.filter(m => m.round === roundKey);
+                if (roundMatches.length === 0) return;
+
+                const section = document.createElement('div');
+                section.className = 'round-section';
+                section.innerHTML = `
+                    <div class="round-header">
+                        <i class="fas ${roundInfo.icon}"></i>
+                        ${roundInfo.name}
+                    </div>
+                    <div class="matches-grid" id="grid-${roundKey}"></div>
+                `;
+                container.appendChild(section);
+
+                const grid = section.querySelector(`#grid-${roundKey}`);
+                roundMatches.forEach(match => {
+                    grid.appendChild(createMatchAdminCard(match));
+                });
+            });
+        }
+
+        function createMatchAdminCard(match) {
+            const card = document.createElement('div');
+            card.className = 'match-admin-card';
+            card.dataset.matchId = match.match_id;
+
+            const isCompleted = match.is_completed;
+
+            card.innerHTML = `
+                <div class="match-admin-header">
+                    <span>Match ${match.match_number}</span>
+                    <span>${new Date(match.match_date).toLocaleDateString()}</span>
+                </div>
+                <div class="team-input-group">
+                    <label>A</label>
+                    <input type="text" class="team-input flag-input" placeholder="Flag" 
+                           value="${match.team_a_flag || ''}" 
+                           onchange="updateTeam('${match.match_id}', 'A', 'flag', this.value)">
+                    <input type="text" class="team-input" placeholder="Team Name" 
+                           value="${match.team_a_name || ''}"
+                           onchange="updateTeam('${match.match_id}', 'A', 'name', this.value)">
+                    <input type="text" class="team-input" placeholder="Code" style="width:60px"
+                           value="${match.team_a_code || ''}"
+                           onchange="updateTeam('${match.match_id}', 'A', 'code', this.value)">
+                </div>
+                <div class="team-input-group">
+                    <label>B</label>
+                    <input type="text" class="team-input flag-input" placeholder="Flag" 
+                           value="${match.team_b_flag || ''}"
+                           onchange="updateTeam('${match.match_id}', 'B', 'flag', this.value)">
+                    <input type="text" class="team-input" placeholder="Team Name" 
+                           value="${match.team_b_name || ''}"
+                           onchange="updateTeam('${match.match_id}', 'B', 'name', this.value)">
+                    <input type="text" class="team-input" placeholder="Code" style="width:60px"
+                           value="${match.team_b_code || ''}"
+                           onchange="updateTeam('${match.match_id}', 'B', 'code', this.value)">
+                </div>
+                <div class="result-section">
+                    <label>Result</label>
+                    <div class="result-buttons">
+                        <button class="result-btn ${match.actual_winner === 'A' ? 'selected' : ''} ${isCompleted ? 'completed' : ''}" 
+                                onclick="setResult('${match.match_id}', 'A')"
+                                ${isCompleted ? 'disabled' : ''}>
+                            Team A Wins
+                        </button>
+                        <button class="result-btn ${match.actual_winner === 'B' ? 'selected' : ''} ${isCompleted ? 'completed' : ''}"
+                                onclick="setResult('${match.match_id}', 'B')"
+                                ${isCompleted ? 'disabled' : ''}>
+                            Team B Wins
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        async function updateTeam(matchId, side, field, value) {
+            const updates = {};
+            updates[`team_${side.toLowerCase()}_${field}`] = value;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('knockout_brackets')
+                    .update(updates)
+                    .eq('match_id', matchId);
+
+                if (error) throw error;
+                showToast('Team updated', 'success');
+            } catch (err) {
+                showToast('Update failed', 'error');
+            }
+        }
+
+        async function setResult(matchId, winner) {
+            try {
+                const { error } = await supabaseClient
+                    .from('knockout_brackets')
+                    .update({
+                        actual_winner: winner,
+                        is_completed: true
+                    })
+                    .eq('match_id', matchId);
+
+                if (error) throw error;
+
+                // Update UI
+                const card = document.querySelector(`[data-match-id="${matchId}"]`);
+                if (card) {
+                    card.querySelectorAll('.result-btn').forEach(btn => {
+                        btn.classList.add('completed');
+                        btn.disabled = true;
+                    });
+                    const winnerBtn = card.querySelector(`[onclick*="'${winner}'"]`);
+                    if (winnerBtn) winnerBtn.classList.add('selected');
+                }
+
+                showToast('Result recorded! Auto-scoring triggered.', 'success');
+                loadStats();
+            } catch (err) {
+                showToast('Failed to record result', 'error');
+            }
+        }
+
+        async function updatePhase() {
+            const phase = document.getElementById('phaseSelect').value;
+            try {
+                const { error } = await supabaseClient
+                    .from('system_settings')
+                    .update({ bracket_phase: phase })
+                    .eq('key', 'bracket_config');
+
+                if (error) throw error;
+                showToast(`Phase updated to: ${phase}`, 'success');
+            } catch (err) {
+                showToast('Failed to update phase', 'error');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                // Total submissions
+                const { count: totalLocked } = await supabaseClient
+                    .from('bracket_submissions')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('is_locked', true);
+
+                // Completed matches
+                const { count: completed } = await supabaseClient
+                    .from('knockout_brackets')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('is_completed', true);
+
+                document.getElementById('lockedBrackets').textContent = totalLocked || 0;
+                document.getElementById('completedMatches').textContent = completed || 0;
+            } catch (err) {
+                console.error('Stats error:', err);
+            }
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toast.className = `toast ${type} show`;
+            toastMsg.textContent = msg;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Load on page load
+        loadBracketData();
+    </script>
+</body>
+</html>
