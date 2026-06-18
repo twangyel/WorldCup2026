@@ -679,6 +679,13 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
 
   setAuthButtonLoading(true, authMode === 'login' ? 'Signing in…' : 'Creating account…')
 
+  // Stage v3: when a valid invite code is in flight, signup carries the
+  // entered_via_private flag so the new profile bypasses the global gate.
+  const isInviteSignup = v3InviteLinkEnabled
+                         && authMode === 'signup'
+                         && _pendingInvite?.league != null
+  const signUpOpts = isInviteSignup ? { enteredViaPrivate: true } : {}
+
   if (authMode === 'signup') {
     if (!name) {
       showToast('Please enter your name', 'error')
@@ -696,7 +703,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       return
     }
 
-    const { error } = await signUpUser(name, whatsapp, password)
+    const { error } = await signUpUser(name, whatsapp, password, signUpOpts)
     if (error) {
       if (error.message.includes('already registered') || error.message.includes('already exists')) {
         showToast('Account already exists. Switch to Sign In.', 'info')
@@ -1521,7 +1528,7 @@ return `
       let paidMap = {}
       try {
         const { data: paidProfiles } = await supabaseClient
-          .from('profiles').select('id, name').eq('fee_paid', true)
+          .from('profiles').select('id, name').eq('fee_paid', true).neq('entered_via_private', true)
         ;(paidProfiles || []).forEach(p => { paidMap[p.id] = p })
       } catch (e) {
         console.warn('[social] paid profiles fetch failed:', e)
@@ -2115,7 +2122,7 @@ async function getLeaderboardFromResults() {
   // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
   const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
     supabaseClient.from('prediction_results').select('*'),
-   supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true)
+   supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true).neq('entered_via_private', true)
   ])
 
   // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
@@ -2448,7 +2455,7 @@ recentEl.innerHTML = finished.map(f => {
         let profMap = {}
         if (userIds.length) {
           const { data: profs } = await supabaseClient
-            .from('profiles').select('id, name, department, fee_paid').in('id', userIds).eq('fee_paid', true)
+            .from('profiles').select('id, name, department, fee_paid').in('id', userIds).eq('fee_paid', true).neq('entered_via_private', true)
           ;(profs || []).forEach(p => { profMap[p.id] = p })
         }
         const agg = {}
@@ -3762,7 +3769,7 @@ async function loadLeaderboard() {
           const { data: allProfiles } = await supabaseClient
             .from('profiles')
             .select('id, full_name, department, name')
-            .eq('fee_paid', true)
+            .eq('fee_paid', true).neq('entered_via_private', true)
             .order('created_at', { ascending: false })
 
           if (allProfiles && allProfiles.length > 0) {
@@ -4483,7 +4490,7 @@ async function loadLeaderboard() {
           .from('prize_settings').select('*').eq('id', 1).single()
         const settings = s || {}
         const { data: profiles } = await supabaseClient
-          .from('profiles').select('fee_paid').eq('fee_paid', true)
+          .from('profiles').select('fee_paid').eq('fee_paid', true).neq('entered_via_private', true)
         const paidCount = profiles?.length || 0
         return computePrizeBreakdown(settings, paidCount)
       } catch (e) { return null }
@@ -6294,7 +6301,73 @@ async function showApp() {
     const profile = getProfile()
     document.getElementById('user-name').textContent = profile?.name || 'Player'
 
-    if (!profile?.fee_paid && !isAdmin()) {
+    // Stage v3: gate allows entry if any of these is true:
+    //   - fee_paid (today's behavior — paid the global Nu. 499)
+    //   - admin
+    //   - has at least one PAID private league membership (the real proof of payment)
+    //
+    // entered_via_private alone does NOT grant entry — the user still has to
+    // pay into at least one private league. The flag just tells us to route
+    // them to the private payment screen instead of the global one.
+    let hasPaidPrivateMembership = false
+    if (v3InviteLinkEnabled && profile?.id) {
+      try {
+        const { count } = await supabaseClient
+          .from('league_memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', profile.id)
+          .eq('payment_status', 'paid')
+        hasPaidPrivateMembership = (count || 0) > 0
+      } catch (_) { /* ignore — fall through to gate */ }
+    }
+
+    const allowEntry = profile?.fee_paid
+                       || isAdmin()
+                       || (v3InviteLinkEnabled && hasPaidPrivateMembership)
+
+    if (!allowEntry) {
+      // Stage v3: private-entry users get the league payment modal instead
+      // of the global payment screen. Three cases that route to private:
+      //   1. They just signed up via invite link (entered_via_private=true,
+      //      _pendingInvite.league still in memory)
+      //   2. They signed up via invite link earlier and reloaded (profile
+      //      has entered_via_private=true; recover the pending league from
+      //      their pending membership, if any)
+      //   3. Pending membership exists but no entered_via_private flag —
+      //      show a "waiting verification" screen rather than re-prompt for payment
+      if (v3InviteLinkEnabled && profile?.entered_via_private === true) {
+        // Try to recover a pending league for this user.
+        let leagueToShow = _pendingInvite?.league || null
+        if (!leagueToShow) {
+          try {
+            const { data: pending } = await supabaseClient
+              .from('league_memberships')
+              .select('league_id, payment_status, leagues:league_id(id, name, entry_fee, status, prize_pool_override, is_private)')
+              .eq('user_id', profile.id)
+              .order('joined_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (pending?.leagues) {
+              // If user already submitted payment proof, show pending state instead of payment modal.
+              if (pending.payment_status === 'pending') {
+                showPaymentGate()  // reuses the gate UI; user sees "Pending verification" state once flow lands
+                return
+              }
+              leagueToShow = pending.leagues
+            }
+          } catch (_) {}
+        }
+        if (leagueToShow && typeof showLeaguePaymentModal === 'function') {
+          // Hide app shell, show only the modal (it's already overlay-positioned).
+          const shell = document.getElementById('app-shell')
+          if (shell) shell.classList.add('hidden')
+          const gate = document.getElementById('payment-gate')
+          if (gate) gate.classList.add('hidden')
+          showLeaguePaymentModal(leagueToShow)
+          return
+        }
+        // Fall through to global gate as a safety net if no pending league found.
+      }
       showPaymentGate()
       return
     }
@@ -6480,7 +6553,7 @@ if (typeof getPrizePool !== 'function') {
       const { data: profiles, error } = await supabaseClient
         .from('profiles')
         .select('fee_paid')
-        .eq('fee_paid', true)
+        .eq('fee_paid', true).neq('entered_via_private', true)
       if (error) throw error
       const paidCount = profiles?.length || 0
       const fee = Number(s.entry_fee) || 0
@@ -6496,6 +6569,45 @@ if (typeof getPrizePool !== 'function') {
 }
 
   async function initApp() {
+  // Stage v3: parse and validate the invite code (if present) BEFORE auth runs.
+  // This lets the auth screen render with league-specific branding and route
+  // the new signup to the private payment flow.
+  //
+  // Bootstrap uses an RPC (public_lookup_league_by_code) instead of the
+  // regular leagues SELECT, because Stage 5 RLS blocks anon users from
+  // querying the leagues table directly. The RPC is SECURITY DEFINER and
+  // returns only public-safe fields (name, fee, status) for active leagues.
+  try {
+    await checkV3InviteLinkEnabled()
+    const code = _extractInviteCodeFromUrl()
+    if (code && v3InviteLinkEnabled) {
+      _pendingInvite.code = code
+      try {
+        const { data: rows, error } = await supabaseClient
+          .rpc('public_lookup_league_by_code', { p_code: code })
+        if (error) throw error
+        const league = Array.isArray(rows) ? rows[0] : rows
+        if (!league) {
+          _pendingInvite.error = 'This invite link is invalid or the league is no longer accepting new members'
+        } else {
+          _pendingInvite.league = league
+        }
+      } catch (e) {
+        _pendingInvite.error = e?.message || 'Invalid invite link'
+        console.warn('[v3 invite] lookup failed:', _pendingInvite.error)
+      }
+      // Apply branding to the auth screen if a landing/affordance exists
+      if (typeof renderInviteBranding === 'function') {
+        renderInviteBranding()
+      }
+    } else if (code && !v3InviteLinkEnabled) {
+      // Flag is off — silently ignore the code; user goes through normal flow
+      console.log('[v3 invite] feature disabled, ignoring code')
+    }
+  } catch (e) {
+    console.warn('[v3 invite] bootstrap failed:', e)
+  }
+
   await initAuth(); 
   async function waitForUser(maxMs = 1500, stepMs = 50) {
     const start = Date.now();
@@ -6548,14 +6660,14 @@ async function getSystemSettings() {
   try {
     const { data, error } = await supabaseClient
       .from('system_settings')
-      .select('private_leagues_enabled, private_leagues_v2_enabled')
+      .select('private_leagues_enabled, private_leagues_v2_enabled, v3_invite_link_enabled')
       .eq('id', 1)
       .single();
     if (error) throw error;
-    return { data: data || { private_leagues_enabled: false, private_leagues_v2_enabled: false }, error: null };
+    return { data: data || { private_leagues_enabled: false, private_leagues_v2_enabled: false, v3_invite_link_enabled: false }, error: null };
   } catch (err) {
     console.warn('getSystemSettings failed, defaulting to false:', err);
-    return { data: { private_leagues_enabled: false, private_leagues_v2_enabled: false }, error: err };
+    return { data: { private_leagues_enabled: false, private_leagues_v2_enabled: false, v3_invite_link_enabled: false }, error: err };
   }
 }
 
@@ -6940,7 +7052,16 @@ let myLeagues = []
 let activeLeagueId = null
 let privateLeaguesEnabled = false
 let privateLeaguesV2Enabled = false  // Stage 4a: admin-only create + per-league payments
+let v3InviteLinkEnabled = false       // Stage v3: invite-link signup (private-only entry)
 let _systemSettingsInitialized = false  // prevents toast on first load / login
+
+// Stage v3: holds the invite code parsed from the URL on page load.
+// Resolved league info gets cached here once validated.
+let _pendingInvite = {
+    code: null,   // raw code from URL
+    league: null, // league row (null until lookupLeagueByCodeForJoin succeeds)
+    error: null   // error message (null until validation completes)
+}
 
 async function checkPrivateLeaguesEnabled() {
     const { data } = await getSystemSettings()
@@ -6956,6 +7077,83 @@ async function checkPrivateLeaguesV2Enabled() {
     const { data } = await getSystemSettings()
     privateLeaguesV2Enabled = data?.private_leagues_v2_enabled === true
     return privateLeaguesV2Enabled
+}
+
+// Stage v3: read the invite-link signup master switch.
+async function checkV3InviteLinkEnabled() {
+    const { data } = await getSystemSettings()
+    v3InviteLinkEnabled = data?.v3_invite_link_enabled === true
+    return v3InviteLinkEnabled
+}
+
+// Stage v3: parse ?invite=CODE from the URL on page load. Idempotent.
+// Strips the param from the visible URL afterwards so a reload doesn't
+// retrigger the invite flow.
+function _extractInviteCodeFromUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search)
+        const code = (params.get('invite') || '').trim().toUpperCase()
+        if (!code) return null
+        // Clean it out so reload doesn't retrigger
+        params.delete('invite')
+        const newSearch = params.toString()
+        const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash
+        window.history.replaceState({}, '', newUrl)
+        return code
+    } catch (_) { return null }
+}
+
+// Stage v3: paint the invite-link banner onto the auth screen. Inserts a
+// banner above the form when a valid invite is in flight, or an error chip
+// if the code was invalid. No-op if the auth screen DOM isn't mounted yet.
+function renderInviteBranding() {
+    const host = document.getElementById('auth-screen')
+    if (!host) return
+    // Remove any prior banner so this function is idempotent.
+    const existing = document.getElementById('invite-banner')
+    if (existing) existing.remove()
+
+    if (!_pendingInvite.code) return
+
+    let bannerHtml = ''
+    if (_pendingInvite.league) {
+        const lg = _pendingInvite.league
+        const fee = Number(lg.entry_fee) || 0
+        const feeStr = 'Nu. ' + fee.toLocaleString('en-IN')
+        bannerHtml = `
+          <div id="invite-banner" class="mx-auto mb-4 max-w-sm bg-gradient-to-br from-brand-50 to-brand-100 border border-brand-200 rounded-2xl p-4 shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shrink-0">🎟️</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-brand-700 uppercase tracking-wider">You're invited</div>
+                <div class="font-bold text-sm text-ink-900 truncate">${escapeHtml(lg.name || 'League')}</div>
+                <div class="text-[11px] text-ink-600 mt-0.5">Entry fee ${feeStr} · sign up below to join</div>
+              </div>
+            </div>
+          </div>`
+    } else if (_pendingInvite.error) {
+        bannerHtml = `
+          <div id="invite-banner" class="mx-auto mb-4 max-w-sm bg-red-50 border border-red-200 rounded-2xl p-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shrink-0">⚠️</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-red-700 uppercase tracking-wider">Invite link</div>
+                <div class="font-semibold text-sm text-ink-900">${escapeHtml(_pendingInvite.error)}</div>
+                <div class="text-[11px] text-ink-600 mt-0.5">You can still sign up normally below.</div>
+              </div>
+            </div>
+          </div>`
+    }
+
+    if (!bannerHtml) return
+
+    // Insert at the top of the auth screen, above the form
+    const form = document.getElementById('auth-form')
+    if (form && form.parentNode) {
+        form.insertAdjacentHTML('beforebegin', bannerHtml)
+    } else {
+        host.insertAdjacentHTML('afterbegin', bannerHtml)
+    }
 }
 
 // ============================================================

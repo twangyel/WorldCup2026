@@ -155,7 +155,6 @@
     .split-sum-bad { color: #B91C1C; }
   </style>
 <base target="_blank">
-<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -676,6 +675,19 @@
               <div class="text-[11px] text-ink-400 mt-1">When ON, only admins create leagues. Players join via invite code and pay separately per league.</div>
             </div>
             <div id="private-leagues-v2-switch" class="switch" onclick="togglePrivateLeaguesV2()"></div>
+          </div>
+
+          <!-- Stage v3: Invite-link Signup Toggle -->
+          <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border mt-4">
+            <div class="min-w-0 mr-3">
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-sm">Invite-link Signup</span>
+                <span class="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wider">v3</span>
+              </div>
+              <div class="text-xs text-ink-500 mt-0.5">Private-only entry via shareable link</div>
+              <div class="text-[11px] text-ink-400 mt-1">When ON, sharing <code>?invite=CODE</code> lets new users sign up and pay only the private league fee, skipping the global Nu. 499. Requires v2.</div>
+            </div>
+            <div id="v3-invite-link-switch" class="switch" onclick="toggleV3InviteLink()"></div>
           </div>
 
           <!-- Inventory Toggle -->
@@ -1238,35 +1250,50 @@ async function setInventoryState(newState) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures' }, (payload) => {
           playChime()
           if (payload.eventType === 'UPDATE' && payload.new.home_score !== null && (payload.new.home_score !== payload.old?.home_score || payload.new.away_score !== payload.old?.away_score)) {
-            const msg = `${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`
-            addNotification('result', 'Result entered', msg)
-            showToast(`Result entered: ${msg}`, 'result')
+            showToast(`Result entered: ${payload.new.home_team} ${payload.new.home_score}–${payload.new.away_score} ${payload.new.away_team}`, 'result')
           } else if (payload.eventType === 'INSERT') {
-            const msg = `${payload.new.home_team} vs ${payload.new.away_team}`
-            addNotification('fixture', 'Fixture added', msg)
-            showToast(`Fixture added: ${msg}`, 'fixture')
+            showToast(`Fixture added: ${payload.new.home_team} vs ${payload.new.away_team}`, 'fixture')
           } else {
-            addNotification('fixture', 'Fixture updated', 'Schedule changed')
             showToast('Fixture schedule updated', 'fixture')
           }
           loadAll()
         }).subscribe()
 
       supabaseClient.channel('admin-predictions')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, async (payload) => {
           playChime()
-          // Look up user name from already-loaded allUsers array
-          const userId = payload.new?.user_id
-          const user = allUsers.find(u => u.id === userId)
-          const userName = user?.name || user?.email || 'Unknown player'
-          // Get fixture info if available
-          const fixture = allFixtures.find(f => f.id === payload.new?.fixture_id)
-          const fixtureName = fixture
-            ? `${fixture.home_team} vs ${fixture.away_team}`
-            : `Match #${payload.new?.fixture_id?.slice(0, 6)}`
-          // Add to notification bell (was missing!)
-          addNotification('general', 'New prediction', `${userName} predicted ${fixtureName}`)
-          showToast(`New prediction: ${userName} — ${fixtureName}`, 'general')
+          const row = payload.new || {}
+          // Default labels in case lookups fail (still show *something* useful)
+          let predictorName = 'Someone'
+          let matchLabel = ''
+          // Fetch predictor name from profiles
+          try {
+            if (row.user_id) {
+              const { data: p } = await supabaseClient
+                .from('profiles')
+                .select('name, full_name')
+                .eq('id', row.user_id)
+                .maybeSingle()
+              predictorName = (p?.full_name || p?.name || predictorName).trim() || predictorName
+            }
+          } catch (e) { /* ignore lookup failures */ }
+          // Fetch fixture label if available
+          try {
+            if (row.fixture_id) {
+              const { data: f } = await supabaseClient
+                .from('fixtures')
+                .select('home_team, away_team')
+                .eq('id', row.fixture_id)
+                .maybeSingle()
+              if (f?.home_team && f?.away_team) {
+                matchLabel = ` for ${f.home_team} vs ${f.away_team}`
+              }
+            }
+          } catch (e) { /* ignore lookup failures */ }
+          const title = 'New Prediction'
+          const message = `${predictorName} submitted a prediction${matchLabel}`
+          showToast(message, 'general')
+          addNotification('general', title, message)
         }).subscribe()
 
       // Auto-refresh when bonus rows land. awardPointsWithBonuses writes
@@ -3600,6 +3627,7 @@ async function adminViewLeague(leagueId) {
         <button onclick="adminShowEditPanel()" class="text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-full tap">✎ Edit</button>
         ${statusBtn}
         <button onclick="adminRegenerateInviteCode('${league.id}')" class="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full tap">🔁 New Code</button>
+        <button onclick="adminCopyInviteLink('${league.invite_code || ''}')" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-full tap">🔗 Copy Invite Link</button>
         <button onclick="adminDeleteLeague('${league.id}', ${JSON.stringify(league.name || '').replace(/"/g, '&quot;')})" class="text-[11px] font-bold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full tap">🗑 Delete</button>
       </div>
 
@@ -4203,6 +4231,26 @@ async function adminActivateLeague(leagueId) {
   await loadAdminLeagueBrowser();
 }
 
+// Stage v3: copy the invite-link URL for sharing via WhatsApp.
+// Format: https://<origin>/?invite=CODE
+async function adminCopyInviteLink(code) {
+  if (!code) { showToast('No invite code yet', 'warning'); return }
+  const url = `${window.location.origin}/?invite=${encodeURIComponent(code)}`
+  try {
+    await navigator.clipboard.writeText(url)
+    showToast('Invite link copied — paste into WhatsApp', 'success')
+  } catch (e) {
+    // Fallback for browsers without clipboard API
+    const ta = document.createElement('textarea')
+    ta.value = url
+    document.body.appendChild(ta)
+    ta.select()
+    try { document.execCommand('copy') } catch (_) {}
+    document.body.removeChild(ta)
+    showToast('Invite link: ' + url, 'info')
+  }
+}
+
 // Archive a league. Reversible by activating again.
 async function adminArchiveLeague(leagueId) {
   if (!isAdmin()) return;
@@ -4273,7 +4321,7 @@ window.setSystemSettings = async function(payload) {
   }
 }
 
-    let systemSettings = { private_leagues_enabled: false, private_leagues_v2_enabled: false }
+    let systemSettings = { private_leagues_enabled: false, private_leagues_v2_enabled: false, v3_invite_link_enabled: false }
 
     async function loadSystemSettings() {
       try {
@@ -4309,6 +4357,12 @@ window.setSystemSettings = async function(payload) {
       const swV2 = document.getElementById('private-leagues-v2-switch')
       if (swV2) {
         swV2.classList.toggle('on', !!systemSettings.private_leagues_v2_enabled)
+      }
+
+      // Stage v3: invite-link switch visual state
+      const swV3 = document.getElementById('v3-invite-link-switch')
+      if (swV3) {
+        swV3.classList.toggle('on', !!systemSettings.v3_invite_link_enabled)
       }
 
       loadLeagueStats()
@@ -4363,6 +4417,37 @@ window.setSystemSettings = async function(payload) {
       systemSettings.private_leagues_v2_enabled = newValue
       renderSettings()
       showToast(newValue ? 'Private Leagues v2 ENABLED' : 'Private Leagues v2 disabled', 'success')
+    }
+
+    // Stage v3: toggle the invite-link signup master switch.
+    async function toggleV3InviteLink() {
+      const newValue = !systemSettings.v3_invite_link_enabled
+
+      if (newValue) {
+        if (!systemSettings.private_leagues_v2_enabled) {
+          showToast('Enable Private Leagues v2 first — v3 builds on top of it.', 'warning')
+          return
+        }
+        const ok = confirm(
+          'Enable Invite-link Signup (v3)?\n\n' +
+          '• Share a URL like https://yourapp.com/?invite=CODE\n' +
+          '• New users signing up via that link skip the global Nu. 499 fee.\n' +
+          '• They pay ONLY the private league entry fee.\n' +
+          '• They will NOT appear on the global leaderboard.\n\n' +
+          'You can turn this off again at any time.'
+        )
+        if (!ok) return
+      }
+
+      const { error } = await setSystemSettings({ v3_invite_link_enabled: newValue })
+      if (error) {
+        showToast(error.message || 'Failed to update setting', 'error')
+        return
+      }
+
+      systemSettings.v3_invite_link_enabled = newValue
+      renderSettings()
+      showToast(newValue ? 'Invite-link Signup ENABLED' : 'Invite-link Signup disabled', 'success')
     }
 
     async function loadLeagueStats() {

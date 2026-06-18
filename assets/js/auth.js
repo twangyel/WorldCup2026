@@ -73,7 +73,7 @@ async function loadProfile() {
     return currentProfile
 }
 
-async function signInOrSignUp(name, whatsapp, password) {
+async function signInOrSignUp(name, whatsapp, password, opts = {}) {
     if (!isValidWhatsapp(whatsapp)) {
         return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
     }
@@ -90,7 +90,9 @@ async function signInOrSignUp(name, whatsapp, password) {
 
     // 2. If sign-in failed, try sign up
     if (signInError) {
-        return signUpUser(name, whatsapp, password)
+        // Stage v3: forward the invite-link opts so signUpUser can stamp
+        // entered_via_private on the new profile.
+        return signUpUser(name, whatsapp, password, opts)
     }
 
     return { data: null, error: signInError }
@@ -163,13 +165,17 @@ async function signInUser(whatsapp, password) {
     return { data: null, error }
 }
 
-async function signUpUser(name, whatsapp, password) {
+async function signUpUser(name, whatsapp, password, opts = {}) {
     const cleanName = (name || '').trim()
     const wa = normalizeWhatsapp(whatsapp)
     if (!cleanName) return { data: null, error: { message: 'Name is required' } }
     if (!isValidWhatsapp(whatsapp)) return { data: null, error: { message: 'Enter a valid WhatsApp number' } }
 
     const email = whatsappToEmail(wa)
+    // Stage v3: when signing up via invite link, the new profile is marked
+    // entered_via_private=true so they bypass the global payment gate but
+    // also stay off the global leaderboard.
+    const enteredViaPrivate = opts.enteredViaPrivate === true
 
     const { data, error } = await supabaseClient.auth.signUp({
         email,
@@ -197,20 +203,47 @@ async function signUpUser(name, whatsapp, password) {
                 name: cleanName,
                 whatsapp: wa,
                 fee_paid: false,
-                role: 'user'
+                role: 'user',
+                entered_via_private: enteredViaPrivate
             })
             .select()
             .single()
         if (newProfile) currentProfile = newProfile
     } else {
         // Profile row already existed (e.g. trigger created it) — make sure
-        // name and whatsapp are filled in.
+        // name and whatsapp are filled in. Also stamp entered_via_private
+        // when the signup came through the invite-link path.
+        const patch = { name: cleanName, whatsapp: wa }
+        if (enteredViaPrivate) patch.entered_via_private = true
         await supabaseClient
             .from('profiles')
-            .update({ name: cleanName, whatsapp: wa })
+            .update(patch)
             .eq('id', data.user.id)
         await loadProfile()
     }
+
+    // Stage v3 hardening: for invite-link signups, also call the SECURITY DEFINER
+    // RPC. This guarantees `entered_via_private` is set even if a handle_new_user
+    // trigger raced the INSERT, or RLS on profiles blocked the UPDATE branch above.
+    if (enteredViaPrivate) {
+        try {
+            const { data: ok, error: rpcErr } = await supabaseClient
+                .rpc('mark_self_entered_via_private')
+            if (rpcErr) {
+                console.warn('[v3] mark_self_entered_via_private RPC failed:', rpcErr)
+            } else if (ok === false) {
+                console.warn('[v3] mark_self_entered_via_private returned false (no row updated)')
+            } else {
+                // Reflect the flag locally without needing another DB roundtrip
+                if (currentProfile) currentProfile.entered_via_private = true
+            }
+        } catch (e) {
+            console.warn('[v3] mark_self_entered_via_private threw:', e)
+        }
+        // Final defensive refresh so getProfile() sees the truth
+        await loadProfile()
+    }
+
     return { data, error: null }
 }
 
