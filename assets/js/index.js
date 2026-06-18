@@ -3442,45 +3442,66 @@ async function shareMatchHighlight(fixtureId) {
 
 
 // ---- Canvas PNG generator for the pick-list share ----
+// ============================================================
+// picklist-2col-patch.js
+// Drop-in replacement for generatePickListCardBlob() in index.js
+// Same function signature, same helpers — only the layout changes.
+//
+// Picks render in TWO columns:
+//   • ceil(N/2) rows on the left  (positions 1..K)
+//   • floor(N/2) rows on the right (positions K+1..N)
+// This roughly halves the card height and keeps text readable
+// after WhatsApp compression.
+// ============================================================
+
 async function generatePickListCardBlob(fixtureId) {
   const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
     .find(f => f.id === fixtureId)
   if (!fixture) throw new Error('Fixture not found')
- 
+
   const picks = hotTakesByFixture[fixtureId] || []
   if (!picks.length) throw new Error('No picks for this fixture')
- 
+
   const finished = fixture.home_score !== null && fixture.away_score !== null
- 
-  // Summary line (only meaningful when finished)
-  const exact = picks.filter(p => p.base_points === 5).length
+
+  // Summary stats
+  const exact         = picks.filter(p => p.base_points === 5).length
   const correctResult = picks.filter(p => p.base_points === 2 || p.base_points === 3).length
-  const pointsWon = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
- 
+  const pointsWon     = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
+
   // Preload flags hi-res
   const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
   const [homeImg, awayImg] = await Promise.all([
     loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
     loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
   ])
- 
+
   // ----- Layout constants -----
-  const WIDTH       = 1080
-  const HEADER_H    = 130
-  const SCORE_H     = 240
-  const STATS_H     = finished ? 110 : 60
-  const SEC_LABEL_H = 60
-  const ROW_H       = 58
-  const FOOTER_H    = 80
-  const PAD_BOTTOM  = 30
- 
-  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + (picks.length * ROW_H) + FOOTER_H + PAD_BOTTOM
- 
+  const WIDTH        = 1080
+  const SIDE_PAD     = 60
+  const HEADER_H     = 130
+  const SCORE_H      = 240
+  const STATS_H      = finished ? 110 : 60
+  const SEC_LABEL_H  = 60
+  const ROW_H        = 62
+  const COL_GUTTER   = 28
+  const FOOTER_H     = 80
+  const PAD_BOTTOM   = 30
+
+  // Two-column math
+  const INNER_W   = WIDTH - SIDE_PAD * 2
+  const COL_W     = (INNER_W - COL_GUTTER) / 2
+  const COL1_X    = SIDE_PAD
+  const COL2_X    = SIDE_PAD + COL_W + COL_GUTTER
+  const ROWS_PER_COL = Math.ceil(picks.length / 2)
+
+  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + (ROWS_PER_COL * ROW_H) + FOOTER_H + PAD_BOTTOM
+
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH; canvas.height = HEIGHT
   const ctx = canvas.getContext('2d')
- 
-  // ----- Background (matches match-highlight card) -----
+
+  // ----- Background (unchanged) -----
   const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
   bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
   ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
@@ -3491,23 +3512,23 @@ async function generatePickListCardBlob(fixtureId) {
   const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
   glow.addColorStop(0, 'rgba(212,162,76,0.30)'); glow.addColorStop(1, 'rgba(212,162,76,0)')
   ctx.fillStyle = glow; ctx.fillRect(0, 0, WIDTH, HEIGHT)
- 
+
   const cx = WIDTH / 2
- 
+
   // ----- Header -----
   ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 32px system-ui, sans-serif'
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-  ctx.fillText(`📋 ${fixture.stage || 'Match'} · Pick List`, 60, 75)
+  ctx.fillText(`📋 ${fixture.stage || 'Match'} · Pick List`, SIDE_PAD, 75)
   ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
   ctx.textAlign = 'right'
-  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - 60, 75)
+  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - SIDE_PAD, 75)
   ctx.textBaseline = 'alphabetic'
- 
+
   // ----- Score block with flags -----
   let y = HEADER_H
   const flagY = y + 40, fw = 96, fh = 64
-  const leftX = cx - 220, rightX = cx + 220
- 
+  const leftFX = cx - 220, rightFX = cx + 220
+
   function drawFlag(img, name, x) {
     if (img) {
       ctx.save()
@@ -3527,10 +3548,9 @@ async function generatePickListCardBlob(fixtureId) {
     ctx.fillStyle = '#fff'; ctx.font = '24px system-ui, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText(truncateForCanvas(ctx, name, 280), x, flagY + fh + 36)
   }
-  drawFlag(homeImg, fixture.home_team, leftX)
-  drawFlag(awayImg, fixture.away_team, rightX)
- 
-  // Center score (or "vs" if locked but not played)
+  drawFlag(homeImg, fixture.home_team, leftFX)
+  drawFlag(awayImg, fixture.away_team, rightFX)
+
   if (finished) {
     ctx.fillStyle = '#F4C430'; ctx.font = 'bold 80px system-ui, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
@@ -3542,12 +3562,12 @@ async function generatePickListCardBlob(fixtureId) {
     ctx.fillStyle = '#60A5FA'; ctx.font = 'bold 20px system-ui, sans-serif'
     ctx.fillText('LOCKED', cx, flagY + fh / 2 + 52)
   }
- 
+
   // ----- Summary stats -----
   y = HEADER_H + SCORE_H
   ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(WIDTH - 60, y); ctx.stroke()
- 
+  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y); ctx.lineTo(WIDTH - SIDE_PAD, y); ctx.stroke()
+
   if (finished) {
     const stats = [
       ['PREDICTIONS', picks.length, '#fff'],
@@ -3555,9 +3575,9 @@ async function generatePickListCardBlob(fixtureId) {
       ['RESULT', correctResult, '#fff'],
       ['POINTS WON', pointsWon, '#F4C430']
     ]
-    const stepW = (WIDTH - 120) / 4
+    const stepW = (WIDTH - SIDE_PAD * 2) / 4
     stats.forEach((st, i) => {
-      const sx = 60 + stepW * i + stepW / 2
+      const sx = SIDE_PAD + stepW * i + stepW / 2
       ctx.fillStyle = st[2]; ctx.font = 'bold 44px system-ui, sans-serif'; ctx.textAlign = 'center'
       ctx.fillText(String(st[1]), sx, y + 50)
       ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 18px system-ui, sans-serif'
@@ -3567,66 +3587,82 @@ async function generatePickListCardBlob(fixtureId) {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 28px system-ui, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText(`${picks.length} ${picks.length === 1 ? 'pick' : 'picks'} locked in`, cx, y + 38)
   }
-  ctx.beginPath(); ctx.moveTo(60, y + STATS_H - 10); ctx.lineTo(WIDTH - 60, y + STATS_H - 10); ctx.stroke()
- 
+  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + STATS_H - 10); ctx.lineTo(WIDTH - SIDE_PAD, y + STATS_H - 10); ctx.stroke()
+
   // ----- Section label -----
   y = HEADER_H + SCORE_H + STATS_H
   ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 24px system-ui, sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText(finished ? '🏅 ALL PICKS · sorted by points' : '🔒 ALL PICKS · sorted by submission', 60, y + 36)
+  ctx.fillText(finished ? '🏅 ALL PICKS · sorted by points' : '🔒 ALL PICKS · sorted by submission', SIDE_PAD, y + 36)
   y += SEC_LABEL_H
- 
-  // ----- Rows -----
-  picks.forEach((p, i) => {
-    const rowY = y + i * ROW_H
+
+  // ===== Picks: TWO COLUMNS =====
+  // Render a single row inside a column box at (colX, rowTopY) with width COL_W
+  function drawRow(p, displayIdx, colX, rowTopY) {
     const win = (p.final_points || 0) > 0
- 
-    // Row background — gold tint for scorers, faint stripe for others
+
+    // Row background
     const rowFill = finished
-      ? (win ? 'rgba(212,162,76,0.13)' : (i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
-      : (i % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)')
+      ? (win ? 'rgba(212,162,76,0.13)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
+      : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)')
     ctx.fillStyle = rowFill
     ctx.strokeStyle = win ? 'rgba(212,162,76,0.35)' : 'rgba(255,255,255,0)'
     ctx.lineWidth = 1.2
-    roundRect(ctx, 60, rowY + 4, WIDTH - 120, ROW_H - 8, 10); ctx.fill(); if (win) ctx.stroke()
- 
-    const cyl = rowY + ROW_H / 2
+    roundRect(ctx, colX, rowTopY + 4, COL_W, ROW_H - 8, 10); ctx.fill(); if (win) ctx.stroke()
+
+    const cyl = rowTopY + ROW_H / 2
     ctx.textBaseline = 'middle'
- 
-    // Position number (subtle, left)
-    ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'right'
+
+    // Geometry inside the column (narrower than 1-col, so tighter spacing)
+    const RANK_RIGHT  = colX + 38            // right edge of rank number
+    const NAME_LEFT   = colX + 50            // start of name
+    const PTS_RIGHT   = colX + COL_W - 14    // right edge of +points (or right of card if !finished)
+    const PRED_RIGHT  = finished ? PTS_RIGHT - 70 : PTS_RIGHT
+    const NAME_MAX_W  = PRED_RIGHT - NAME_LEFT - 70   // 70px reserved for the predicted score
+
+    // Position number
+    ctx.font = 'bold 16px system-ui, sans-serif'; ctx.textAlign = 'right'
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
-    ctx.fillText(String(i + 1), 100, cyl)
- 
+    ctx.fillText(String(displayIdx + 1), RANK_RIGHT, cyl)
+
     // Name + bonus emojis
     let nameLabel = p.name || 'Anonymous'
-    if ((p.combo_bonus || 0) > 0) nameLabel += ' ⚡'
+    if ((p.combo_bonus  || 0) > 0) nameLabel += ' ⚡'
     if ((p.streak_bonus || 0) > 0) nameLabel += ' 🔥'
-    ctx.font = win ? 'bold 24px system-ui, sans-serif' : '22px system-ui, sans-serif'
+    ctx.font = win ? 'bold 21px system-ui, sans-serif' : '20px system-ui, sans-serif'
     ctx.fillStyle = win ? '#fff' : 'rgba(255,255,255,0.82)'
     ctx.textAlign = 'left'
-    ctx.fillText(truncateForCanvas(ctx, nameLabel, 600), 120, cyl)
- 
-    // Predicted score (middle-right)
-    ctx.font = 'bold 26px system-ui, sans-serif'
+    ctx.fillText(truncateForCanvas(ctx, nameLabel, NAME_MAX_W), NAME_LEFT, cyl)
+
+    // Predicted score
+    ctx.font = 'bold 22px system-ui, sans-serif'
     ctx.fillStyle = win ? '#F4C430' : 'rgba(255,255,255,0.85)'
     ctx.textAlign = 'right'
-    ctx.fillText(`${p.home}–${p.away}`, WIDTH - 180, cyl)
- 
-    // Points badge (rightmost)
+    ctx.fillText(`${p.home}–${p.away}`, PRED_RIGHT, cyl)
+
+    // Points badge
     if (finished) {
-      ctx.font = 'bold 22px system-ui, sans-serif'
+      ctx.font = 'bold 20px system-ui, sans-serif'
       ctx.fillStyle = win ? '#4ADE80' : 'rgba(255,255,255,0.35)'
       ctx.textAlign = 'right'
-      ctx.fillText(`+${p.final_points || 0}`, WIDTH - 84, cyl)
+      ctx.fillText(`+${p.final_points || 0}`, PTS_RIGHT, cyl)
     }
- 
+
     ctx.textBaseline = 'alphabetic'
+  }
+
+  // Split picks top-down: 1..K go left, K+1..N go right (K = ceil(N/2))
+  picks.forEach((p, i) => {
+    const inLeft  = i < ROWS_PER_COL
+    const colX    = inLeft ? COL1_X : COL2_X
+    const rowIdx  = inLeft ? i : (i - ROWS_PER_COL)
+    const rowTopY = y + rowIdx * ROW_H
+    drawRow(p, i, colX, rowTopY)
   })
- 
+
   // ----- Footer -----
   ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'
   ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
- 
+
   return new Promise((resolve, reject) => {
     canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
   })
