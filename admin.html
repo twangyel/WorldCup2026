@@ -2107,7 +2107,7 @@ async function executeRecalcAll() {
     <!-- Line 2: Status badges + Actions (left-aligned under identity) -->
     <div class="flex items-center gap-2 pl-14"> <!-- pl-14 = avatar width (44px) + gap (12px) -->
       <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : privateOnly ? 'bg-paper text-ink-500 border border-paper-border' : 'bg-paper text-ink-700 border border-paper-border'}" title="${privateOnly ? 'Mark as Global Paid (upgrades them to also play global)' : ''}">${paid ? '✓ GLOBAL PAID' : privateOnly ? 'NO GLOBAL' : 'UNPAID'}</button>
-      <button onclick="toggleLeagueAccess('${u.id}', ${!(u.private_leagues_access === true)})" class="text-[11px] font-bold px-2.5 py-1.5 rounded-full tap shrink-0 ${u.private_leagues_access ? 'bg-purple-500 text-white' : 'bg-paper text-ink-500 border border-paper-border'}" title="${u.private_leagues_access ? 'Revoke private league access' : 'Grant private league access'}">${u.private_leagues_access ? '🔓 LEAGUE' : '🔒'}</button>
+      <!-- Stage 6: 🔓 LEAGUE button removed — column private_leagues_access dropped. Access is per-membership in v2. -->
       <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
       </button>
@@ -2142,24 +2142,10 @@ async function executeRecalcAll() {
       showToast(paid ? 'Marked as paid' : 'Marked as unpaid', 'success')
     }
 
-    async function toggleLeagueAccess(userId, grant) {
-      const u = allUsers.find(x => x.id === userId)
-      if (!u) return
-
-      const { error } = await supabaseClient
-        .from('profiles')
-        .update({ private_leagues_access: grant })
-        .eq('id', userId)
-
-      if (error) {
-        showToast(error.message || 'Update failed', 'error')
-        return
-      }
-
-      u.private_leagues_access = grant
-      renderUsers()
-      showToast(grant ? `Granted league access to ${u.name || 'user'}` : `Revoked league access`, 'success')
-    }
+    // Stage 6: toggleLeagueAccess() removed. The private_leagues_access
+    // column it managed has been dropped from the profiles table.
+    // In v2, league access is per-membership and managed via the league
+    // drawer (Admin → Leagues → click league → members panel).
 
         function buildPaymentVerifiedMessage(name, whatsapp) {
       const appUrl = typeof window !== 'undefined' ? (window.location.origin + '/index.html') : 'https://your-app-url.com'
@@ -3368,9 +3354,9 @@ async function checkPrivateLeaguesEnabled() {
 }
 
 function hasAdminLeagueAccess(profile) {
+  // Stage 6: private_leagues_access column dropped. Admin-only check now.
   if (!profile) return false;
-  return profile.private_leagues_access === true
-    || (typeof isAdmin === 'function' && isAdmin());
+  return (typeof isAdmin === 'function' && isAdmin());
 }
 
 async function canAccessLeagues() {
@@ -3379,7 +3365,8 @@ async function canAccessLeagues() {
   const enabled = await checkPrivateLeaguesEnabled();
   if (!enabled) return { allowed: false, reason: 'disabled' };
   if (isAdmin()) return { allowed: true, reason: 'admin' };
-  if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
+  // Stage 6: v1 fallback (granted via column) removed. With v2 always preferred,
+  // admin.html's access checks only need to gate by admin or feature flag.
   return { allowed: false, reason: 'not_granted' };
 }
 

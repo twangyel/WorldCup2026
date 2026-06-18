@@ -906,37 +906,9 @@ function showPaymentGate() {
               ]
             })
           }
-          if (payload.new?.private_leagues_access === true && payload.old?.private_leagues_access !== true) {
-            // Update cached profile so hasLeagueAccess() returns true on next render
-            const cached = (typeof getProfile === 'function') ? getProfile() : null
-            if (cached) cached.private_leagues_access = true
-            // Defensive: force fresh DB read in case getProfile() returns a fresh copy each call
-            try {
-              const { data: fresh } = await supabaseClient
-                .from('profiles').select('*').eq('id', user.id).single()
-              if (fresh && cached) Object.assign(cached, fresh)
-            } catch (e) { /* ignore */ }
-            // Stage 4c: skip v1-flag toast/refresh when v2 is on — the flag is dead in v2.
-            if (!privateLeaguesV2Enabled) {
-              showToast('🎉 Private league access granted by admin!', 'success')
-              if (typeof loadMyLeagues === 'function') loadMyLeagues()
-            }
-          }
-          if (payload.new?.private_leagues_access === false && payload.old?.private_leagues_access === true) {
-            const cached = (typeof getProfile === 'function') ? getProfile() : null
-            if (cached) cached.private_leagues_access = false
-            try {
-              const { data: fresh } = await supabaseClient
-                .from('profiles').select('*').eq('id', user.id).single()
-              if (fresh && cached) Object.assign(cached, fresh)
-            } catch (e) { /* ignore */ }
-            // Stage 4c: in v2 mode, the flag is dead — don't toast, don't lockout, don't refresh.
-            if (!privateLeaguesV2Enabled) {
-              showToast('Private league access has been revoked', 'info')
-              if (typeof enforceLeagueAccessLockout === 'function') enforceLeagueAccessLockout('revoked')
-              if (typeof loadMyLeagues === 'function') loadMyLeagues()
-            }
-          }
+          // Stage 6: removed realtime handlers for profiles.private_leagues_access.
+          // The column is dropped. In v2/v3, access is per-membership and handled
+          // by the v2-memberships channel above.
         })
         .subscribe()
     }
@@ -1002,6 +974,23 @@ document.addEventListener('DOMContentLoaded', function() {
   // Social caches: needs `fixtures` to be loaded, so do this AFTER loadFixtures
   // resolves below. We just kick off the first refresh in the background here.
 
+  // Stage v3 fix: resolve scopes BEFORE the parallel data loads. Otherwise
+  // the first loadLeaderboard() runs with activeLeagueId=null and briefly
+  // renders the global leaderboard into the DOM, which a private-only user
+  // shouldn't see at all. By moving this up, activeLeagueId is already set
+  // when the parallel loads kick off → loadLeaderboard immediately routes
+  // to loadLeagueLeaderboardView for private-scope users.
+  try {
+    if (typeof checkPrivateLeaguesV2Enabled === 'function') {
+      await checkPrivateLeaguesV2Enabled()
+    }
+    if (typeof initScopeOnLogin === 'function') {
+      await initScopeOnLogin()
+    }
+  } catch (e) {
+    console.warn('[Stage v3] early scope init failed:', e)
+  }
+
   // Load all home-screen data IN PARALLEL so the user doesn't wait for
   // sequential network round-trips. We wrap each call in catch() so one
   // slow/failing source can't block the rest of the home from rendering.
@@ -1019,21 +1008,6 @@ document.addEventListener('DOMContentLoaded', function() {
   renderBadges()
   startCountdownTicker()
   setupRealtime()
-
-  // Stage 4c: resolve scopes once after login. Safe no-op when v2 is OFF.
-  // Need to wait for v2 flag to be read first (setupRealtime reads it via
-  // checkPrivateLeaguesV2Enabled in its system-settings setup); we re-read
-  // here defensively so this works regardless of init order.
-  try {
-    if (typeof checkPrivateLeaguesV2Enabled === 'function') {
-      await checkPrivateLeaguesV2Enabled()
-    }
-    if (typeof initScopeOnLogin === 'function') {
-      await initScopeOnLogin()
-    }
-  } catch (e) {
-    console.warn('[Stage 4c] scope init failed:', e)
-  }
 }async function loadGateFee() {
       try {
         let fee = 500
@@ -7466,9 +7440,9 @@ document.getElementById('league-modal-overlay')?.addEventListener('click', e => 
  * This does NOT check payment status - use canAccessLeagues() for full check.
  */
 function hasAdminLeagueAccess(profile) {
+    // Stage 6: private_leagues_access column dropped. Admin-only check now.
     if (!profile) return false;
-    return profile.private_leagues_access === true
-        || (typeof isAdmin === 'function' && isAdmin());
+    return (typeof isAdmin === 'function' && isAdmin());
 }
 
 /**
@@ -7479,24 +7453,26 @@ async function canAccessLeagues() {
     const profile = getProfile();
     if (!profile) return { allowed: false, reason: 'not_authenticated' };
 
-    // Stage 4c: in v2 mode, access is per-membership (enforced by DB queries
-    // that filter on user_id). The legacy private_leagues_access flag is dead.
-    // If the user is authenticated and v2 is on, allow — the per-league
+    // v2 (active mode): access is per-membership, enforced by Stage 5 RLS on
+    // league_memberships. Any authenticated user can interact; the per-league
     // membership checks downstream do the real gating.
     if (privateLeaguesV2Enabled) {
         return { allowed: true, reason: 'v2' };
     }
 
+    // Stage 6: legacy v1 path simplified. With the private_leagues_access
+    // column removed, v1 mode now only grants access to admins. If v2 is
+    // off and you're not an admin, you can't use private leagues — which
+    // matches your current production setup.
     const enabled = await checkPrivateLeaguesEnabled();
     if (!enabled) return { allowed: false, reason: 'disabled' };
-
     if (isAdmin()) return { allowed: true, reason: 'admin' };
-    if (profile.private_leagues_access === true) return { allowed: true, reason: 'granted' };
-
     return { allowed: false, reason: 'not_granted' };
 }
 
-// DEPRECATED: Use hasAdminLeagueAccess() or canAccessLeagues() instead
+// Stage 6: hasLeagueAccess() kept as a thin shim. It's still referenced
+// in a few places downstream; removing it would force a larger surface
+// of edits. Just delegate to the simplified admin check.
 function hasLeagueAccess(profile) {
     return hasAdminLeagueAccess(profile);
 }
