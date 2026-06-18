@@ -971,6 +971,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // first paint instead of zeros. (Bug 3 expanded)
   await refreshMyResultsCache().catch(e => console.error('refreshMyResultsCache', e))
 
+  // Load this user's active card plays so the prediction form knows whether
+  // to render alt-score inputs / DOUBLE POINTS badges, then subscribe to changes.
+  await loadMyCardPlays().catch(e => console.error('loadMyCardPlays', e))
+  subscribeToMyCardPlays()
+
   // Social caches: needs `fixtures` to be loaded, so do this AFTER loadFixtures
   // resolves below. We just kick off the first refresh in the background here.
 
@@ -1141,6 +1146,41 @@ let fixtures = []
 let predictions = []
 let pendingPredictions = {}
 
+// Cache of this user's non-refunded card plays, keyed by fixture_id.
+// Refreshed on login + after executeCardPlay + via realtime subscription.
+let myCardPlaysByFixture = {};
+
+async function loadMyCardPlays() {
+  myCardPlaysByFixture = {};
+  const u = (typeof getUser === 'function' ? getUser() : null);
+  if (!u?.id) return;
+  try {
+    const { data, error } = await supabaseClient
+      .from('card_plays')
+      .select('fixture_id, card_type, status, result_summary')
+      .eq('user_id', u.id)
+      .neq('status', 'refunded');
+    if (error) { console.error('[card_plays] load failed:', error); return; }
+    (data || []).forEach(p => { myCardPlaysByFixture[p.fixture_id] = p; });
+  } catch (e) { console.error('[card_plays] load exception:', e); }
+}
+
+function subscribeToMyCardPlays() {
+  const u = (typeof getUser === 'function' ? getUser() : null);
+  if (!u?.id) return;
+  supabaseClient
+    .channel('my-card-plays')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'card_plays',
+        filter: `user_id=eq.${u.id}` },
+      async () => {
+        await loadMyCardPlays();
+        if (typeof renderFixtures === 'function') renderFixtures();
+      }
+    )
+    .subscribe();
+}
+
 // ============== NAVIGATION HISTORY ==============
 let navHistory = []           // Stack of visited tabs for back navigation
 let currentNavIndex = -1      // Current position in history
@@ -1289,6 +1329,11 @@ function msToCountdown(ms) {
     const locked = previewMode || !isOpen || timeLocked
     const hP = pred ? pred.home_prediction : ''
     const aP = pred ? pred.away_prediction : ''
+    const altH = pred?.alt_home_prediction ?? ''
+    const altA = pred?.alt_away_prediction ?? ''
+    const cardOnThisMatch = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[f.id] : null
+    const hasDoublePick   = cardOnThisMatch?.card_type === 'double_pick'
+    const hasDoublePoints = cardOnThisMatch?.card_type === 'double_points'
     const pts = getPointsForFixture(f.id)   // Bug 3: was pred?.points_awarded (never written)
 
     // Status badge
@@ -1305,8 +1350,14 @@ function msToCountdown(ms) {
     const dateStr = ko.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
     const timeStr = ko.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 
-    // Score boxes (readonly or input)
-    const scoreSection = locked
+    // Score boxes (readonly or input) — with card badges + optional alt pick row
+    const cardBadge = hasDoublePoints
+      ? '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#FFC964,#E07A1F);color:#3A2410;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">⚡ DOUBLE POINTS ACTIVE</div>'
+      : hasDoublePick
+        ? '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7EC8FF,#2E6FBF);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">🎯 DOUBLE PICK ACTIVE</div>'
+        : ''
+
+    const primaryRow = locked
       ? `<div class="fixture-score-row">
           <div class="fixture-score-box">${hP !== '' ? hP : '–'}</div>
           <span class="fixture-score-divider">:</span>
@@ -1317,6 +1368,26 @@ function msToCountdown(ms) {
           <span class="fixture-score-divider">:</span>
           <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${aP}" onchange="updatePrediction('${f.id}','away',this.value)">
         </div>`
+
+    const altRow = hasDoublePick
+      ? (locked
+          ? `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-weight:700;">Alt pick</div>
+             <div class="fixture-score-row">
+               <div class="fixture-score-box">${altH !== '' ? altH : '–'}</div>
+               <span class="fixture-score-divider">:</span>
+               <div class="fixture-score-box">${altA !== '' ? altA : '–'}</div>
+             </div>`
+          : `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-weight:700;">Alt pick (Double Pick)</div>
+             <div class="fixture-score-row">
+               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${altH}" onchange="updatePrediction('${f.id}','alt_home',this.value)">
+               <span class="fixture-score-divider">:</span>
+               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${altA}" onchange="updatePrediction('${f.id}','alt_away',this.value)">
+             </div>`)
+      : ''
+
+    const scoreSection = cardBadge + (hasDoublePick
+      ? `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;font-weight:700;">Primary pick</div>${primaryRow}${altRow}`
+      : primaryRow)
 
     // Save button
     const saveBtn = !locked
@@ -1402,6 +1473,31 @@ return `
       const { error } = await savePrediction(id, home, away)
       if (error) { showToast(error.message, 'error'); return }
 
+      // If Double Pick is armed on this match, persist alt scores
+      const cpForSave = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
+      let altHomeSaved = null, altAwaySaved = null
+      if (cpForSave?.card_type === 'double_pick') {
+        const pp = pendingPredictions[id] || {}
+        const altHraw = pp.alt_home
+        const altAraw = pp.alt_away
+        if (altHraw !== undefined && altHraw !== '' && altAraw !== undefined && altAraw !== '') {
+          altHomeSaved = parseInt(altHraw, 10)
+          altAwaySaved = parseInt(altAraw, 10)
+          try {
+            await supabaseClient
+              .from('predictions')
+              .update({
+                alt_home_prediction: altHomeSaved,
+                alt_away_prediction: altAwaySaved
+              })
+              .eq('user_id', getUser().id)
+              .eq('fixture_id', id)
+          } catch (e) { console.error('[double-pick] alt save failed:', e) }
+        } else {
+          showToast('Double Pick is armed — enter your alt scoreline too', 'warning')
+        }
+      }
+
       // Feature 1: write submitted_at timestamp. Silent-fail if column doesn't exist.
       const submittedAt = new Date().toISOString()
       try {
@@ -1424,9 +1520,22 @@ return `
       if (existing) {
         existing.home_prediction = home
         existing.away_prediction = away
+        if (altHomeSaved !== null) {
+          existing.alt_home_prediction = altHomeSaved
+          existing.alt_away_prediction = altAwaySaved
+        }
         existing.submitted_at = submittedAt
       } else {
-        predictions.push({ user_id: getUser().id, fixture_id: id, home_prediction: home, away_prediction: away, points_awarded: 0, submitted_at: submittedAt })
+        predictions.push({
+          user_id: getUser().id,
+          fixture_id: id,
+          home_prediction: home,
+          away_prediction: away,
+          alt_home_prediction: altHomeSaved,
+          alt_away_prediction: altAwaySaved,
+          points_awarded: 0,
+          submitted_at: submittedAt
+        })
       }
       updatePredictionCount()
       renderFixtures()  // re-render so "Locked in just now" appears immediately

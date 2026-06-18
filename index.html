@@ -2343,7 +2343,7 @@
     }
     .inv-flip {
       position: relative;
-      aspect-ratio: 5 / 8.5;
+      aspect-ratio: 5 / 9.4;
       perspective: 1200px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -2508,9 +2508,11 @@
       margin-bottom: 6px;
     }
     .inv-back-rule {
-      font-size: 10.5px;
-      line-height: 1.4;
+      font-size: 10px;
+      line-height: 1.35;
       color: #4A5560;
+      flex: 1 1 auto;
+      overflow: hidden;
     }
     .inv-back-hint {
       font-size: 9.5px;
@@ -4161,10 +4163,10 @@
                 <div class="inv-flip-inner">
                   <div class="inv-face inv-face-front is-insurance">
                     <span class="inv-corner tl">WC 26</span>
-                    <span class="inv-corner tr">🛡</span>
-                    <span class="inv-pill">INSURANCE</span>
-                    <div class="inv-glyph">🛡️</div>
-                    <div class="inv-title">Streak Saver</div>
+                    <span class="inv-corner tr">🎯</span>
+                    <span class="inv-pill">BOOSTER</span>
+                    <div class="inv-glyph">🎯</div>
+                    <div class="inv-title">Double Pick</div>
                     <div class="inv-subtitle">One-time use</div>
                     <span class="inv-corner br">WC 26</span>
                   </div>
@@ -4800,17 +4802,17 @@
           id: 'double_points',
           name: 'Double Points',
           emoji: '⚡',
-          desc: '2× points on your next prediction',
+          desc: '2× points on your chosen match',
           type: 'booster',
           gradient: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
           shadow: '0 2px 8px rgba(212,162,76,0.2)'
         },
-        streak_saver: {
-          id: 'streak_saver',
-          name: 'Streak Saver',
-          emoji: '🛡️',
-          desc: 'Protects your streak on one wrong call',
-          type: 'insurance',
+        double_pick: {
+          id: 'double_pick',
+          name: 'Double Pick',
+          emoji: '🎯',
+          desc: 'Submit two scorelines, keep the highest-scoring one',
+          type: 'booster',
           gradient: 'linear-gradient(135deg, #DBEAFE, #BFDBFE)',
           shadow: '0 2px 8px rgba(59,130,246,0.2)'
         }
@@ -4820,7 +4822,7 @@
     // Current inventory state (in-memory, loaded from Supabase)
     let _inventoryState = {
       double_points: 0,
-      streak_saver: 0,
+      double_pick: 0,
       lastSynced: null
     };
 
@@ -4976,14 +4978,14 @@ async function renderInventoryCard() {
 
         // Reset state
         _inventoryState.double_points = 0;
-        _inventoryState.streak_saver = 0;
+        _inventoryState.double_pick = 0;
 
         if (data && data.length > 0) {
           data.forEach(row => {
             if (row.card_id === 'double_points') {
               _inventoryState.double_points = row.quantity || 0;
-            } else if (row.card_id === 'streak_saver') {
-              _inventoryState.streak_saver = row.quantity || 0;
+            } else if (row.card_id === 'double_pick') {
+              _inventoryState.double_pick = row.quantity || 0;
             }
           });
         }
@@ -5007,7 +5009,7 @@ async function renderInventoryCard() {
       if (!grid) return;
 
       const doubleCount = _inventoryState.double_points || 0;
-      const streakCount = _inventoryState.streak_saver || 0;
+      const streakCount = _inventoryState.double_pick || 0;
       const totalAvailable = doubleCount + streakCount;
 
       if (totalCount) {
@@ -5016,7 +5018,7 @@ async function renderInventoryCard() {
 
       grid.innerHTML = '';
       grid.appendChild(buildFlipCard('double_points', doubleCount));
-      grid.appendChild(buildFlipCard('streak_saver', streakCount));
+      grid.appendChild(buildFlipCard('double_pick', streakCount));
 
       // Empty state only matters if there are zero rows at all — but we always
       // show 2 cards now (spent ones included), so we keep this hidden unless
@@ -5029,19 +5031,21 @@ async function renderInventoryCard() {
      * decided here, plus all click handlers.
      */
     function buildFlipCard(cardId, quantity) {
-      const isBooster   = cardId === 'double_points';
-      const slotClass   = isBooster ? 'is-booster' : 'is-insurance';
-      const slotMark    = isBooster ? '⚡' : '🛡'; // top-right corner mark
-      const slotPill    = isBooster ? 'BOOSTER' : 'INSURANCE';
-      const heroGlyph   = isBooster ? '⚡' : '🛡️';
-      const cardName    = isBooster ? 'Double Points' : 'Streak Saver';
-      const cardTagline = isBooster ? 'One-time use' : 'One-time use';
-      const ruleText    = isBooster
-        ? 'Doubles every base point you earn on the match you choose. Stage multipliers, streak bonuses and combo bonuses still apply on top.'
-        : 'Protects your streak from breaking on the matchday you choose. If you miss a call that day, your streak count is preserved.';
-      const hintText    = isBooster
+      const isDP   = cardId === 'double_points';
+      const isPick = cardId === 'double_pick';
+
+      const slotClass   = isDP ? 'is-booster' : 'is-insurance';
+      const slotMark    = isDP ? '⚡' : '🎯';
+      const slotPill    = 'BOOSTER';
+      const heroGlyph   = isDP ? '⚡' : '🎯';
+      const cardName    = isDP ? 'Double Points' : 'Double Pick';
+      const cardTagline = 'One-time use';
+      const ruleText    = isDP
+        ? 'Doubles the base points on the match you choose. Stage multiplier, streak and combo bonuses still apply on top.'
+        : 'Submit two scorelines for the match you choose. You keep the higher-scoring one. All bonuses apply on the winning pick.';
+      const hintText    = isDP
         ? 'Best on knockout matches with a high stage multiplier.'
-        : 'Best on a matchday with tricky games while you have a 3+ streak going.';
+        : 'Best on tight matches where you\'re torn between two scorelines.';
 
       const isAvailable = quantity > 0;
 
@@ -5105,129 +5109,135 @@ async function renderInventoryCard() {
      * matchday (Streak Saver) to spend the card on. Both go through showModal
      * to keep the bottom-sheet aesthetic consistent.
      */
-    function openCardTargetPicker(cardId) {
-      const isBooster = cardId === 'double_points';
-      const cardName  = isBooster ? 'Double Points' : 'Streak Saver';
-      const emoji     = isBooster ? '⚡' : '🛡️';
+    async function openCardTargetPicker(cardId) {
+      const cfg = INVENTORY_CONFIG.cards[cardId];
+      const cardName = cfg.name;
+      const emoji = cfg.emoji;
 
-      // Only matches that are still open for prediction are eligible.
+      // Fetch this user's existing non-refunded card plays to enforce rules:
+      //   - cannot play the SAME card type twice in one matchday_key
+      //   - cannot play ANY card on a fixture that already has a card
+      let blockedFixtures = new Set();
+      let blockedMatchdaysForCard = new Set();
+      try {
+        const { data: existing } = await supabaseClient
+          .from('card_plays')
+          .select('fixture_id, card_type, matchday_key')
+          .eq('user_id', currentUser.id)
+          .neq('status', 'refunded');
+        (existing || []).forEach(p => {
+          blockedFixtures.add(p.fixture_id);
+          if (p.card_type === cardId) blockedMatchdaysForCard.add(p.matchday_key);
+        });
+      } catch (e) { /* fail open */ }
+
       const now = new Date();
       const open = (typeof fixtures !== 'undefined' && Array.isArray(fixtures) ? fixtures : [])
         .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .filter(f => !blockedFixtures.has(f.id))
+        .filter(f => !blockedMatchdaysForCard.has(matchdayKeyOf(f.kickoff)))
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
 
       if (open.length === 0) {
-        showToast('No open matches to apply this card to right now.', 'info');
+        showToast('No eligible matches. You may have already used a card on every upcoming fixture.', 'info');
         return;
       }
 
-      if (isBooster) {
-        // Double Points: pick a specific match.
-        const optionsHtml = open.slice(0, 8).map(f => {
-          const k = new Date(f.kickoff);
-          const when = k.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-            + ' · ' + k.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-          return `<button class="w-full text-left px-3 py-2.5 mb-1.5 rounded-xl border border-paper-border bg-white hover:bg-paper-50 tap"
-                          onclick="confirmCardPlay('double_points', '${f.id}')">
-                    <div class="text-[13px] font-bold text-ink-900">${f.home_team} vs ${f.away_team}</div>
-                    <div class="text-[11px] text-ink-500 mt-0.5">${f.stage || ''} · ${when}</div>
-                  </button>`;
-        }).join('');
+      const optionsHtml = open.slice(0, 10).map(f => {
+        const k = new Date(f.kickoff);
+        const when = k.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+          + ' · ' + k.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return `<button class="w-full text-left px-3 py-2.5 mb-1.5 rounded-xl border border-paper-border bg-white hover:bg-paper-50 tap"
+                        onclick="confirmCardPlay('${cardId}', '${f.id}')">
+                  <div class="text-[13px] font-bold text-ink-900">${f.home_team} vs ${f.away_team}</div>
+                  <div class="text-[11px] text-ink-500 mt-0.5">${f.stage || ''} · ${when}</div>
+                </button>`;
+      }).join('');
 
-        showModal({
-          icon: emoji,
-          title: 'Choose your match',
-          messageHtml: '<div class="text-xs text-ink-500 mb-3">Double Points will apply to the match you pick. Choose carefully — this card can\'t be used again.</div>'
-                   + '<div class="max-h-72 overflow-y-auto -mx-1 px-1">' + optionsHtml + '</div>',
-          actions: [
-            { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
-          ]
-        });
-      } else {
-        // Streak Saver: pick a matchday (calendar date).
-        const days = {};
-        open.forEach(f => {
-          const key = new Date(f.kickoff).toDateString();
-          if (!days[key]) days[key] = [];
-          days[key].push(f);
-        });
-        const dayKeys = Object.keys(days).slice(0, 8);
+      showModal({
+        icon: emoji,
+        title: 'Choose your match',
+        messageHtml: `<div class="text-xs text-ink-500 mb-3">${cardName} will apply to the match you pick. This card can\'t be used again, and you can only play one card per match.</div>`
+                 + '<div class="max-h-72 overflow-y-auto -mx-1 px-1">' + optionsHtml + '</div>',
+        actions: [
+          { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
+        ]
+      });
+    }
 
-        const optionsHtml = dayKeys.map(key => {
-          const dayDate = new Date(key);
-          const label = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-          const matchCount = days[key].length;
-          return `<button class="w-full text-left px-3 py-2.5 mb-1.5 rounded-xl border border-paper-border bg-white hover:bg-paper-50 tap"
-                          onclick="confirmCardPlay('streak_saver', '${encodeURIComponent(key)}')">
-                    <div class="text-[13px] font-bold text-ink-900">${label}</div>
-                    <div class="text-[11px] text-ink-500 mt-0.5">${matchCount} match${matchCount === 1 ? '' : 'es'}</div>
-                  </button>`;
-        }).join('');
-
-        showModal({
-          icon: emoji,
-          title: 'Choose a matchday',
-          messageHtml: '<div class="text-xs text-ink-500 mb-3">Streak Saver will protect your streak across every match on the day you pick.</div>'
-                   + '<div class="max-h-72 overflow-y-auto -mx-1 px-1">' + optionsHtml + '</div>',
-          actions: [
-            { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' }
-          ]
-        });
-      }
+    // Helper: matches bonus-engine getMatchdayKey() — kickoff date in UTC.
+    function matchdayKeyOf(kickoffIso) {
+      const d = new Date(kickoffIso);
+      return d.getUTCFullYear() + '-' +
+             String(d.getUTCMonth()+1).padStart(2,'0') + '-' +
+             String(d.getUTCDate()).padStart(2,'0');
     }
 
     /**
      * Final confirmation step + actual consume. Called from the picker buttons.
      * target = fixture_id (Double Points) or encoded matchday key (Streak Saver).
      */
-    async function confirmCardPlay(cardId, target) {
+    async function confirmCardPlay(cardId, fixtureId) {
       hideModal();
-      const isBooster = cardId === 'double_points';
-      const decodedTarget = decodeURIComponent(target);
-
-      // Resolve a human-readable summary for the confirmation step.
-      let summary = '';
-      if (isBooster) {
-        const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === decodedTarget);
-        summary = f ? `${f.home_team} vs ${f.away_team}` : 'the selected match';
-      } else {
-        const d = new Date(decodedTarget);
-        summary = d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-      }
+      const cfg = INVENTORY_CONFIG.cards[cardId];
+      const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === fixtureId);
+      const summary = f ? `${f.home_team} vs ${f.away_team}` : 'the selected match';
 
       showModal({
-        icon: isBooster ? '⚡' : '🛡️',
+        icon: cfg.emoji,
         title: 'Play this card?',
-        messageHtml: `<div class="text-sm text-ink-700">You're about to play <b>${isBooster ? 'Double Points' : 'Streak Saver'}</b> on <b>${summary}</b>. This can't be undone.</div>`,
+        messageHtml: `<div class="text-sm text-ink-700">You're about to play <b>${cfg.name}</b> on <b>${summary}</b>. This can't be undone.</div>`,
         actions: [
           { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
-          { text: 'Play Card', onclick: `executeCardPlay('${cardId}', '${target}')`, class: 'bg-ink-900 text-white' }
+          { text: 'Play Card', onclick: `executeCardPlay('${cardId}', '${fixtureId}')`, class: 'bg-ink-900 text-white' }
         ]
       });
     }
 
     /**
-     * Commit: consume the card and stash the target locally. The actual
-     * scoring effect (doubling, streak protection) will be applied by the
-     * bonus engine in a later pass — for now we record the play so it's
-     * visible and recoverable.
+     * Commit: insert card_plays row (RLS enforces all rules), then decrement
+     * inventory. The bonus engine reads card_plays when admin publishes results.
      */
-    async function executeCardPlay(cardId, target) {
+    async function executeCardPlay(cardId, fixtureId) {
       hideModal();
-      const decodedTarget = decodeURIComponent(target);
+      if (!currentUser?.id) { showToast('Not signed in', 'error'); return; }
 
-      // Record the target locally so a future engine pass can apply the effect.
-      // Mirrors the existing localStorage pattern used by consumeInventoryCard.
-      try {
-        localStorage.setItem('active_card_' + cardId, JSON.stringify({
-          cardId,
-          target: decodedTarget,
-          activatedAt: new Date().toISOString(),
-          used: false
-        }));
-      } catch (e) { /* non-fatal */ }
+      const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === fixtureId);
+      if (!f) { showToast('Match not found', 'error'); return; }
 
+      const matchdayKey = matchdayKeyOf(f.kickoff);
+
+      // 1. Insert card_plays row (RLS enforces inventory_enabled + uniqueness + kickoff>now)
+      const { error: playErr } = await supabaseClient
+        .from('card_plays')
+        .insert({
+          user_id: currentUser.id,
+          card_type: cardId,
+          fixture_id: fixtureId,
+          matchday_key: matchdayKey
+        });
+
+      if (playErr) {
+        const msg = String(playErr.message || '').toLowerCase();
+        if (msg.includes('duplicate') || msg.includes('unique')) {
+          showToast('You already have a card on this match or matchday.', 'error');
+        } else if (msg.includes('inventory_enabled') || msg.includes('check') || msg.includes('row-level')) {
+          showToast('Cards are not currently active.', 'error');
+        } else {
+          showToast(playErr.message || 'Could not play card.', 'error');
+        }
+        return;
+      }
+
+      // 2. Decrement player_inventory
       await consumeInventoryCard(cardId);
+
+      // 3. Toast + refresh prediction view so alt inputs / badge appear immediately
+      const cfg = INVENTORY_CONFIG.cards[cardId];
+      showToast(`${cfg.emoji} ${cfg.name} armed on ${f.home_team} vs ${f.away_team}!`, 'success');
+
+      if (typeof loadMyCardPlays === 'function') await loadMyCardPlays();
+      if (typeof renderFixtures === 'function') renderFixtures();
     }
 
     /**
@@ -5281,14 +5291,6 @@ async function confirmUseCard(cardId) {
         const card = INVENTORY_CONFIG.cards[cardId];
         showToast(card.emoji + ' ' + card.name + ' activated!', 'success');
 
-        // TODO: Apply card effect to next prediction
-        // Store active card in localStorage or Supabase active_effects table
-        localStorage.setItem('active_card_' + cardId, JSON.stringify({
-          cardId: cardId,
-          activatedAt: new Date().toISOString(),
-          used: false
-        }));
-
       } catch (e) {
         console.error('[Inventory] Exception consuming card:', e);
         showToast('Something went wrong', 'error');
@@ -5314,7 +5316,7 @@ async function confirmUseCard(cardId) {
   .from('player_inventory')
           .select('card_id')
           .eq('player_id', playerId)
-          .in('card_id', ['double_points', 'streak_saver']);
+          .in('card_id', ['double_points', 'double_pick']);
 
         if (checkError) {
           console.error('[Inventory] Error checking existing cards:', checkError);
@@ -5327,7 +5329,7 @@ async function confirmUseCard(cardId) {
           return;
         }
 
-        // Issue 1x Double Points + 1x Streak Saver
+        // Issue 1x Double Points + 1x Double Pick
         const now = new Date().toISOString();
         const inserts = [
           {
@@ -5339,7 +5341,7 @@ async function confirmUseCard(cardId) {
           },
           {
             player_id: playerId,
-            card_id: 'streak_saver',
+            card_id: 'double_pick',
             quantity: 1,
             issued_at: now,
             source: 'starter_pack'

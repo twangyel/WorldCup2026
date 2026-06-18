@@ -660,32 +660,97 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
     return { written: 0, healed: 0, errors: predError ? 1 : 0 };
   }
 
+  // 3. Get active card_plays for this fixture (any user)
+  const { data: cardPlays, error: cpError } = await supabaseClient
+    .from('card_plays')
+    .select('id, user_id, card_type, status')
+    .eq('fixture_id', fixtureId)
+    .neq('status', 'refunded');
+
+  if (cpError) {
+    console.error('[award] Failed to load card_plays (continuing without):', cpError);
+  }
+
+  // Build lookup: { userId: { double_points: playRow, double_pick: playRow } }
+  const cardsByUser = {};
+  (cardPlays || []).forEach(cp => {
+    if (!cardsByUser[cp.user_id]) cardsByUser[cp.user_id] = {};
+    cardsByUser[cp.user_id][cp.card_type] = cp;
+  });
+
   const matchdayKey = getMatchdayKey(fixture.kickoff);
   let written = 0, errors = 0;
+  const cardUpdates = []; // batch resolution updates
 
   // ---- PHASE 1: write base rows for EVERY prediction (no history needed) ----
   // Streak/combo come out as 0 here (history = []); Phase 2 fills them in.
   for (const pred of predictions) {
     try {
-      const basePoints = calculatePoints(
+      const userCards = cardsByUser[pred.user_id] || {};
+      const hasDoublePick = !!userCards.double_pick &&
+                            pred.alt_home_prediction != null &&
+                            pred.alt_away_prediction != null;
+      const hasDoublePoints = !!userCards.double_points;
+
+      // --- Step 1: base points for primary prediction
+      const primaryBase = calculatePoints(
         pred.home_prediction,
         pred.away_prediction,
         actualHome,
         actualAway
       );
 
+      let basePoints = primaryBase;
+      let winningHome = pred.home_prediction;
+      let winningAway = pred.away_prediction;
+      let winningPick = hasDoublePick ? 'primary' : null;
+      let altBaseCached = null;
+
+      // --- Step 2: Double Pick — score alt, take higher
+      if (hasDoublePick) {
+        const altBase = calculatePoints(
+          pred.alt_home_prediction,
+          pred.alt_away_prediction,
+          actualHome,
+          actualAway
+        );
+        altBaseCached = altBase;
+        if (altBase > primaryBase) {
+          basePoints = altBase;
+          winningHome = pred.alt_home_prediction;
+          winningAway = pred.alt_away_prediction;
+          winningPick = 'alt';
+        }
+      }
+
+      // --- Step 3: Double Points — multiply base
+      const doublePointsApplied = hasDoublePoints && basePoints > 0;
+      if (hasDoublePoints) {
+        basePoints = basePoints * 2;
+      }
+
+      // --- Step 4: stage multiplier + streak + combo via existing pipeline
       const fullResult = calculateFullPoints({
         fixtureId: fixtureId,
         userId: pred.user_id,
         stage: fixture.stage,
         kickoff: fixture.kickoff,
         matchdayKey: matchdayKey,
-        predHome: pred.home_prediction,
-        predAway: pred.away_prediction,
+        predHome: winningHome,
+        predAway: winningAway,
         actualHome: actualHome,
         actualAway: actualAway,
         basePoints: basePoints
       }, []); // <-- empty history on purpose; Phase 2 replays the chain
+
+      // --- Step 5: persist winning pick back to predictions (best-effort)
+      if (winningPick) {
+        try {
+          await supabaseClient.from('predictions')
+            .update({ winning_pick: winningPick })
+            .eq('id', pred.id);
+        } catch (e) { /* non-fatal */ }
+      }
 
       const { error: upsertError } = await supabaseClient
         .from('prediction_results')
@@ -693,8 +758,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           prediction_id: pred.id,
           user_id: pred.user_id,
           fixture_id: fixtureId,
-          home_prediction: pred.home_prediction,
-          away_prediction: pred.away_prediction,
+          home_prediction: winningHome,
+          away_prediction: winningAway,
           stage: fixture.stage,
           base_points: fullResult.base_points,
           stage_multiplier: fullResult.stage_multiplier,
@@ -717,9 +782,44 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
       } else {
         written++;
       }
+
+      // --- Step 7: queue card_plays resolution
+      if (hasDoublePick) {
+        cardUpdates.push({
+          id: userCards.double_pick.id,
+          summary: {
+            winning_pick: winningPick,
+            primary_base: primaryBase,
+            alt_base: altBaseCached,
+            final_points: fullResult.final_points
+          }
+        });
+      }
+      if (hasDoublePoints) {
+        cardUpdates.push({
+          id: userCards.double_points.id,
+          summary: {
+            base_before_double: doublePointsApplied ? basePoints / 2 : basePoints,
+            base_after_double: basePoints,
+            final_points: fullResult.final_points,
+            wasted: !doublePointsApplied
+          }
+        });
+      }
     } catch (err) {
       console.error(`[award] Phase 1 failed for prediction ${pred.id}:`, err);
       errors++;
+    }
+  }
+
+  // ---- Mark card_plays as resolved (batched) ----
+  for (const u of cardUpdates) {
+    try {
+      await supabaseClient.from('card_plays')
+        .update({ status: 'resolved', result_summary: u.summary })
+        .eq('id', u.id);
+    } catch (e) {
+      console.error('[award] Failed to resolve card_play', u.id, e);
     }
   }
 
@@ -736,7 +836,7 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
     }
   }
 
-  console.log(`[award] fixture ${fixtureId}: ${written} base rows written, ${healed} chains healed, ${errors} errors`);
+  console.log(`[award] fixture ${fixtureId}: ${written} base rows written, ${healed} chains healed, ${cardUpdates.length} cards resolved, ${errors} errors`);
   return { written, healed, errors };
 }
 
