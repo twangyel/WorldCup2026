@@ -4365,7 +4365,7 @@ async function loadLeaderboard() {
     try { window._v2MembershipsChannel.unsubscribe() } catch (_) {}
   }
   window._v2MembershipsChannel = supabaseClient.channel('v2-memberships')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, async (payload) => {
       const me = (typeof getUser === 'function') ? getUser() : null
       const leagueId  = payload.new?.league_id || payload.old?.league_id
       const memberUid = payload.new?.user_id  || payload.old?.user_id
@@ -4383,6 +4383,61 @@ async function loadLeaderboard() {
           payload.new?.payment_status === 'paid' &&
           payload.old?.payment_status !== 'paid') {
         showToast('✅ Your league entry has been verified', 'success')
+      }
+
+      // Stage v3: when MY membership changes payment state, re-evaluate the
+      // app gate. Three scenarios drive a full reload:
+      //   (a) Just-approved: I was on the pending screen / payment modal,
+      //       now I have access → reload so showApp lets me in.
+      //   (b) Just-unpaid AND I have no other paid memberships AND no
+      //       global access → I'm orphaned → reload kicks me back to the
+      //       payment screen.
+      //   (c) Deleted AND same orphaning conditions → same as (b).
+      //
+      // We always check the live DB count rather than trust local state,
+      // because the user could have stale myLeagues in memory.
+      if (me && memberUid === me.id) {
+        const profile = (typeof getProfile === 'function') ? getProfile() : null
+        const isAdminUser = (typeof isAdmin === 'function') && isAdmin()
+        const hasGlobal   = profile?.fee_paid === true
+        const justPaid    = payload.eventType === 'UPDATE'
+                            && payload.new?.payment_status === 'paid'
+                            && payload.old?.payment_status !== 'paid'
+        const justUnpaid  = payload.eventType === 'UPDATE'
+                            && payload.old?.payment_status === 'paid'
+                            && payload.new?.payment_status !== 'paid'
+        const justDeleted = payload.eventType === 'DELETE'
+                            && payload.old?.payment_status === 'paid'
+
+        try {
+          if (justPaid) {
+            // (a) Reload so the gate lets me into the app. Small delay
+            // so the success toast is readable first.
+            setTimeout(() => { try { location.reload() } catch (_) {} }, 1500)
+            return
+          }
+          if ((justUnpaid || justDeleted) && !hasGlobal && !isAdminUser) {
+            // Check live DB: do I have ANY other paid memberships?
+            const { count } = await supabaseClient
+              .from('league_memberships')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', me.id)
+              .eq('payment_status', 'paid')
+            if ((count || 0) === 0) {
+              // Orphaned — kick back to gate.
+              showToast(
+                justDeleted
+                  ? 'You have been removed from your league'
+                  : 'Your league access has been revoked',
+                'warning'
+              )
+              setTimeout(() => { try { location.reload() } catch (_) {} }, 1500)
+              return
+            }
+          }
+        } catch (e) {
+          console.warn('[Realtime] orphan check failed:', e)
+        }
       }
 
       // Stage 4c: refresh scopes when MY membership row changes — covers
@@ -4517,16 +4572,16 @@ async function loadLeaderboard() {
       }
 
       try {
-        // Pull league + paid member count + global splits in parallel.
+        // Pull league + paid member count + global splits + house fee in parallel.
         const [
           { data: league },
           { count: paidCount },
           { data: settings }
         ] = await Promise.all([
-          supabaseClient.from('leagues').select('id, name, entry_fee, prize_pool_override').eq('id', s.id).maybeSingle(),
+          supabaseClient.from('leagues').select('id, name, entry_fee, prize_pool_override, house_fee_pct').eq('id', s.id).maybeSingle(),
           supabaseClient.from('league_memberships').select('id', { count: 'exact', head: true })
             .eq('league_id', s.id).eq('payment_status', 'paid'),
-          supabaseClient.from('prize_settings').select('currency, split_1st, split_2nd, split_3rd').eq('id', 1).maybeSingle()
+          supabaseClient.from('prize_settings').select('currency, split_1st, split_2nd, split_3rd, house_fee_pct').eq('id', 1).maybeSingle()
         ]);
 
         if (!league) return null;
@@ -4535,8 +4590,16 @@ async function loadLeaderboard() {
         const count = Number(paidCount) || 0;
         const hasOverride = league.prize_pool_override !== null && league.prize_pool_override !== undefined;
         const gross = hasOverride ? (Number(league.prize_pool_override) || 0) : (count * fee);
-        // Private leagues: no platform house fee; net == gross.
-        const net = gross;
+
+        // Lever 3: per-league house fee override.
+        //   league.house_fee_pct (when not null) overrides the global default.
+        //   Falls back to prize_settings.house_fee_pct (admin-configurable).
+        //   This lets some leagues be pure-pot (0%) while others take a cut.
+        const hasOwnFee = league.house_fee_pct !== null && league.house_fee_pct !== undefined;
+        const housePctRaw = hasOwnFee ? Number(league.house_fee_pct) : Number(settings?.house_fee_pct);
+        const housePct = Math.max(0, Math.min(100, Number(housePctRaw) || 0));
+        const houseFee = gross * (housePct / 100);
+        const net = gross - houseFee;
 
         const cur = (settings && settings.currency) || 'Nu.';
         const s1 = Number(settings?.split_1st) || 50;
@@ -4550,9 +4613,9 @@ async function loadLeaderboard() {
           entryFee: fee,
           manualOverride: hasOverride,
           gross,
-          housePct: 0,
-          houseFee: 0,
-          houseNote: 'Organizing & hosting',
+          housePct,
+          houseFee,
+          houseNote: hasOwnFee ? 'Organizing & hosting (custom)' : 'Organizing & hosting',
           net,
           splits: [
             { place: '1st', emoji: '🥇', pct: s1 / totalSplit * 100, amount: net * s1 / totalSplit },
@@ -7307,6 +7370,17 @@ async function initScopeOnLogin() {
   availableScopes = await resolveUserScopes();
   currentScope = _pickDefaultScope();
   _persistScope(currentScope);
+
+  // Stage v3: sync activeLeagueId with the chosen scope. Without this, a
+  // private-only user lands with scope=private but activeLeagueId=null, so
+  // the leaderboard tab still renders the global view. Setting it here means
+  // the first time they tap Ranks, they see their league's leaderboard.
+  if (currentScope?.type === 'private' && currentScope.id) {
+    activeLeagueId = currentScope.id;
+  } else {
+    activeLeagueId = null;
+  }
+
   renderScopeSwitcher();
 }
 
@@ -8118,6 +8192,15 @@ async function loadLeagueLeaderboardView(leagueId) {
         backBtn.textContent = '← Global'
         backBtn.onclick = () => { activeLeagueId = null; loadMyLeagues(); switchTab('leaderboard') }
         document.querySelector('.lb-subtabs')?.prepend(backBtn)
+    }
+    // Stage v3: hide the "← Global" affordance for users who don't have a
+    // global scope (private-only signups). It would be confusing to offer a
+    // path back to a league they're not a member of.
+    const myProfile = (typeof getProfile === 'function') ? getProfile() : null
+    const hasGlobalAccess = myProfile?.fee_paid === true
+                            || (typeof isAdmin === 'function' && isAdmin())
+    if (!hasGlobalAccess) {
+        backBtn.classList.add('hidden')
     } else {
         backBtn.classList.remove('hidden')
     }

@@ -598,6 +598,14 @@
               <p class="text-[11px] text-ink-400 mt-1">Default Nu. 1000. Players pay this to join.</p>
             </div>
 
+            <!-- Organizer fee % (per-league override) -->
+            <div>
+              <label class="text-xs font-semibold text-ink-700 mb-1 block">Organizer Fee % <span class="text-ink-400 font-normal">(optional)</span></label>
+              <input type="number" id="new-pl-fee-pct" min="0" max="100" step="0.5" placeholder="Leave blank = use global default"
+                class="w-full px-4 py-3 rounded-2xl border border-paper-border bg-white text-[15px] focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition">
+              <p class="text-[11px] text-ink-400 mt-1">Cut you take from this league's pool. Blank = use Prize Settings %. Set <b>0</b> for pure-pot friend leagues.</p>
+            </div>
+
             <!-- Invite code override -->
             <div>
               <label class="text-xs font-semibold text-ink-700 mb-1 block">Invite Code <span class="text-ink-400 font-normal">(optional)</span></label>
@@ -1308,6 +1316,65 @@ async function setInventoryState(newState) {
             }
           }, 500)
         }).subscribe()
+
+      // Stage v3: notify admin when private league memberships change.
+      // INSERT with payment_status='pending' = someone submitted a payment proof.
+      // DELETE = membership was removed (often by admin themselves; only notify
+      //         if it was the *user* leaving — we detect by checking the
+      //         current admin's session against the deleted row).
+      supabaseClient.channel('admin-league-memberships')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'league_memberships' }, async (payload) => {
+          const row = payload.new || {}
+          // Skip notifications for admin-initiated INSERTs (admin can create
+          // memberships from the drawer); only notify on user-initiated joins.
+          // Heuristic: payment_status='pending' indicates the v2 pay-to-join
+          // flow which is always user-initiated.
+          if (row.payment_status !== 'pending') return
+          let memberName = 'Someone'
+          let leagueName = 'a private league'
+          try {
+            if (row.user_id) {
+              const { data: p } = await supabaseClient
+                .from('profiles')
+                .select('name, full_name')
+                .eq('id', row.user_id)
+                .maybeSingle()
+              memberName = (p?.full_name || p?.name || memberName).trim() || memberName
+            }
+          } catch (_) {}
+          try {
+            if (row.league_id) {
+              const { data: lg } = await supabaseClient
+                .from('leagues')
+                .select('name')
+                .eq('id', row.league_id)
+                .maybeSingle()
+              if (lg?.name) leagueName = lg.name
+            }
+          } catch (_) {}
+          playChime()
+          const title = 'Payment Submitted'
+          const message = `${memberName} submitted payment proof for ${leagueName}`
+          showToast(message, 'payment')
+          addNotification('payment', title, message)
+          // If the league drawer is open for the affected league, refresh it
+          if (activeLeagueId === row.league_id && typeof adminViewLeague === 'function') {
+            adminViewLeague(activeLeagueId)
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'league_memberships' }, (payload) => {
+          // Membership update — usually admin marking paid/unpaid. Keep the
+          // drawer fresh but don't toast (the admin just clicked the button).
+          if (activeLeagueId === (payload.new?.league_id) && typeof adminViewLeague === 'function') {
+            adminViewLeague(activeLeagueId)
+          }
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'league_memberships' }, (payload) => {
+          // Membership removed. Refresh the open drawer.
+          if (activeLeagueId === (payload.old?.league_id) && typeof adminViewLeague === 'function') {
+            adminViewLeague(activeLeagueId)
+          }
+        }).subscribe()
     }
 
     supabaseClient.channel('admin-system-settings')
@@ -1328,10 +1395,45 @@ async function setInventoryState(newState) {
       })
       .subscribe()
 
-    // Realtime for league memberships
+    // Realtime for league memberships — new submissions ping the bell, refresh stats
     supabaseClient.channel('admin-league-memberships')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'league_memberships' }, async (payload) => {
         loadLeagueStats()
+        // Only INSERT events fire the notification — UPDATE/DELETE happen from admin actions
+        // (and would be noisy/self-referential)
+        if (payload.eventType !== 'INSERT') return
+        const row = payload.new || {}
+        let memberName = 'Someone'
+        let leagueName = 'a private league'
+        try {
+          if (row.user_id) {
+            const { data: p } = await supabaseClient
+              .from('profiles')
+              .select('name, full_name')
+              .eq('id', row.user_id)
+              .maybeSingle()
+            memberName = (p?.full_name || p?.name || memberName).trim() || memberName
+          }
+        } catch (e) { /* ignore */ }
+        try {
+          if (row.league_id) {
+            const { data: l } = await supabaseClient
+              .from('leagues')
+              .select('name')
+              .eq('id', row.league_id)
+              .maybeSingle()
+            if (l?.name) leagueName = l.name
+          }
+        } catch (e) { /* ignore */ }
+        const hasProof = !!row.payment_proof_url
+        const status = row.payment_status || 'pending'
+        const title = hasProof ? 'Payment Submitted' : 'New League Member'
+        const message = hasProof
+          ? `${memberName} submitted payment proof for ${leagueName}`
+          : `${memberName} joined ${leagueName} (${status})`
+        playChime()
+        showToast(message, 'payment')
+        addNotification('payment', title, message)
       })
       .subscribe()
 
@@ -1638,6 +1740,34 @@ async function executeRecalcAll() {
         const ps = await getPrizeSettings()
         if (ps?.data) prizeSettings = { ...prizeSettings, ...ps.data, currency: 'Nu.' }
       }
+
+      // Issue #2: attach each user's paid private league names so the Users
+      // list can show "in: League A, League B" beside their identity.
+      // Done as one query then grouped client-side to avoid N+1.
+      try {
+        const { data: memberships, error: mErr } = await supabaseClient
+          .from('league_memberships')
+          .select('user_id, payment_status, leagues:league_id ( id, name, status )')
+          .eq('payment_status', 'paid')
+        if (!mErr && Array.isArray(memberships)) {
+          const byUser = new Map()
+          memberships.forEach(m => {
+            const lg = m.leagues
+            // Only show currently active leagues — archived/draft would be misleading
+            if (!lg || lg.status !== 'active') return
+            const arr = byUser.get(m.user_id) || []
+            arr.push({ id: lg.id, name: lg.name || 'Untitled' })
+            byUser.set(m.user_id, arr)
+          })
+          allUsers.forEach(u => {
+            u._paid_leagues = byUser.get(u.id) || []
+          })
+        }
+      } catch (e) {
+        console.warn('[admin] paid leagues attach failed (non-fatal):', e)
+        allUsers.forEach(u => { u._paid_leagues = u._paid_leagues || [] })
+      }
+
       renderUsers(); renderFixturesManage(); renderResults(); renderPrize()
     }
 
@@ -1947,25 +2077,36 @@ async function executeRecalcAll() {
       }
   list.innerHTML = displayUsers.map(u => {
   const paid = u.fee_paid === true
+  // Stage v3: distinguish private-only users from "unpaid global" users.
+  // Someone with entered_via_private=true but fee_paid=false didn't ghost
+  // their Nu. 499 — they joined via an invite link. Showing "UNPAID" misleads
+  // the admin into chasing a payment that was never owed.
+  const privateOnly = u.entered_via_private === true && !paid
   const initials = (u.name || u.email || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()
   return `
   <div class="px-5 py-3.5">
     <!-- Line 1: Avatar + Identity (full width) -->
     <div class="flex items-center gap-3 mb-2">
-      <div class="w-11 h-11 rounded-2xl ${paid ? 'bg-brand-50 text-brand-700' : 'bg-paper text-ink-500'} flex items-center justify-center font-bold text-sm shrink-0 border ${paid ? 'border-brand-100' : 'border-paper-border'}">${initials}</div>
+      <div class="w-11 h-11 rounded-2xl ${paid ? 'bg-brand-50 text-brand-700' : privateOnly ? 'bg-emerald-50 text-emerald-700' : 'bg-paper text-ink-500'} flex items-center justify-center font-bold text-sm shrink-0 border ${paid ? 'border-brand-100' : privateOnly ? 'border-emerald-100' : 'border-paper-border'}">${initials}</div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <span class="font-semibold text-sm truncate">${u.name || '(no name)'}</span>
           ${u.is_admin ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>' : ''}
-          ${u.payment_proof_url && !u.fee_paid ? `<a href="${u.payment_proof_url}" target="_blank" class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider tap">View Proof</a>` : ''}
+          ${privateOnly ? '<span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider" title="Signed up via invite link — pays per-league only, does not owe global Nu. 499">Private-only</span>' : ''}
+          ${u.payment_proof_url && !u.fee_paid && !privateOnly ? `<a href="${u.payment_proof_url}" target="_blank" class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider tap">View Proof</a>` : ''}
         </div>
         <div class="text-xs text-ink-500 truncate">${u.email || ''}${u.department ? ' · ' + u.department : ''}</div>
+        ${Array.isArray(u._paid_leagues) && u._paid_leagues.length ? `
+        <div class="flex items-center gap-1 mt-1 flex-wrap">
+          <span class="text-[10px] text-ink-400 shrink-0">🎟️ in:</span>
+          ${u._paid_leagues.map(lg => `<span class="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">${(lg.name || '').replace(/</g,'&lt;')}</span>`).join('')}
+        </div>` : ''}
       </div>
     </div>
     
     <!-- Line 2: Status badges + Actions (left-aligned under identity) -->
     <div class="flex items-center gap-2 pl-14"> <!-- pl-14 = avatar width (44px) + gap (12px) -->
-      <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : 'bg-paper text-ink-700 border border-paper-border'}">${paid ? '✓ PAID' : 'UNPAID'}</button>
+      <button onclick="toggleFee('${u.id}', ${!paid})" class="text-[11px] font-bold px-3 py-1.5 rounded-full tap shrink-0 ${paid ? 'bg-brand-500 text-white' : privateOnly ? 'bg-paper text-ink-500 border border-paper-border' : 'bg-paper text-ink-700 border border-paper-border'}" title="${privateOnly ? 'Mark as Global Paid (upgrades them to also play global)' : ''}">${paid ? '✓ GLOBAL PAID' : privateOnly ? 'NO GLOBAL' : 'UNPAID'}</button>
       <button onclick="toggleLeagueAccess('${u.id}', ${!(u.private_leagues_access === true)})" class="text-[11px] font-bold px-2.5 py-1.5 rounded-full tap shrink-0 ${u.private_leagues_access ? 'bg-purple-500 text-white' : 'bg-paper text-ink-500 border border-paper-border'}" title="${u.private_leagues_access ? 'Revoke private league access' : 'Grant private league access'}">${u.private_leagues_access ? '🔓 LEAGUE' : '🔒'}</button>
       <button onclick="resetUserPassword('${u.id}', '${(u.name || u.email || '').replace(/'/g, "\\'")}')" class="text-ink-400 hover:text-amber-600 p-1.5 tap" title="Reset password">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
@@ -3571,6 +3712,11 @@ async function adminViewLeague(leagueId) {
         <input type="number" id="edit-pl-fee" min="0" step="50" value="${league.entry_fee || 0}"
           class="w-full px-3 py-2.5 rounded-xl border border-paper-border bg-white text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none">
       </div>
+      <div>
+        <label class="text-xs font-semibold text-ink-700 mb-1 block">Organizer Fee % <span class="text-ink-400 font-normal">(blank = global default)</span></label>
+        <input type="number" id="edit-pl-fee-pct" min="0" max="100" step="0.5" value="${league.house_fee_pct !== null && league.house_fee_pct !== undefined ? league.house_fee_pct : ''}" placeholder="Use Prize Settings %"
+          class="w-full px-3 py-2.5 rounded-xl border border-paper-border bg-white text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none">
+      </div>
       <div class="bg-white rounded-xl p-3 border border-paper-border">
         <div class="flex items-center justify-between">
           <div class="min-w-0 mr-3">
@@ -3601,6 +3747,21 @@ async function adminViewLeague(leagueId) {
     ? `<span class="text-purple-700 font-semibold">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(override)</span>`
     : `<span class="text-ink-900 font-semibold">${_formatNu(pool.amount)}</span> <span class="text-ink-400">(auto)</span>`;
 
+  // Lever 3: organizer fee indicator. Shows the effective % and whether
+  // it's a per-league override or the global default. Helps admin spot at
+  // a glance how much they're taking from each league.
+  let feeLine = '';
+  try {
+    const hasOwn = league.house_fee_pct !== null && league.house_fee_pct !== undefined;
+    if (hasOwn) {
+      const pct = Number(league.house_fee_pct);
+      feeLine = `· Fee: <span class="font-semibold text-purple-700">${pct}%</span> <span class="text-ink-400">(custom)</span>`;
+    } else {
+      const globalPct = Number(prizeSettings?.house_fee_pct ?? 0);
+      feeLine = `· Fee: <span class="font-semibold text-ink-700">${globalPct}%</span> <span class="text-ink-400">(global)</span>`;
+    }
+  } catch (_) {}
+
   // Render the full drawer.
   container.innerHTML = `
     <div class="card p-5 mb-4">
@@ -3617,6 +3778,7 @@ async function adminViewLeague(leagueId) {
           <p class="text-[11px] text-ink-500 truncate mt-0.5">
             Code: <span class="font-mono font-bold">${league.invite_code || '—'}</span>
             · Fee: ${_formatNu(league.entry_fee || 0)}
+            ${feeLine}
             · Pool: ${poolLine}
           </p>
         </div>
@@ -3727,6 +3889,18 @@ async function adminSaveLeagueEdits(leagueId) {
     prizePoolOverride = n;
   }
 
+  // Lever 3: per-league organizer fee % (optional, blank = use global default)
+  const feePctRaw = (document.getElementById('edit-pl-fee-pct')?.value || '').trim();
+  let housePct = null;
+  if (feePctRaw !== '') {
+    const fp = Number(feePctRaw);
+    if (!Number.isFinite(fp) || fp < 0 || fp > 100) {
+      showToast('Organizer fee % must be between 0 and 100', 'warning');
+      return;
+    }
+    housePct = fp;
+  }
+
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = 'Saving…';
@@ -3736,7 +3910,8 @@ async function adminSaveLeagueEdits(leagueId) {
     .update({
       name: name,
       entry_fee: entryFee,
-      prize_pool_override: prizePoolOverride
+      prize_pool_override: prizePoolOverride,
+      house_fee_pct: housePct
     })
     .eq('id', leagueId);
 
@@ -3891,8 +4066,46 @@ async function adminRemoveMembership(membershipId, leagueId, userName) {
   if (!isAdmin()) return;
   if (!membershipId || !leagueId) return;
 
-  if (!confirm(`Remove ${userName || 'this member'} from the league? This cannot be undone.`)) return;
+  // Fetch the membership to know what to clean up
+  let proofPath = null
+  let userId = null
+  let wasPaid = false
+  try {
+    const { data: m } = await supabaseClient
+      .from('league_memberships')
+      .select('id, user_id, payment_status, payment_proof_url, entry_fee_paid')
+      .eq('id', membershipId)
+      .maybeSingle()
+    if (m) {
+      userId = m.user_id
+      wasPaid = m.payment_status === 'paid'
+      // Convert public URL back to bucket path for storage delete.
+      // Format is .../league-payment-proofs/<bucket-path>?... so split on the bucket name.
+      if (m.payment_proof_url) {
+        const marker = '/league-payment-proofs/'
+        const idx = m.payment_proof_url.indexOf(marker)
+        if (idx !== -1) {
+          proofPath = m.payment_proof_url.substring(idx + marker.length).split('?')[0]
+        }
+      }
+    }
+  } catch (e) { /* fetch failed — proceed anyway */ }
 
+  // More informative confirmation than the original "cannot be undone"
+  const refundReminder = wasPaid
+    ? '\n\nThis member has PAID. Make sure you have refunded them (if applicable) before continuing — the system does not auto-refund.'
+    : ''
+  if (!confirm(
+    `Remove ${userName || 'this member'} from the league?` +
+    refundReminder +
+    '\n\nWhat happens:\n' +
+    '• Their membership row is deleted\n' +
+    '• Their payment proof file (if any) is removed from storage\n' +
+    '• Their predictions and profile are NOT deleted — they remain a valid app user\n' +
+    '• Their points in this league are recomputed automatically'
+  )) return;
+
+  // Delete the membership row first
   const { error } = await supabaseClient
     .from('league_memberships')
     .delete()
@@ -3902,6 +4115,25 @@ async function adminRemoveMembership(membershipId, leagueId, userName) {
     console.error('[ADMIN] adminRemoveMembership error:', error);
     showToast(error.message || 'Remove failed', 'error');
     return;
+  }
+
+  // Best-effort: clean up the proof file from storage (don't block on failure)
+  if (proofPath) {
+    try {
+      const { error: storageErr } = await supabaseClient.storage
+        .from('league-payment-proofs')
+        .remove([proofPath])
+      if (storageErr) {
+        console.warn('[ADMIN] proof file cleanup failed (non-fatal):', storageErr.message)
+      }
+    } catch (e) {
+      console.warn('[ADMIN] proof file cleanup threw (non-fatal):', e)
+    }
+  }
+
+  // Record the removal in the bell so admin has an audit trail across the session
+  if (typeof addNotification === 'function') {
+    addNotification('member', 'Member Removed', `${userName || 'A member'} was removed from the league`)
   }
 
   showToast(`Removed ${userName || 'member'}`, 'success');
@@ -4110,6 +4342,20 @@ async function adminCreateLeague() {
     prizePoolOverride = n;
   }
 
+  // Lever 3: per-league organizer fee % (optional).
+  // Empty input → null → use global prize_settings.house_fee_pct.
+  // Numeric input → clamped to [0, 100] and stored per-league.
+  const feePctRaw = (document.getElementById('new-pl-fee-pct')?.value || '').trim();
+  let housePct = null;
+  if (feePctRaw !== '') {
+    const fp = Number(feePctRaw);
+    if (!Number.isFinite(fp) || fp < 0 || fp > 100) {
+      showToast('Organizer fee % must be between 0 and 100', 'warning');
+      return;
+    }
+    housePct = fp;
+  }
+
   // Resolve invite code: explicit OR auto-generated with uniqueness check.
   let inviteCode = codeRaw;
   if (!inviteCode) {
@@ -4157,6 +4403,7 @@ async function adminCreateLeague() {
       is_private: true,
       status: 'draft',
       prize_pool_override: prizePoolOverride,
+      house_fee_pct: housePct,
       chat_enabled: true,
       created_by: user?.id || null,
       scoring_rules: {}
@@ -4179,6 +4426,8 @@ async function adminCreateLeague() {
   document.getElementById('new-pl-name').value = '';
   document.getElementById('new-pl-fee').value = '1000';
   document.getElementById('new-pl-code').value = '';
+  const feePctEl = document.getElementById('new-pl-fee-pct');
+  if (feePctEl) feePctEl.value = '';
   const sw = document.getElementById('pl-override-switch');
   const wrap = document.getElementById('pl-override-input-wrap');
   if (sw) sw.classList.remove('on');
