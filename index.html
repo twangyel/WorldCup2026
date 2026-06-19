@@ -3868,6 +3868,105 @@
       }
     }
 
+
+
+    /* ============================================================
+       FINAL MICRO-FIX V4 — avatar/name spacing + animated leader tag
+       ============================================================ */
+
+    /* Add clean white space between avatar and name without disturbing trend/points. */
+    .lb-row.lb-v2-row {
+      grid-template-columns: 82px minmax(0, 1fr) 30px 58px !important;
+      padding-left: 7px !important;
+      padding-right: 13px !important;
+    }
+
+    .lb-v2-table-head {
+      grid-template-columns: 82px minmax(0, 1fr) 30px 58px !important;
+      padding-left: 7px !important;
+      padding-right: 13px !important;
+    }
+
+    .lb-v2-rank-avatar {
+      grid-template-columns: 28px 40px !important;
+      gap: 9px !important;
+    }
+
+    /* Small left offset creates breathing room between profile photo and text. */
+    .lb-v2-main {
+      padding-left: 5px !important;
+    }
+
+    /* Premium subtle animation for current leader tag. */
+    .lb-v2-leader {
+      position: relative !important;
+      overflow: hidden !important;
+      animation: leaderTagPulse 2.4s ease-in-out infinite !important;
+      box-shadow: 0 4px 12px rgba(245,158,11,.20) !important;
+    }
+
+    .lb-v2-leader::after {
+      content: '' !important;
+      position: absolute !important;
+      top: -45% !important;
+      left: -70% !important;
+      width: 45% !important;
+      height: 190% !important;
+      transform: rotate(24deg) !important;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent) !important;
+      animation: leaderTagShine 2.8s ease-in-out infinite !important;
+      pointer-events: none !important;
+    }
+
+    @keyframes leaderTagPulse {
+      0%, 100% {
+        transform: translateY(-1px) scale(1);
+        box-shadow: 0 4px 12px rgba(245,158,11,.18);
+      }
+      50% {
+        transform: translateY(-1px) scale(1.045);
+        box-shadow: 0 6px 18px rgba(245,158,11,.30);
+      }
+    }
+
+    @keyframes leaderTagShine {
+      0% { left: -80%; opacity: 0; }
+      18% { opacity: .9; }
+      42% { left: 125%; opacity: 0; }
+      100% { left: 125%; opacity: 0; }
+    }
+
+    @media (min-width: 390px) and (max-width: 460px) {
+      .lb-row.lb-v2-row,
+      .lb-v2-table-head {
+        grid-template-columns: 82px minmax(0, 1fr) 30px 58px !important;
+      }
+      .lb-v2-main {
+        padding-left: 5px !important;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .lb-row.lb-v2-row,
+      .lb-v2-table-head {
+        grid-template-columns: 74px minmax(0, 1fr) 28px 54px !important;
+      }
+      .lb-v2-rank-avatar {
+        grid-template-columns: 26px 36px !important;
+        gap: 7px !important;
+      }
+      .lb-v2-main {
+        padding-left: 4px !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lb-v2-leader,
+      .lb-v2-leader::after {
+        animation: none !important;
+      }
+    }
+
 </style>
 
   <!-- FIFA World Rankings (June 2026) -->
