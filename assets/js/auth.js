@@ -250,9 +250,28 @@ async function signUpUser(name, whatsapp, password, opts = {}) {
 async function updateProfile(updates) {
     if (!currentUser) return { error: new Error('Not authenticated') }
 
+    const allowed = [
+        'name',
+        'department',
+        'phone',
+        'avatar_url',
+        'whatsapp'
+    ]
+
+    const safeUpdates = {}
+    for (const key of allowed) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            safeUpdates[key] = updates[key]
+        }
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+        return { data: currentProfile, error: null }
+    }
+
     const { data, error } = await supabaseClient
         .from('profiles')
-        .update(updates)
+        .update(safeUpdates)
         .eq('id', currentUser.id)
         .select()
         .single()

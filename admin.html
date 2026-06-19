@@ -638,6 +638,8 @@
           </div>
         </div>
 
+        
+
         <!-- ============ ALL PRIVATE LEAGUES LIST ============ -->
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
@@ -658,9 +660,29 @@
       </div>
 
       <div id="atab-settings" class="atab hidden space-y-4">
-        <div class="card p-5">
-          <h2 class="font-bold text-lg tracking-tight mb-1">System Settings</h2>
-          <p class="text-xs text-ink-500 mb-5">Control global features for all players.</p>
+       <!-- SETTINGS -->
+<div id="atab-settings" class="atab hidden space-y-4">
+
+  <div class="card p-5">
+    <div class="flex items-start gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center text-lg shrink-0">
+        🔔
+      </div>
+      <div>
+        <h2 class="font-bold text-lg tracking-tight">Push Notifications</h2>
+        <p class="text-xs text-ink-500 mt-1 leading-relaxed">
+          Enable admin push alerts for new predictions, payments, fixtures and results.
+        </p>
+      </div>
+    </div>
+    
+  </div>
+
+
+
+  <!-- your existing settings cards below -->
+
+</div>
 
           <!-- Private Leagues Toggle -->
           <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border">
@@ -769,6 +791,15 @@
           <div id="card-plays-empty" class="text-xs text-ink-400 py-4 text-center hidden">No active card plays.</div>
           <div id="card-plays-list" class="space-y-2"></div>
         </div>
+        <button onclick="enablePushNotifications('admin')" class="btn-primary tap">
+      🔔 Enable Push Notifications
+    </button>
+          <!-- <button onclick="sendTestPush()" class="btn-dark tap">
+  Send Test Push
+</button> -->
+<!-- <button onclick="sendTestUserPush()" class="btn-primary tap">
+  🔔 Test User Push
+</button> -->
       </div>
 
     </div>
@@ -968,25 +999,58 @@ function flagHtml(name, size = 24) {
     const pendingKickoffs = {}
 
     // ============== CHIME ==============
+    // Browsers block sound until the admin has interacted with the page once.
+    // This unlocks the AudioContext on first tap/click/key so later realtime
+    // events can play the notification chime reliably.
     let chimeCtx = null
-    function playChime() {
+    let chimeUnlocked = false
+
+    function getChimeCtx() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return null
+      if (!chimeCtx) chimeCtx = new AudioContext()
+      return chimeCtx
+    }
+
+    async function unlockChime() {
       try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext
-        if (!AudioContext) return
-        if (!chimeCtx) chimeCtx = new AudioContext()
-        if (chimeCtx.state === 'suspended') chimeCtx.resume()
-        const osc = chimeCtx.createOscillator()
-        const gain = chimeCtx.createGain()
+        const ctx = getChimeCtx()
+        if (!ctx) return
+        if (ctx.state === 'suspended') await ctx.resume()
+        chimeUnlocked = ctx.state === 'running'
+      } catch (e) {
+        console.warn('[chime] unlock failed:', e)
+      }
+    }
+
+    function setupChimeUnlock() {
+      const unlock = () => unlockChime()
+      window.addEventListener('pointerdown', unlock, { once: true, passive: true })
+      window.addEventListener('keydown', unlock, { once: true })
+      window.addEventListener('touchstart', unlock, { once: true, passive: true })
+    }
+
+    async function playChime() {
+      try {
+        const ctx = getChimeCtx()
+        if (!ctx) return
+        if (ctx.state === 'suspended') await ctx.resume()
+        if (ctx.state !== 'running') return
+
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
         osc.connect(gain)
-        gain.connect(chimeCtx.destination)
+        gain.connect(ctx.destination)
         osc.type = 'sine'
-        osc.frequency.setValueAtTime(523.25, chimeCtx.currentTime)
-        osc.frequency.exponentialRampToValueAtTime(1046.5, chimeCtx.currentTime + 0.1)
-        gain.gain.setValueAtTime(0.12, chimeCtx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, chimeCtx.currentTime + 0.5)
-        osc.start(chimeCtx.currentTime)
-        osc.stop(chimeCtx.currentTime + 0.5)
-      } catch (e) {}
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1)
+        gain.gain.setValueAtTime(0.12, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.5)
+      } catch (e) {
+        console.warn('[chime] play failed:', e)
+      }
     }
 
     // ============== TOAST + MODAL ==============
@@ -1290,6 +1354,129 @@ async function refundCardPlay(playId, userId, cardType) {
     let notifications = stored.notifications
     let unreadCount = stored.unreadCount
 
+    // ============== PUSH NOTIFICATIONS ==============
+
+const VAPID_PUBLIC_KEY = 'BKm0WC3YIjEiw2CSBANy61L3EEsIt8wQfvYTCzgPak1vuUHazry42ac8H3MysBKaWTcgyREM9_prFBgToYgvGKI';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+}
+
+async function enablePushNotifications(role = 'admin') {
+  try {
+    console.log('[Push] enable clicked');
+    showToast('Setting up push...', 'info');
+
+    if (!window.isSecureContext) {
+      showToast('Push needs HTTPS or localhost', 'error');
+      console.error('[Push] Not secure context');
+      return;
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      showToast('Service worker not supported', 'error');
+      console.error('[Push] Service worker not supported');
+      return;
+    }
+
+    if (!('PushManager' in window)) {
+      showToast('Push notifications not supported', 'error');
+      console.error('[Push] PushManager not supported');
+      return;
+    }
+
+    if (!('Notification' in window)) {
+      showToast('Notifications not supported', 'error');
+      console.error('[Push] Notification API not supported');
+      return;
+    }
+
+    // Force register the service worker first
+    let registration;
+    try {
+      registration = await navigator.serviceWorker.register('/sw.js');
+      console.log('[Push] Service worker registered:', registration);
+    } catch (swErr) {
+      console.error('[Push] Service worker register failed:', swErr);
+      showToast('Service worker registration failed', 'error');
+      return;
+    }
+
+    await navigator.serviceWorker.ready;
+    console.log('[Push] Service worker ready');
+
+    const permission = await Notification.requestPermission();
+    console.log('[Push] Permission:', permission);
+
+    if (permission !== 'granted') {
+      showToast('Notification permission denied', 'warning');
+      return;
+    }
+
+    let subscription = await registration.pushManager.getSubscription();
+    console.log('[Push] Existing subscription:', subscription);
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      console.log('[Push] New subscription:', subscription);
+    }
+
+    const subJson = subscription.toJSON();
+    const user = typeof getUser === 'function' ? getUser() : null;
+
+    console.log('[Push] User:', user);
+    console.log('[Push] Subscription JSON:', subJson);
+
+    if (!user?.id) {
+      showToast('Please login first to enable push', 'error');
+      return;
+    }
+
+    const { error } = await supabaseClient
+      .from('push_subscriptions')
+      .upsert({
+        user_id: user.id,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys?.p256dh,
+        auth: subJson.keys?.auth,
+        role,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'endpoint'
+      });
+
+    if (error) {
+      console.error('[Push] Subscription save failed:', error);
+      showToast(error.message || 'Could not save push subscription', 'error');
+      return;
+    }
+
+    localStorage.setItem('push-enabled', 'true');
+    showToast('Push notifications enabled', 'success');
+    console.log('[Push] Saved successfully');
+
+  } catch (err) {
+    console.error('[Push] Enable push failed:', err);
+    showToast(err.message || 'Push setup failed', 'error');
+  }
+}
+
     function requestNotificationPermission() {
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().then(permission => {
@@ -1306,17 +1493,76 @@ async function refundCardPlay(playId, userId, cardType) {
       }
     }
 
-    function addNotification(type, title, message) {
-      const notif = { id: Date.now(), type, title, message, time: new Date(), read: false }
-      notifications.unshift(notif)
-      if (notifications.length > 50) notifications.pop()
-      unreadCount++
-      updateNotifBadge()
-      renderNotifications()
-      saveNotificationsToStorage()
-      sendBrowserNotification(title, message, type === 'member' ? '👤' : type === 'payment' ? '💰' : type === 'fixture' ? '⚽' : type === 'result' ? '🏁' : '🔔')
+    async function sendAdminPush(title, message, url = '/admin.html') {
+  try {
+    const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-push`;
+
+    // Use your working publishable key for Edge Function calls
+    const EDGE_FUNCTION_KEY = 'sb_publishable_-BAvh2zD75dXEEby26NnRg_on1FAgz3';
+
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EDGE_FUNCTION_KEY,
+        'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`
+      },
+      body: JSON.stringify({
+        role: 'admin',
+        title,
+        message,
+        url
+      })
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      console.error('[Push] Admin push failed:', res.status, data);
+      return;
     }
 
+    console.log('[Push] Admin push sent:', data);
+  } catch (err) {
+    console.error('[Push] Admin push error:', err);
+  }
+}
+
+ function addNotification(type, title, message) {
+  const notif = {
+    id: Date.now(),
+    type,
+    title,
+    message,
+    time: new Date(),
+    read: false
+  };
+
+  notifications.unshift(notif);
+  if (notifications.length > 50) notifications.pop();
+
+  unreadCount++;
+  updateNotifBadge();
+  renderNotifications();
+  saveNotificationsToStorage();
+
+  sendBrowserNotification(
+    title,
+    message,
+    type === 'member'
+      ? '👤'
+      : type === 'payment'
+        ? '💰'
+        : type === 'fixture'
+          ? '⚽'
+          : type === 'result'
+            ? '🏁'
+            : '🔔'
+  );
+
+  // Send real push notification to subscribed admins
+  sendAdminPush(title, message, '/admin.html');
+}
     function updateNotifBadge() {
       const badge = document.getElementById('notif-badge')
       if (unreadCount > 0) { badge.classList.remove('hidden') }
@@ -1375,6 +1621,8 @@ async function refundCardPlay(playId, userId, cardType) {
     // ============== REALTIME ==============
     function setupAdminRealtime() {
       if (typeof supabaseClient === 'undefined' || !supabaseClient) return
+      if (window.__adminRealtimeSetupDone) return
+      window.__adminRealtimeSetupDone = true
 
       supabaseClient.channel('admin-profiles')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
@@ -1413,42 +1661,78 @@ async function refundCardPlay(playId, userId, cardType) {
           loadAll()
         }).subscribe()
 
+      // Predictions: listen to BOTH INSERT and UPDATE.
+      // One player save can INSERT the row, then immediately UPDATE submitted_at / card metadata.
+      // Keep one toast per user+fixture+score within a short window.
+      const recentPredictionToasts = window.__recentPredictionToasts || (window.__recentPredictionToasts = new Map())
       supabaseClient.channel('admin-predictions')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, async (payload) => {
-          playChime()
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, async (payload) => {
           const row = payload.new || {}
-          // Default labels in case lookups fail (still show *something* useful)
+          if (!row.user_id || !row.fixture_id) return
+
+          // Ignore noisy metadata-only updates if the scoreline itself did not change.
+          // Supabase only provides payload.old when the table has REPLICA IDENTITY FULL;
+          // if old is unavailable, the time-window dedupe below still prevents double toast.
+          if (payload.eventType === 'UPDATE' && payload.old) {
+            const sameHome = payload.old.home_prediction === row.home_prediction
+            const sameAway = payload.old.away_prediction === row.away_prediction
+            const sameAltHome = payload.old.alt_home_prediction === row.alt_home_prediction
+            const sameAltAway = payload.old.alt_away_prediction === row.alt_away_prediction
+            if (sameHome && sameAway && sameAltHome && sameAltAway) return
+          }
+
+          const toastKey = [
+            row.user_id,
+            row.fixture_id,
+            row.home_prediction,
+            row.away_prediction,
+            row.alt_home_prediction ?? '',
+            row.alt_away_prediction ?? ''
+          ].join('|')
+          const now = Date.now()
+          const lastAt = recentPredictionToasts.get(toastKey) || 0
+          if (now - lastAt < 2500) return
+          recentPredictionToasts.set(toastKey, now)
+          setTimeout(() => recentPredictionToasts.delete(toastKey), 6000)
+
+          await playChime()
+
+          // Default labels in case lookups fail (still show something useful)
           let predictorName = 'Someone'
           let matchLabel = ''
-          // Fetch predictor name from profiles
           try {
-            if (row.user_id) {
-              const { data: p } = await supabaseClient
-                .from('profiles')
-                .select('name, full_name')
-                .eq('id', row.user_id)
-                .maybeSingle()
-              predictorName = (p?.full_name || p?.name || predictorName).trim() || predictorName
-            }
+            const { data: p } = await supabaseClient
+              .from('profiles')
+              .select('name, full_name')
+              .eq('id', row.user_id)
+              .maybeSingle()
+            predictorName = (p?.full_name || p?.name || predictorName).trim() || predictorName
           } catch (e) { /* ignore lookup failures */ }
-          // Fetch fixture label if available
+
           try {
-            if (row.fixture_id) {
-              const { data: f } = await supabaseClient
-                .from('fixtures')
-                .select('home_team, away_team')
-                .eq('id', row.fixture_id)
-                .maybeSingle()
-              if (f?.home_team && f?.away_team) {
-                matchLabel = ` for ${f.home_team} vs ${f.away_team}`
-              }
-            }
+            const { data: f } = await supabaseClient
+              .from('fixtures')
+              .select('home_team, away_team')
+              .eq('id', row.fixture_id)
+              .maybeSingle()
+            if (f?.home_team && f?.away_team) matchLabel = ` for ${f.home_team} vs ${f.away_team}`
           } catch (e) { /* ignore lookup failures */ }
-          const title = 'New Prediction'
-          const message = `${predictorName} submitted a prediction${matchLabel}`
+
+          const isUpdate = payload.eventType === 'UPDATE'
+          const title = isUpdate ? 'Prediction Updated' : 'New Prediction'
+          const scoreText = (row.home_prediction !== null && row.away_prediction !== null)
+            ? ` (${row.home_prediction}–${row.away_prediction})`
+            : ''
+          const message = `${predictorName} ${isUpdate ? 'updated' : 'submitted'} a prediction${matchLabel}${scoreText}`
           showToast(message, 'general')
           addNotification('general', title, message)
-        }).subscribe()
+        })
+        .subscribe((status, err) => {
+          console.log('[Realtime] admin-predictions status:', status, err || '')
+          if (status === 'CHANNEL_ERROR') {
+            showToast('Prediction realtime failed. Check Supabase Realtime/RLS for predictions.', 'error')
+          }
+        })
 
       // Auto-refresh when bonus rows land. awardPointsWithBonuses writes
       // 20-50 rows in a burst per fixture, so debounce to one refresh.
@@ -1632,6 +1916,7 @@ function confirmRecalcAll() {
     ]
   })
 }
+
 
 // Self-contained leaderboard query for admin stamping. Mirrors
 // getLeaderboardFromResults() in index.js exactly — same paid-profile filter,
@@ -1856,12 +2141,20 @@ async function executeRecalcAll() {
       console.warn('[publish] post-recalc admin refresh failed:', refreshErr)
     }
     if (errors > 0) {
-      showToast(`Done with ${errors} error${errors === 1 ? '' : 's'}. ${updated} row${updated === 1 ? '' : 's'} updated across ${users} player${users === 1 ? '' : 's'}. Check console.`, 'error')
-    } else if (updated === 0) {
-      showToast(`All ${users} player${users === 1 ? '' : 's'} already in sync — nothing to update.`, 'success')
-    } else {
-      showToast(`Recalculated ${users} player${users === 1 ? '' : 's'}, ${updated} row${updated === 1 ? '' : 's'} updated.`, 'success')
-    }
+  showToast(`Done with ${errors} error${errors === 1 ? '' : 's'}. ${updated} row${updated === 1 ? '' : 's'} updated across ${users} player${users === 1 ? '' : 's'}. Check console.`, 'error')
+} else {
+  await sendUserPush(
+    '🏁 Results Published',
+    'Latest match results and points are now updated. Check your standing!',
+    '/index.html'
+  )
+
+  if (updated === 0) {
+    showToast(`All ${users} player${users === 1 ? '' : 's'} already in sync — results notification sent.`, 'success')
+  } else {
+    showToast(`Recalculated ${users} player${users === 1 ? '' : 's'}, ${updated} row${updated === 1 ? '' : 's'} updated. Results notification sent.`, 'success')
+  }
+}
 
   } catch (err) {
     console.error('[recalc-all] Failed:', err)
@@ -1874,6 +2167,132 @@ async function executeRecalcAll() {
   }
 }
 
+async function sendUserPush(title, message, url = '/index.html') {
+  try {
+    const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-push`;
+
+    const EDGE_FUNCTION_KEY = 'sb_publishable_-BAvh2zD75dXEEby26NnRg_on1FAgz3';
+
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EDGE_FUNCTION_KEY,
+        'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`
+      },
+      body: JSON.stringify({
+        role: 'user',
+        title,
+        message,
+        url
+      })
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      console.error('[User Push] Failed:', res.status, data);
+      return;
+    }
+
+    console.log('[User Push] Sent:', data);
+  } catch (err) {
+    console.error('[User Push] Error:', err);
+  }
+}
+
+async function sendTestUserPush() {
+  try {
+    showToast('Sending user test push...', 'info');
+
+    const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-push`;
+
+    const EDGE_FUNCTION_KEY = 'sb_publishable_-BAvh2zD75dXEEby26NnRg_on1FAgz3';
+
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EDGE_FUNCTION_KEY,
+        'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`
+      },
+      body: JSON.stringify({
+        role: 'user',
+        title: '⚽ Match Reminder Test',
+        message: 'This is a test reminder for players.',
+        url: '/index.html'
+      })
+    });
+
+    const data = await res.json().catch(() => null);
+
+    console.log('[User Push Test] Result:', data);
+
+    if (!res.ok) {
+      showToast(`User push failed: ${res.status}`, 'error');
+      return;
+    }
+
+    showToast(`User push sent: ${data.sent || 0}, failed: ${data.failed || 0}`, 'success');
+
+  } catch (err) {
+    console.error('[User Push Test] Error:', err);
+    showToast('User push test error. Check console.', 'error');
+  }
+}
+
+async function sendTestPush() {
+  try {
+    showToast('Sending test push...', 'info');
+
+    const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-push`;
+
+    const EDGE_FUNCTION_KEY = 'sb_publishable_-BAvh2zD75dXEEby26NnRg_on1FAgz3';
+
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EDGE_FUNCTION_KEY,
+        'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`
+      },
+      body: JSON.stringify({
+        role: 'admin',
+        title: '🔔 WC Predictions Test',
+        message: 'Push notification is working!',
+        url: '/admin.html'
+      })
+    });
+
+    const text = await res.text();
+
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      data = { raw: text };
+    }
+
+    if (!res.ok) {
+      console.error('[Push Test] Function failed:', res.status, data);
+      showToast(`Push failed: ${res.status}`, 'error');
+      return;
+    }
+
+    console.log('[Push Test] Push result:', data);
+
+    if (!data?.success) {
+      showToast(data?.error || 'Push failed on server', 'error');
+      return;
+    }
+
+    showToast(`Push sent: ${data.sent || 0}, failed: ${data.failed || 0}`, 'success');
+
+  } catch (err) {
+    console.error('[Push Test] Error:', err);
+    showToast('Push test error. Check console.', 'error');
+  }
+}
     // ============== INIT ==============
     async function init() {
       await initAuth()
@@ -1882,6 +2301,7 @@ async function executeRecalcAll() {
       if (!isAdmin()) { document.getElementById('access-denied').classList.remove('hidden'); return }
       document.getElementById('admin-content').classList.remove('hidden')
       requestNotificationPermission()
+      setupChimeUnlock()
             await loadAll()
       await loadNotifications()
       setupAdminRealtime()
@@ -2772,6 +3192,28 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
       }
     }
 
+    async function sendMatchReminder(fixtureId) {
+  try {
+    const fixture = allFixtures.find(f => f.id === fixtureId);
+
+    if (!fixture) {
+      showToast('Fixture not found', 'error');
+      return;
+    }
+
+    await sendUserPush(
+      `⚽ ${fixture.home_team} vs ${fixture.away_team}`,
+      'Prediction lock is coming soon. Submit your score before kickoff!',
+      '/index.html'
+    );
+
+    showToast('Match reminder sent to users', 'success');
+  } catch (err) {
+    console.error('Match reminder failed:', err);
+    showToast('Could not send reminder', 'error');
+  }
+}
+
     // ============== FIXTURES MANAGE ==============
     function renderFixturesManage() {
       const list = document.getElementById('fixtures-manage-list')
@@ -2807,9 +3249,15 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
             </button>
           </div>
           <div class="flex items-center gap-2">
-            <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}">
-            <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
-          </div>
+  <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}">
+  <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
+</div>
+
+${!locked ? `
+  <button onclick="sendMatchReminder('${f.id}')" class="btn-ghost tap text-xs py-2.5">
+    🔔 Send Match Reminder
+  </button>
+` : ''}
         </div>`
       }).join('')
     }

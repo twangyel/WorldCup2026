@@ -62,16 +62,46 @@ self.addEventListener('fetch', event => {
   )
 })
 
+self.addEventListener('push', event => {
+  let data = {}
+
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch (e) {
+    data = {
+      title: 'WC Predictions',
+      body: event.data ? event.data.text() : 'New notification'
+    }
+  }
+
+  const title = data.title || 'WC Predictions'
+
+  const options = {
+    body: data.body || 'You have a new update.',
+    icon: '/image/logo-maskable.svg',
+    badge: '/image/logo-maskable.svg',
+    vibrate: [120, 80, 120],
+    data: {
+      url: data.url || '/'
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  )
+})
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const url = event.notification.data?.url || '/admin.html'
+
+  const url = event.notification.data?.url || '/'
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-      for (const client of windowClients) {
-        if (client.url.includes(url) && 'focus' in client) return client.focus()
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus()
       }
-      if (clients.openWindow) return clients.openWindow(url)
+      return clients.openWindow(url)
     })
   )
 })

@@ -242,42 +242,149 @@
     }
     .submitted-stamp::before { content: '🔒'; font-size: 10px; opacity: 0.7; }
 
-    /* ===== Badges ===== */
-    .badge-card {
+    /* ===== Premium Profile + Achievement Redesign ===== */
+    .profile-premium-card {
+      position: relative; overflow: hidden; border-radius: 28px; padding: 22px;
+      background: radial-gradient(circle at 82% 0%, rgba(212,162,76,0.22), transparent 34%), radial-gradient(circle at 12% 14%, rgba(96,165,250,0.14), transparent 30%), linear-gradient(135deg, rgba(11,18,33,0.98) 0%, rgba(30,58,95,0.92) 52%, rgba(11,18,33,0.98) 100%);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 16px 38px rgba(11,18,33,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+    .profile-premium-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(115deg, transparent 0 58%, rgba(255,255,255,0.045) 58% 59%, transparent 59% 100%), repeating-linear-gradient(115deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 11px);
+      mask-image: linear-gradient(90deg, transparent, #000 45%, #000 100%); opacity: .65; pointer-events: none;
+    }
+    .profile-premium-avatar { width: 88px; height: 88px; border-radius: 999px; background: linear-gradient(135deg, #D4A24C, #F59E0B, #EA580C); display:flex; align-items:center; justify-content:center; color:#fff; font-size:30px; font-weight:900; overflow:hidden; border:4px solid rgba(255,255,255,.96); box-shadow:0 12px 28px rgba(0,0,0,.24); flex-shrink:0; }
+    .profile-premium-online { position:absolute; right:0; bottom:2px; width:25px; height:25px; border-radius:999px; background:#16C784; border:4px solid #fff; box-shadow:0 6px 16px rgba(16,199,132,.28); }
+    .profile-premium-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:999px; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; line-height:1; }
+    .profile-premium-pill.admin { color:#FCD34D; background:rgba(212,162,76,.15); border:1px solid rgba(212,162,76,.42); }
+    .profile-premium-pill.verified { color:#BBF7D0; background:rgba(16,185,129,.16); border:1px solid rgba(16,185,129,.42); }
+    .profile-premium-name { font-size:21px; line-height:1.12; font-weight:900; color:#fff; letter-spacing:-.045em; overflow:visible; display:block; max-width:100%; }
+    .profile-edit-btn { position:absolute; top:21px; right:12px; z-index:3; width:42px; height:42px; border-radius:15px; background:rgba(255,255,255,.11); color:#fff; border:1px solid rgba(255,255,255,.22); box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 8px 18px rgba(0,0,0,.12); }
+    .profile-edit-btn svg { stroke:#fff !important; color:#fff !important; }
+    #profile-header-dept { color:#fff !important; }
+    .profile-stat-module { flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:9px; text-align:left; }
+    .profile-stat-icon { width:38px; height:38px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(145deg, rgba(255,255,255,.15), rgba(255,255,255,.055)); border:1px solid rgba(255,255,255,.18); box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 7px 14px rgba(0,0,0,.14); flex-shrink:0; }
+    .profile-stat-icon svg { width:22px; height:22px; display:block; filter:drop-shadow(0 2px 5px rgba(0,0,0,.22)); }
+    .profile-stat-icon.rank-icon { background:radial-gradient(circle at 35% 25%, #FDE68A, #D4A24C 58%, #7C4A03); }
+    .profile-stat-icon.points-icon { background:radial-gradient(circle at 35% 25%, #BFDBFE, #2563EB 58%, #172554); }
+    .profile-stat-icon.predictions-icon { background:radial-gradient(circle at 35% 25%, #DDD6FE, #7C3AED 58%, #2E1065); }
+    .profile-stat-number { font-size:23px; line-height:1; font-weight:900; letter-spacing:-.03em; color:#fff; font-variant-numeric:tabular-nums; }
+    .profile-stat-number.rank { color:#FBBF24; }
+    .profile-stat-label { margin-top:4px; font-size:9px; color:rgba(255,255,255,.52); text-transform:uppercase; letter-spacing:.08em; font-weight:900; }
+    .achievement-panel { position:relative; overflow:hidden; border-radius:28px; padding:18px; background:linear-gradient(135deg, rgba(255,255,255,.96), rgba(250,250,247,.9)); border:1px solid rgba(238,237,231,.9); box-shadow:0 14px 34px rgba(10,15,13,.07), inset 0 1px 0 rgba(255,255,255,.92); }
+    .achievement-panel::before { content:''; position:absolute; top:-80px; right:-90px; width:190px; height:190px; border-radius:999px; background:radial-gradient(circle, rgba(212,162,76,.16), transparent 68%); pointer-events:none; }
+    .achievement-section-icon { width:42px; height:42px; border-radius:16px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #F5F3FF, #EDE9FE); border:1px solid #DDD6FE; font-size:21px; box-shadow:0 7px 18px rgba(109,40,217,.10); flex-shrink:0; }
+    .badge-card { position:relative; min-height:178px; padding:18px 12px 13px; border-radius:0 !important; border:1.5px solid rgba(238,237,231,.95); background:linear-gradient(145deg,#FFFFFF 0%,#FBFAF5 56%,#FFFFFF 100%); text-align:center; transition:transform 240ms cubic-bezier(.2,.8,.2,1), box-shadow 240ms ease, border-color 240ms ease; overflow:hidden; box-shadow:0 8px 20px rgba(10,15,13,.055), inset 0 1px 0 rgba(255,255,255,.92); transform-style:preserve-3d; }
+    .badge-card::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 18%, rgba(255,255,255,.96), transparent 48%); pointer-events:none; }
+    .badge-card::after { content:''; position:absolute; top:-70%; left:-85%; width:70%; height:240%; transform:rotate(28deg); background:linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); opacity:0; pointer-events:none; }
+    .badge-card:hover { transform:translateY(-3px) rotateY(4deg); box-shadow:0 16px 32px rgba(10,15,13,.10), inset 0 1px 0 rgba(255,255,255,.96); }
+    .badge-card:hover::after, .badge-card.earned::after { animation:badgeShine 2.8s ease-in-out infinite; opacity:1; }
+    @keyframes badgeShine { 0% { left:-90%; opacity:0; } 18% { opacity:.68; } 42% { left:125%; opacity:0; } 100% { left:125%; opacity:0; } }
+    .badge-card.earned { border-color:rgba(212,162,76,.88); background:linear-gradient(135deg,#FFFBF0 0%,#FFF2CA 48%,#FFFFFF 100%); box-shadow:0 12px 28px rgba(212,162,76,.20), inset 0 1px 0 rgba(255,255,255,.95); }
+    .badge-card.locked { opacity:.88; }
+    .badge-card.locked .badge-icon-art { filter:grayscale(1) saturate(0) opacity(.62); }
+    .badge-card.earned:active, .badge-card:active { transform:scale(.985) rotateY(8deg); }
+    .badge-icon { position:relative; z-index:1; margin-bottom:10px; display:flex; justify-content:center; }
+    .badge-icon-art { width:70px; height:70px; display:inline-flex; align-items:center; justify-content:center; filter:drop-shadow(0 10px 12px rgba(10,15,20,.12)); }
+    .badge-icon-art svg { width:100%; height:100%; display:block; }
+    .badge-name { position:relative; z-index:1; font-size:13px; font-weight:900; color:#1F2A35; letter-spacing:-.03em; }
+    .badge-desc { position:relative; z-index:1; font-size:11px; color:#6F7C88; margin-top:4px; line-height:1.28; min-height:28px; }
+    .badge-earned-tick { position:absolute; top:10px; right:10px; z-index:2; width:24px; height:24px; border-radius:8px; background:#10B981; color:white; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; box-shadow:0 7px 14px rgba(16,185,129,.28); border:2px solid #fff; }
+    .badge-share-hint, .badge-lock-hint { position:relative; z-index:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; margin-top:10px; padding:6px 11px; border-radius:999px; font-size:10.5px; font-weight:900; }
+    .badge-share-hint { background:rgba(212,162,76,.14); color:#A26D08; border:1px solid rgba(212,162,76,.28); }
+    .badge-lock-hint { background:rgba(244,243,238,.86); color:#7A8792; border:1px solid rgba(238,237,231,.95); }
+    @media (max-width: 380px) { .profile-premium-card{padding:18px}.profile-premium-avatar{width:78px;height:78px}.profile-premium-name{font-size:19px}.profile-stat-module{gap:6px}.profile-stat-icon{width:32px;height:32px}.profile-stat-icon svg{width:19px;height:19px}.profile-stat-number{font-size:20px}.badge-card{min-height:164px;padding-left:10px;padding-right:10px;border-radius:0!important}.badge-icon-art{width:62px;height:62px} }
+
+    /* Final profile micro-fixes: keep name clear, white department text, and absolute-sharp badge cards */
+    .profile-premium-card .profile-edit-btn { top:21px !important; right:12px !important; width:42px !important; height:42px !important; color:#fff !important; }
+    .profile-premium-card .profile-edit-btn svg { stroke:#fff !important; color:#fff !important; }
+    #profile-header-dept { color:#fff !important; }
+    .badge-card { border-radius:0 !important; }
+    .badge-card::before, .badge-card::after { border-radius:0 !important; }
+
+
+
+    /* ===== Match Reminder CTA (Me tab) ===== */
+    .match-reminder-card {
       position: relative;
-      padding: 14px 12px 12px;
-      border-radius: 18px;
-      border: 1.5px solid #EEEDE7;
-      background: #fff;
-      text-align: center;
-      transition: all 200ms ease;
+      overflow: hidden;
+      border-radius: 24px;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 82% 8%, rgba(212,162,76,.22), transparent 34%),
+        linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,251,240,.92));
+      border: 1px solid rgba(212,162,76,.28);
+      box-shadow: 0 12px 28px rgba(10,15,13,.07), inset 0 1px 0 rgba(255,255,255,.92);
     }
-    .badge-card.earned {
-      border-color: rgba(212,162,76,0.4);
-      background: linear-gradient(135deg, #FFFBF0 0%, #FDF6E3 100%);
-      box-shadow: 0 2px 12px rgba(212,162,76,0.12);
+    .match-reminder-card::before {
+      content:'';
+      position:absolute;
+      inset:0;
+      background: linear-gradient(115deg, transparent 0 62%, rgba(255,255,255,.55) 63%, transparent 70%);
+      opacity:.45;
+      pointer-events:none;
     }
-    .badge-card.locked { opacity: 0.55; }
-    .badge-card.locked .badge-icon { filter: grayscale(1); }
-    .badge-icon { font-size: 28px; line-height: 1; margin-bottom: 6px; }
-    .badge-name { font-size: 11px; font-weight: 700; color: #1F2A26; letter-spacing: -0.01em; }
-    .badge-desc { font-size: 10px; color: #8A959F; margin-top: 2px; line-height: 1.3; }
-    .badge-earned-tick {
-      position: absolute; top: 6px; right: 6px;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: #10B981; color: white;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 9px; font-weight: 900;
+    .match-reminder-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: linear-gradient(135deg, #0B1221, #1E3A5F);
+      color:#FCD34D;
+      font-size: 22px;
+      box-shadow: 0 10px 20px rgba(11,18,33,.18), inset 0 1px 0 rgba(255,255,255,.12);
+      flex-shrink: 0;
+    }
+    .match-reminder-action {
+      width:100%;
+      margin-top:14px;
+      border:0;
+      border-radius:16px;
+      padding:13px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      color:#fff;
+      font-size:13px;
+      font-weight:900;
+      letter-spacing:-.01em;
+      background: linear-gradient(135deg, #0F766E, #065F46);
+      box-shadow: 0 10px 22px rgba(6,95,70,.22), inset 0 1px 0 rgba(255,255,255,.14);
+    }
+    .match-reminder-chip {
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 9px;
+      border-radius:999px;
+      background:rgba(16,185,129,.12);
+      color:#047857;
+      border:1px solid rgba(16,185,129,.2);
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      white-space:nowrap;
     }
 
     /* Tiny inline badge icon (leaderboard) */
     .lb-badge {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 18px; height: 18px; border-radius: 50%;
-      font-size: 11px; line-height: 1;
-      background: rgba(212,162,76,0.15);
+      width: 24px; height: 24px; border-radius: 50%;
+      line-height: 1;
+      background: linear-gradient(135deg, rgba(255,251,240,0.95), rgba(253,246,227,0.92));
+      border: 1px solid rgba(212,162,76,0.28);
+      box-shadow: 0 2px 6px rgba(10,15,20,0.06);
       margin-left: 4px;
+      overflow: hidden;
     }
+    .lb-badge-art { width: 18px; height: 18px; display: inline-flex; }
+    .lb-badge-art svg { width: 100%; height: 100%; display: block; }
+    .lb-badge-more { font-size: 10px; font-weight: 800; color: #8A5E08; }
 
     /* Streak chip */
     .streak-chip {
@@ -1331,13 +1438,14 @@
       padding: 8px 0 4px;
     }
     .info-popup-badge-icon {
-      width: 96px; height: 96px; border-radius: 24px;
-      background: rgba(255,255,255,0.10);
+      width: 112px; height: 112px; border-radius: 30px;
+      background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.22), rgba(255,255,255,0.08));
       border: 2px solid rgba(255,255,255,0.18);
       display: flex; align-items: center; justify-content: center;
-      font-size: 56px; line-height: 1;
-      box-shadow: 0 8px 24px rgba(109,40,217,0.3);
+      box-shadow: 0 10px 28px rgba(109,40,217,0.24);
     }
+    .info-popup-badge-art { width: 82px; height: 82px; display: inline-flex; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.18)); }
+    .info-popup-badge-art svg { width: 100%; height: 100%; display: block; }
     .info-popup-badge-status {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 12px; border-radius: 999px;
@@ -1524,9 +1632,12 @@
 
     /* Compact badges inline */
     .lb-row-compact .lb-badge {
+      width: 24px !important;
+      height: 24px !important;
+    }
+    .lb-row-compact .lb-badge-art {
       width: 18px !important;
       height: 18px !important;
-      font-size: 11px !important;
     }
     .lb-row-compact .lb-streak {
       font-size: 10px !important;
@@ -2577,7 +2688,488 @@
     }
     .inv-flip.is-locked .inv-face-front::after { display: none; }
 
-</style>
+
+
+    /* ============================================================
+       LEADERBOARD V2.1 — compact production list layout
+       ============================================================ */
+    #tab-leaderboard { padding-left: 12px !important; padding-right: 12px !important; padding-bottom: 104px !important; }
+    .lb-v2-hero { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:2px 2px 0; }
+    .lb-v2-hero-main { display:flex; align-items:center; gap:10px; min-width:0; }
+    .lb-v2-trophy { width:38px; height:38px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0B1221,#1E3A5F); box-shadow:0 6px 18px rgba(11,18,33,.14); color:#F4C430; font-size:19px; }
+    .lb-v2-title { font-size:22px; line-height:1.08; font-weight:900; letter-spacing:-.04em; color:#0B1221; }
+    .lb-v2-subtitle { margin-top:3px; font-size:12px; font-weight:700; color:#64748B; }
+    .lb-v2-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .lb-v2-help { display:none; align-items:center; gap:6px; height:34px; padding:0 11px; border:1px solid rgba(148,163,184,.26); border-radius:14px; background:rgba(255,255,255,.78); color:#475569; font-size:11px; font-weight:900; }
+    .lb-v2-share { width:36px; height:36px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid rgba(239,68,68,.18); color:#DC2626; box-shadow:0 5px 16px rgba(220,38,38,.08); }
+    @media (min-width:390px){ .lb-v2-help{display:none !important;} }
+
+    .lb-v2-table-head { display:grid; grid-template-columns:66px minmax(0,1fr) 50px; align-items:center; gap:8px; padding:3px 8px 7px; color:#64748B; font-size:9px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+    .lb-v2-table-head span:last-child { text-align:right; }
+
+    #leaderboard-list.lb-v2-list, #leaderboard-list { gap:7px !important; padding-bottom:14px !important; }
+    .lb-row.lb-v2-row { display:grid !important; grid-template-columns:66px minmax(0,1fr) 50px; gap:8px !important; align-items:center; min-height:72px; padding:9px 9px !important; border-radius:15px !important; border:1px solid rgba(226,232,240,.76) !important; background:rgba(255,255,255,.95) !important; box-shadow:0 2px 8px rgba(15,23,42,.04) !important; overflow:hidden; position:relative; }
+    .lb-row.lb-v2-row::before { content:''; position:absolute; left:0; top:9px; bottom:9px; width:3px; border-radius:999px; background:transparent; }
+    .lb-row.lb-v2-row.lb-row-rank-1 { background:linear-gradient(135deg,rgba(255,248,221,.96),rgba(255,255,255,.94) 72%) !important; border-color:rgba(212,162,76,.50) !important; box-shadow:0 5px 15px rgba(212,162,76,.11) !important; }
+    .lb-row.lb-v2-row.lb-row-rank-1::before { background:#D4A24C; }
+    .lb-row.lb-v2-row.lb-row-rank-2 { background:linear-gradient(135deg,rgba(241,245,249,.96),rgba(255,255,255,.94) 72%) !important; border-color:rgba(148,163,184,.44) !important; }
+    .lb-row.lb-v2-row.lb-row-rank-2::before { background:#94A3B8; }
+    .lb-row.lb-v2-row.lb-row-rank-3 { background:linear-gradient(135deg,rgba(255,237,213,.88),rgba(255,255,255,.94) 72%) !important; border-color:rgba(205,127,50,.38) !important; }
+    .lb-row.lb-v2-row.lb-row-rank-3::before { background:#CD7F32; }
+    .lb-row.lb-v2-row.is-me { background:linear-gradient(135deg,rgba(239,246,255,.94),rgba(255,255,255,.96)) !important; border-color:rgba(37,99,235,.56) !important; box-shadow:0 0 0 1px rgba(37,99,235,.08),0 5px 14px rgba(37,99,235,.07) !important; }
+    .lb-row.lb-v2-row.is-me::before { background:#3B82F6; }
+
+    .lb-v2-rank-avatar { display:grid; grid-template-columns:28px 34px; gap:6px; align-items:center; }
+    .lb-v2-rank-tile, .lb-v2-medal-simple { width:28px; height:28px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid rgba(226,232,240,.92); color:#0F172A; font-size:13px; font-weight:900; box-shadow:inset 0 1px 0 rgba(255,255,255,.85); font-variant-numeric:tabular-nums; }
+    .lb-v2-medal-simple { border-radius:999px; color:#fff; box-shadow:0 2px 7px rgba(15,23,42,.14); }
+    .lb-v2-medal-simple.gold { background:linear-gradient(135deg,#F6C34A,#C98A11); border-color:#F6D074; }
+    .lb-v2-medal-simple.silver { background:linear-gradient(135deg,#CBD5E1,#64748B); border-color:#E2E8F0; }
+    .lb-v2-medal-simple.bronze { background:linear-gradient(135deg,#E6A15A,#B65F20); border-color:#FDBA74; }
+    .lb-v2-row .lb-avatar { width:34px !important; height:34px !important; border-radius:12px !important; font-size:12px !important; }
+
+    .lb-v2-name-line { display:flex; align-items:center; gap:5px; min-width:0; }
+    .lb-v2-name { font-size:13px; line-height:1.08; font-weight:900; color:#0B1221; letter-spacing:-.02em; max-width:100%; }
+    .lb-v2-leader, .lb-v2-you { display:inline-flex; align-items:center; gap:2px; height:16px; padding:0 5px; border-radius:6px; font-size:8px; font-weight:900; letter-spacing:.02em; text-transform:uppercase; flex-shrink:0; }
+    .lb-v2-leader { color:#B45309; background:rgba(255,247,237,.94); border:1px solid rgba(245,158,11,.26); }
+    .lb-v2-you { color:#fff; background:linear-gradient(135deg,#2563EB,#1D4ED8); border:1px solid rgba(255,255,255,.55); }
+    .lb-v2-stats { display:flex; flex-wrap:nowrap; align-items:center; gap:8px; margin-top:4px; font-size:10px; font-weight:800; color:#475569; }
+    .lb-v2-stat { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+    .lb-v2-stat-icon { width:12px; height:12px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-size:8px; font-weight:900; }
+    .lb-v2-stat-icon.correct { background:#16A34A; }
+    .lb-v2-stat-icon.exact { color:#E11D48; background:#FFE4E6; border:1px solid rgba(225,29,72,.18); }
+
+    .lb-v2-chips { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:5px; max-height:38px; overflow:hidden; }
+    .lb-v2-chip { display:inline-flex; align-items:center; gap:3px; height:18px; padding:0 6px; border-radius:999px; font-size:9px; line-height:1; font-weight:900; white-space:nowrap; border:1px solid transparent; }
+    .lb-v2-chip.streak { color:#C2410C; background:#FFF7ED; border-color:#FED7AA; }
+    .lb-v2-chip.nostradamus { color:#7C3AED; background:#F3E8FF; border-color:#DDD6FE; }
+    .lb-v2-chip.top, .lb-v2-chip.bonus { color:#92400E; background:#FFFBEB; border-color:#FDE68A; }
+    .lb-v2-chip.badge { display:none !important; }
+
+    .lb-v2-trend { position:absolute; right:58px; top:50%; transform:translateY(-50%); display:flex; justify-content:center; pointer-events:none; }
+    .lb-v2-trend .rank-trend { min-width:30px; justify-content:center; font-size:10px !important; padding:4px 7px !important; border-radius:999px; }
+    .lb-v2-trend .rank-trend.new { font-size:8px !important; }
+    .lb-v2-trend-empty { color:#94A3B8; font-weight:900; font-size:15px; line-height:1; }
+    .lb-v2-points { text-align:right; min-width:48px; }
+    .lb-v2-points .points-num { font-size:24px !important; line-height:.95 !important; letter-spacing:-.04em; color:#12345A !important; font-weight:900 !important; }
+    .lb-v2-points .points-label { font-size:9px !important; margin-top:3px !important; color:#64748B !important; letter-spacing:.08em; }
+    .lb-v2-hint { margin-top:4px; font-size:9px; font-weight:900; color:#7C3AED; text-decoration:underline; text-underline-offset:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .lb-v2-legend { display:flex; justify-content:center; gap:8px 12px; flex-wrap:wrap; margin-top:4px; padding:10px; border-radius:15px; background:rgba(255,255,255,.88); border:1px solid rgba(226,232,240,.76); box-shadow:0 2px 8px rgba(15,23,42,.035); color:#334155; font-size:10px; font-weight:900; }
+    .lb-v2-legend span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+
+    /* ===== Leaderboard V2.2 polish tweaks ===== */
+    .lb-v2-help { display: none !important; }
+    .lb-v2-actions { gap: 0 !important; }
+
+    .lb-row.lb-v2-row {
+      grid-template-columns: 82px minmax(0, 1fr) 60px !important;
+      gap: 7px !important;
+      padding: 9px 13px 9px 9px !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 82px minmax(0, 1fr) 60px !important;
+      padding-right: 13px !important;
+    }
+    .lb-v2-rank-avatar {
+      grid-template-columns: 32px 42px !important;
+      gap: 7px !important;
+      align-items: center !important;
+    }
+    .lb-v2-row .lb-avatar {
+      width: 42px !important;
+      height: 42px !important;
+      border-radius: 999px !important;
+      font-size: 13px !important;
+      border: 2px solid rgba(255,255,255,.95) !important;
+      box-shadow: 0 5px 12px rgba(11,18,33,.16) !important;
+    }
+    .lb-v2-row .lb-avatar img {
+      border-radius: 999px !important;
+    }
+    .lb-v2-medal-shiny {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 25px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 8px rgba(15,23,42,.16));
+      transform: translateZ(0);
+    }
+    .lb-v2-medal-shiny.gold { filter: drop-shadow(0 4px 10px rgba(212,162,76,.34)); }
+    .lb-v2-medal-shiny.silver { filter: drop-shadow(0 4px 10px rgba(100,116,139,.25)); }
+    .lb-v2-medal-shiny.bronze { filter: drop-shadow(0 4px 10px rgba(205,127,50,.25)); }
+
+    .lb-v2-trend {
+      right: 66px !important;
+      z-index: 2;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 34px !important;
+      font-size: 10px !important;
+      padding: 4px 7px !important;
+      box-shadow: 0 2px 7px rgba(15,23,42,.06);
+    }
+    .lb-v2-trend-empty {
+      color: #CBD5E1 !important;
+      font-size: 14px !important;
+    }
+    .lb-v2-points {
+      min-width: 58px !important;
+      text-align: center !important;
+      padding-right: 2px !important;
+    }
+    .lb-v2-points .points-num {
+      font-size: 25px !important;
+    }
+
+    @media (max-width: 370px) {
+      .lb-row.lb-v2-row {
+        grid-template-columns: 76px minmax(0, 1fr) 56px !important;
+        gap: 6px !important;
+        padding-right: 11px !important;
+      }
+      .lb-v2-table-head {
+        grid-template-columns: 76px minmax(0, 1fr) 56px !important;
+      }
+      .lb-v2-rank-avatar { grid-template-columns: 30px 38px !important; gap: 6px !important; }
+      .lb-v2-row .lb-avatar { width: 38px !important; height: 38px !important; }
+      .lb-v2-medal-shiny { width: 30px; height: 30px; font-size: 23px; }
+      .lb-v2-trend { right: 60px !important; }
+      .lb-v2-points { min-width: 54px !important; }
+      .lb-v2-points .points-num { font-size: 23px !important; }
+    }
+
+
+    @media (max-width:374px){
+      #tab-leaderboard{padding-left:10px!important;padding-right:10px!important;}
+      .lb-row.lb-v2-row{grid-template-columns:62px minmax(0,1fr) 46px;gap:6px!important;padding:8px!important;min-height:68px;}
+      .lb-v2-table-head{grid-template-columns:62px minmax(0,1fr) 46px;padding-left:7px;padding-right:7px;}
+      .lb-v2-rank-avatar{grid-template-columns:26px 32px;gap:5px;}
+      .lb-v2-rank-tile,.lb-v2-medal-simple{width:26px;height:26px;border-radius:9px;font-size:12px;}
+      .lb-v2-row .lb-avatar{width:32px!important;height:32px!important;border-radius:11px!important;}
+      .lb-v2-name{font-size:12px;}
+      .lb-v2-stats{font-size:9px;gap:6px;}
+      .lb-v2-chip{font-size:8px;height:17px;padding:0 5px;}
+      .lb-v2-trend{right:52px;}
+      .lb-v2-trend .rank-trend{min-width:26px;font-size:9px!important;padding:3px 6px!important;}
+      .lb-v2-points .points-num{font-size:22px!important;}
+    }
+
+
+
+    /* ===== Leaderboard V2.3 tweaks ===== */
+    .lb-v2-hero-main { gap: 0 !important; }
+    .lb-v2-trophy { display: none !important; }
+    .lb-v2-title { font-size: 21px !important; }
+
+    .lb-row.lb-v2-row {
+      grid-template-columns: 76px minmax(0,1fr) 40px 58px !important;
+      gap: 8px !important;
+      padding: 10px 14px 10px 10px !important;
+      overflow: hidden !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 76px minmax(0,1fr) 40px 58px !important;
+      padding-left: 10px !important;
+      padding-right: 14px !important;
+    }
+    .lb-v2-table-head span:last-child { grid-column: 4; }
+
+    .lb-v2-rank-avatar { grid-template-columns: 32px 40px !important; gap: 6px !important; }
+    .lb-v2-row .lb-avatar {
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 999px !important;
+      font-size: 13px !important;
+      border: 2px solid #fff !important;
+      box-shadow: 0 6px 14px rgba(15,23,42,.14) !important;
+    }
+    .lb-v2-row .lb-avatar img { border-radius: 999px !important; }
+
+    .lb-v2-medal-shiny {
+      width: 32px !important;
+      height: 36px !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 0 !important;
+    }
+    .lb-v2-medal-shiny svg { width: 31px !important; height: 36px !important; }
+
+    .lb-v2-name-line { gap: 6px !important; }
+    .lb-v2-leader {
+      height: 20px !important;
+      padding: 0 8px !important;
+      border-radius: 999px !important;
+      color: #78350F !important;
+      background: linear-gradient(135deg,#FEF3C7,#FDBA74) !important;
+      border: 1px solid rgba(245,158,11,.55) !important;
+      box-shadow: 0 5px 12px rgba(245,158,11,.20) !important;
+      animation: lbLeaderPulse 1.7s ease-in-out infinite;
+    }
+    @keyframes lbLeaderPulse {
+      0%,100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-1px) scale(1.035); }
+    }
+
+    .lb-v2-chips {
+      display: flex !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      gap: 4px !important;
+      margin-top: 5px !important;
+      max-height: 22px !important;
+      overflow: hidden !important;
+      padding-right: 2px;
+    }
+    .lb-v2-chip { height: 18px !important; padding: 0 6px !important; font-size: 8.5px !important; flex: 0 0 auto; }
+    .lb-v2-chip.more { color:#475569; background:#F8FAFC; border-color:#E2E8F0; }
+    .lb-v2-badge-icons { display:inline-flex; align-items:center; gap:3px; flex:0 0 auto; }
+    .lb-v2-badge-icons .lb-badge {
+      width: 20px !important;
+      height: 20px !important;
+      margin-left: 0 !important;
+      background: #fff !important;
+      border-color: rgba(212,162,76,.35) !important;
+    }
+    .lb-v2-badge-icons .lb-badge-art { width: 15px !important; height: 15px !important; }
+    .lb-v2-badge-icons .lb-badge-more { font-size: 9px !important; }
+
+    .lb-v2-trend {
+      position: static !important;
+      transform: none !important;
+      justify-self: center !important;
+      align-self: center !important;
+      width: 40px !important;
+      display: flex !important;
+      justify-content: center !important;
+    }
+    .lb-v2-trend .rank-trend { min-width: 34px !important; padding: 4px 7px !important; font-size: 10px !important; }
+    .lb-v2-points { min-width: 58px !important; padding-right: 2px !important; }
+
+    @media (max-width: 360px) {
+      .lb-row.lb-v2-row { grid-template-columns: 70px minmax(0,1fr) 36px 52px !important; gap:6px !important; padding-right:12px !important; }
+      .lb-v2-table-head { grid-template-columns: 70px minmax(0,1fr) 36px 52px !important; }
+      .lb-v2-rank-avatar { grid-template-columns: 30px 36px !important; gap:5px !important; }
+      .lb-v2-row .lb-avatar { width:36px !important; height:36px !important; }
+      .lb-v2-chip { font-size:8px !important; padding:0 5px !important; }
+    }
+
+
+    /* ===== Leaderboard V2.4 compact badge + spacing tweaks ===== */
+    .lb-row.lb-v2-row {
+      grid-template-columns: 76px minmax(0,1fr) 32px 56px !important;
+      column-gap: 5px !important;
+      row-gap: 0 !important;
+      padding: 10px 12px 10px 10px !important;
+      min-height: 72px !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 76px minmax(0,1fr) 32px 56px !important;
+      column-gap: 5px !important;
+      padding-right: 12px !important;
+    }
+    .lb-v2-trend {
+      width: 32px !important;
+      justify-self: end !important;
+      margin-right: 2px !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 30px !important;
+      padding: 4px 6px !important;
+      font-size: 9.5px !important;
+    }
+    .lb-v2-points {
+      min-width: 56px !important;
+      padding-right: 0 !important;
+      text-align: center !important;
+    }
+
+    /* Keep rows cleaner: two compact progress chips + one badge slot max. */
+    .lb-v2-chips {
+      max-width: 100% !important;
+      max-height: 20px !important;
+      overflow: hidden !important;
+      gap: 4px !important;
+      padding-right: 0 !important;
+    }
+    .lb-v2-chip {
+      height: 18px !important;
+      padding: 0 6px !important;
+      font-size: 8.5px !important;
+      letter-spacing: -0.01em;
+    }
+    .lb-v2-chip.is-compact {
+      min-width: auto !important;
+      max-width: none !important;
+    }
+    .lb-v2-chip-icon {
+      width: 14px !important;
+      height: 14px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex: 0 0 14px !important;
+    }
+    .lb-v2-chip-icon img,
+    .lb-v2-chip-icon .badge-img-asset {
+      width: 14px !important;
+      height: 14px !important;
+      object-fit: contain !important;
+      display: block !important;
+      margin: 0 !important;
+    }
+    .lb-v2-badge-icons {
+      max-width: 42px !important;
+      overflow: hidden !important;
+    }
+    .lb-v2-badge-icons .lb-badge {
+      width: 18px !important;
+      height: 18px !important;
+    }
+    .lb-v2-badge-icons .lb-badge-art,
+    .lb-v2-badge-icons .lb-badge-art img {
+      width: 14px !important;
+      height: 14px !important;
+    }
+
+    /* Slightly tighter text so names get more space without looking cramped. */
+    .lb-v2-name { font-size: 12.5px !important; }
+    .lb-v2-stats { margin-top: 3px !important; gap: 7px !important; font-size: 9.5px !important; }
+
+    @media (max-width: 360px) {
+      .lb-row.lb-v2-row { grid-template-columns: 70px minmax(0,1fr) 30px 52px !important; column-gap: 4px !important; }
+      .lb-v2-table-head { grid-template-columns: 70px minmax(0,1fr) 30px 52px !important; column-gap: 4px !important; }
+      .lb-v2-trend { width: 30px !important; margin-right: 1px !important; }
+      .lb-v2-trend .rank-trend { min-width: 28px !important; padding: 3px 5px !important; font-size: 9px !important; }
+      .lb-v2-points { min-width: 52px !important; }
+      .lb-v2-chip { font-size: 8px !important; padding: 0 5px !important; }
+      .lb-v2-chip-icon { width: 13px !important; height: 13px !important; flex-basis: 13px !important; }
+      .lb-v2-chip-icon img, .lb-v2-chip-icon .badge-img-asset { width: 13px !important; height: 13px !important; }
+    }
+
+
+
+    /* ===== Leaderboard V2.5 final touch ===== */
+    .lb-v2-medal-shiny {
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 999px !important;
+      transform: none !important;
+    }
+    .lb-v2-medal-shiny svg {
+      width: 30px !important;
+      height: 30px !important;
+    }
+    .lb-v2-medal-shiny.gold,
+    .lb-v2-medal-shiny.silver,
+    .lb-v2-medal-shiny.bronze {
+      filter: drop-shadow(0 4px 8px rgba(15,23,42,.16)) !important;
+    }
+
+    /* Clean stat text: no tick/exact icons in the leaderboard rows. */
+    .lb-v2-stats {
+      gap: 9px !important;
+      color: #334155 !important;
+    }
+    .lb-v2-stat {
+      gap: 2px !important;
+    }
+    .lb-v2-stat b {
+      color: #0F172A !important;
+      font-weight: 900 !important;
+    }
+    .lb-v2-stat-icon {
+      display: none !important;
+    }
+
+    /* Move trend indicator slightly closer to the points, without touching it. */
+    .lb-v2-trend {
+      transform: translateX(4px) !important;
+      margin-right: 0 !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 29px !important;
+    }
+
+    @media (max-width: 360px) {
+      .lb-v2-trend { transform: translateX(3px) !important; }
+    }
+
+  
+
+    /* ===== Leaderboard V2.6 final polish ===== */
+    /* More elegant rank medallion and a cleaner row with no partially-hidden icons. */
+    .lb-v2-medal-shiny {
+      width: 34px !important;
+      height: 38px !important;
+      border-radius: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      filter: drop-shadow(0 5px 9px rgba(15,23,42,.16)) !important;
+    }
+    .lb-v2-medal-shiny svg {
+      width: 34px !important;
+      height: 38px !important;
+      display: block !important;
+    }
+
+    /* Give the movement pill its own clean lane, slightly closer to points. */
+    .lb-row.lb-v2-row {
+      grid-template-columns: 76px minmax(0,1fr) 38px 56px !important;
+      column-gap: 6px !important;
+      padding-right: 12px !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 76px minmax(0,1fr) 38px 56px !important;
+      column-gap: 6px !important;
+      padding-right: 12px !important;
+    }
+    .lb-v2-trend {
+      width: 38px !important;
+      justify-self: end !important;
+      transform: translateX(6px) !important;
+      margin-right: 0 !important;
+      z-index: 3 !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 31px !important;
+      padding: 4px 6px !important;
+      font-size: 9.5px !important;
+      box-shadow: 0 3px 9px rgba(15,23,42,.07) !important;
+    }
+    .lb-v2-trend-empty {
+      display: none !important;
+    }
+
+    /* No separate achievement icons on rows; progress chips only. This prevents clipped icons. */
+    .lb-v2-badge-icons {
+      display: none !important;
+    }
+    .lb-v2-chips {
+      flex-wrap: nowrap !important;
+      max-height: 20px !important;
+      overflow: hidden !important;
+      padding-right: 0 !important;
+    }
+    .lb-v2-chip {
+      flex: 0 0 auto !important;
+    }
+
+    @media (max-width: 360px) {
+      .lb-row.lb-v2-row { grid-template-columns: 70px minmax(0,1fr) 34px 52px !important; column-gap: 5px !important; }
+      .lb-v2-table-head { grid-template-columns: 70px minmax(0,1fr) 34px 52px !important; column-gap: 5px !important; }
+      .lb-v2-trend { width: 34px !important; transform: translateX(5px) !important; }
+      .lb-v2-trend .rank-trend { min-width: 29px !important; padding: 3px 5px !important; font-size: 9px !important; }
+    }
+
+  </style>
 
   <!-- FIFA World Rankings (June 2026) -->
   <script>
@@ -2890,7 +3482,7 @@
     <div class="relative max-w-lg mx-auto w-full px-5 pt-12 pb-10 safe-top">
       <!-- Crown + headline -->
       <div class="text-center mb-6">
-        <div class="champ-crown text-8xl mb-2">👑</div>
+        <div class="champ-crown text-8xl mb-2">🏆</div>
         <p class="text-xs uppercase tracking-[0.3em] text-amber-300/80 font-semibold mb-2">Tournament Complete</p>
         <h1 class="text-3xl font-black tracking-tight text-white">The Champion is Crowned</h1>
       </div>
@@ -3239,7 +3831,7 @@
 
         <div class="ml-10 grid grid-cols-2 gap-2">
           <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
-            <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-lg shrink-0">👑</div>
+            <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-lg shrink-0">🏆</div>
             <div class="min-w-0">
               <div class="text-xs font-bold text-ink-900">Champion</div>
               <div class="text-[10px] text-ink-500 leading-tight">#1 on the board</div>
@@ -3260,7 +3852,7 @@
             </div>
           </div>
           <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
-            <div class="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center text-lg shrink-0">⚡</div>
+            <div class="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center text-lg shrink-0">🔗</div>
             <div class="min-w-0">
               <div class="text-xs font-bold text-ink-900">Combo King</div>
               <div class="text-[10px] text-ink-500 leading-tight">3+ exact combos</div>
@@ -3288,7 +3880,7 @@
             </div>
           </div>
           <div class="flex items-center gap-2 bg-paper rounded-xl p-2.5 border border-paper-border">
-            <div class="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center text-lg shrink-0">💯</div>
+            <div class="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center text-lg shrink-0">🏅</div>
             <div class="min-w-0">
               <div class="text-xs font-bold text-ink-900">Centurion</div>
               <div class="text-[10px] text-ink-500 leading-tight">100+ total points</div>
@@ -3793,20 +4385,23 @@
 
       <!-- LEADERBOARD -->
       <div id="tab-leaderboard" class="tab-content hidden space-y-3">
-        <!-- Compact Header -->
-     <!-- Compact Header -->
-        <div class="lb-header-compact px-1 flex items-start justify-between gap-2">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight"><span id="lb-live-dot" class="live-dot" title="Live"></span>Leaderboard</h2>
-            <p class="text-sm text-ink-500 mt-0">Live rankings, updated as results come in.</p>
+        <!-- Leaderboard V2 Header -->
+        <div class="lb-v2-hero">
+          <div class="lb-v2-hero-main">
+            <div class="lb-v2-trophy">🏆</div>
+            <div class="min-w-0">
+              <h2 class="lb-v2-title"><span id="lb-live-dot" class="live-dot" title="Live"></span>Overall Leaderboard</h2>
+              <p class="lb-v2-subtitle">Updated live as results come in</p>
+            </div>
           </div>
-          <button onclick="shareLeaderboard()" class="shrink-0 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg flex items-center gap-1 tap" title="Share to WhatsApp">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-            Share
-          </button>
+          <div class="lb-v2-actions">
+            <button onclick="shareLeaderboard()" class="lb-v2-share tap" title="Share to WhatsApp">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Compact Next Match Strip (replaces the big card) -->
@@ -3983,63 +4578,42 @@
 
       <!-- PROFILE --><div id="tab-profile" class="tab-content hidden space-y-5">
 
-  <!-- Profile Header (Glassmorphism) -->
-  <div class="relative overflow-hidden rounded-3xl border border-white/20 p-6" 
-       style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.92) 0%, rgba(11, 18, 33, 0.88) 100%); 
-              backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
-              box-shadow: 0 8px 32px rgba(11, 18, 33, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);">
-
-    <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full opacity-25" 
-         style="background: radial-gradient(circle, rgba(212, 162, 76, 0.6), transparent 70%);"></div>
-
-    <div class="relative flex items-center gap-4">
+  <!-- Profile Header (Premium Redesign) -->
+  <div class="profile-premium-card">
+    <div class="relative z-[1] flex items-start gap-4">
       <div class="relative">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 via-amber-500 to-orange-500 flex items-center justify-center text-2xl font-bold text-white shadow-lg ring-2 ring-white/30 overflow-hidden" 
-             id="profile-avatar">
-              <span id="profile-avatar-initials-header">TW</span>
-              <img id="profile-avatar-img-header" class="hidden w-full h-full object-cover" />
-            </div>
-        <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
-          <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <div class="profile-premium-avatar" id="profile-avatar">
+          <span id="profile-avatar-initials-header">TW</span>
+          <img id="profile-avatar-img-header" class="hidden w-full h-full object-cover" />
+        </div>
+        <div class="profile-premium-online" aria-hidden="true"></div>
+      </div>
+
+      <div class="flex-1 min-w-0 pt-1 pr-[4.75rem]">
+        <h2 class="profile-premium-name" id="profile-header-name">Tandin Wangyel</h2>
+        <div class="flex items-center gap-2 flex-wrap mt-2">
+          <span id="profile-admin-badge" class="hidden profile-premium-pill admin"><span>♛</span><span>Admin</span></span>
+          <span id="profile-verified-badge" class="hidden profile-premium-pill verified"><span>✓</span><span>Verified</span></span>
+          <span id="profile-header-streak" class="hidden text-[10px] font-black text-amber-200 bg-amber-500/15 px-2.5 py-1 rounded-full border border-amber-400/25"></span>
+        </div>
+        <div class="text-[15px] text-white mt-3" id="profile-header-dept">No department</div>
+        <div class="flex items-center gap-1.5 text-[13px] text-white/45 mt-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          <span id="profile-header-phone">17364171</span>
         </div>
       </div>
 
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          <h2 class="text-lg font-bold text-white truncate" id="profile-header-name">Tandin Wangyel</h2>
-          <span id="profile-admin-badge" class="hidden text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/30">Admin</span>
-          <span id="profile-verified-badge" class="hidden text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">✓ Verified</span>
-        </div>
-        <div class="text-sm text-white/60 mt-0.5" id="profile-header-dept">No department</div>
-        <div class="flex items-center gap-3 mt-2">
-          <div class="flex items-center gap-1 text-xs text-white/50">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <span id="profile-header-phone">17364171</span>
-          </div>
-          <div id="profile-header-streak" class="hidden text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30"></div>
-        </div>
-      </div>
-
-      <button onclick="toggleEditProfile()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 transition tap border border-white/10">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+      <button onclick="toggleEditProfile()" class="profile-edit-btn flex items-center justify-center transition tap hover:bg-white/16" aria-label="Edit profile">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </button>
     </div>
 
-    <div class="relative flex items-center gap-4 mt-5 pt-4 border-t border-white/10">
-      <div class="flex-1 text-center">
-        <div class="text-xl font-bold text-gold" id="profile-header-rank">—</div>
-        <div class="text-[10px] text-white/40 uppercase tracking-wider font-semibold mt-0.5">Rank</div>
-      </div>
-      <div class="w-px h-8 bg-white/10"></div>
-      <div class="flex-1 text-center">
-        <div class="text-xl font-bold text-white" id="profile-header-points">—</div>
-        <div class="text-[10px] text-white/40 uppercase tracking-wider font-semibold mt-0.5">Points</div>
-      </div>
-      <div class="w-px h-8 bg-white/10"></div>
-      <div class="flex-1 text-center">
-        <div class="text-xl font-bold text-white" id="profile-header-predictions">—</div>
-        <div class="text-[10px] text-white/40 uppercase tracking-wider font-semibold mt-0.5">Predictions</div>
-      </div>
+    <div class="relative z-[1] mt-6 pt-5 border-t border-white/12 flex items-center justify-between gap-2">
+      <div class="profile-stat-module"><div class="profile-stat-icon rank-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M8 21h8M9 17h6v4H9v-4Z" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M7 4h10v4.8A5 5 0 0 1 12 14a5 5 0 0 1-5-5.2V4Z" fill="rgba(255,255,255,.35)" stroke="white" stroke-width="1.7"/><path d="M7 6H4.6c0 3 1.4 4.8 3.3 5.4M17 6h2.4c0 3-1.4 4.8-3.3 5.4" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg></div><div><div class="profile-stat-number rank" id="profile-header-rank">—</div><div class="profile-stat-label">Rank</div></div></div>
+      <div class="w-px h-11 bg-white/12"></div>
+      <div class="profile-stat-module"><div class="profile-stat-icon points-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 3 2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.02 6.9 18.7l.98-5.68L3.75 9l5.7-.83L12 3Z" fill="rgba(255,255,255,.45)" stroke="white" stroke-width="1.7" stroke-linejoin="round"/></svg></div><div><div class="profile-stat-number" id="profile-header-points">—</div><div class="profile-stat-label">Points</div></div></div>
+      <div class="w-px h-11 bg-white/12"></div>
+      <div class="profile-stat-module"><div class="profile-stat-icon predictions-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" fill="rgba(255,255,255,.30)" stroke="white" stroke-width="1.6"/><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2 12 7Z" fill="white"/><path d="M5.5 11.5 9 9.2M18.5 11.5 15 9.2M8.4 18l1.7-5.3M15.6 18l-1.7-5.3" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg></div><div><div class="profile-stat-number" id="profile-header-predictions">—</div><div class="profile-stat-label">Predictions</div></div></div>
     </div>
   </div>
 
@@ -4152,7 +4726,7 @@
                     <span class="inv-corner tl">WC 26</span>
                     <span class="inv-corner tr">⚡</span>
                     <span class="inv-pill">BOOSTER</span>
-                    <div class="inv-glyph">⚡</div>
+                    <div class="inv-glyph">🔗</div>
                     <div class="inv-title">Double Points</div>
                     <div class="inv-subtitle">One-time use</div>
                     <span class="inv-corner br">WC 26</span>
@@ -4217,32 +4791,45 @@
       </div>
     </div>
   </div>
-<!-- Badges & streaks -->
-  <div class="relative overflow-hidden rounded-3xl border border-white/40 p-5"
-       style="background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,250,247,0.8) 50%, rgba(255,255,255,0.88) 100%);
-              backdrop-filter: blur(24px) saturate(160%);
-              -webkit-backdrop-filter: blur(24px) saturate(160%);
-              box-shadow: 0 8px 32px rgba(10,15,13,0.08), 0 2px 8px rgba(10,15,13,0.04), inset 0 1px 0 rgba(255,255,255,0.8);">
-
-    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"></div>
-    <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-15"
-         style="background: radial-gradient(circle, rgba(212, 162, 76, 0.3), transparent 70%);"></div>
-
-    <div class="relative">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl border border-amber-500/20">🎯</div>
-          <h3 class="font-bold tracking-tight text-ink-900">Achievements</h3>
+<!-- Achievements (Premium Redesign) -->
+  <div class="achievement-panel">
+    <div class="relative z-[1]">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="achievement-section-icon">🏅</div>
+          <div class="min-w-0">
+            <h3 class="font-extrabold tracking-tight text-ink-900 leading-tight">Achievements</h3>
+            <p class="text-[12px] text-ink-500 mt-0.5">Your unlocked and upcoming badges</p>
+          </div>
         </div>
-        <span id="profile-streak" class="hidden"></span>
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="profile-streak" class="hidden"></span>
+          <button type="button" onclick="document.getElementById('profile-badges')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="text-[12px] font-extrabold text-ink-700 flex items-center gap-1 tap px-2 py-1 rounded-full hover:bg-ink-900/5">See all <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
+        </div>
       </div>
-      <div id="profile-badges" class="grid grid-cols-3 gap-2.5">
-        <div class="skel h-24 rounded-2xl"></div>
-        <div class="skel h-24 rounded-2xl"></div>
-        <div class="skel h-24 rounded-2xl"></div>
+      <div id="profile-badges" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div class="skel h-36 rounded-lg"></div><div class="skel h-36 rounded-lg"></div><div class="skel h-36 rounded-lg"></div><div class="skel h-36 rounded-lg"></div>
       </div>
-      <p class="text-[11px] text-ink-400 mt-3 text-center">Earn badges by predicting smarter than the crowd.</p>
+      <p class="text-[11px] text-ink-400 mt-4 text-center">Earn badges by predicting smarter than the crowd.</p>
     </div>
+  </div>
+  <div class="match-reminder-card mt-4">
+    <div class="relative z-[1] flex items-start gap-3">
+      <div class="match-reminder-icon">🔔</div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <h3 class="font-extrabold text-ink-900 tracking-tight leading-tight">Match Reminders</h3>
+            <p class="text-[12px] text-ink-500 mt-1 leading-relaxed">Get notified before prediction lock and when results are published.</p>
+          </div>
+          <span class="match-reminder-chip">Optional</span>
+        </div>
+      </div>
+    </div>
+    <button onclick="enablePushNotifications('user')" class="match-reminder-action tap relative z-[1]">
+      <span>Enable Match Reminders</span>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+    </button>
   </div>
 </div>
 <!-- Bottom Nav -->

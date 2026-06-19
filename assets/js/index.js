@@ -368,6 +368,96 @@ function getAvatarHtml(name, avatarUrl, rank, size = 32) {
       requestAnimationFrame(() => { toast.classList.remove('toast-enter'); toast.classList.add('toast-shown') })
       setTimeout(() => { toast.classList.remove('toast-shown'); toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 280) }, 2800)
     }
+
+
+    // ============== PUSH NOTIFICATIONS ==============
+
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+}
+
+
+const VAPID_PUBLIC_KEY = 'BKm0WC3YIjEiw2CSBANy61L3EEsIt8wQfvYTCzgPak1vuUHazry42ac8H3MysBKaWTcgyREM9_prFBgToYgvGKI';
+
+async function enablePushNotifications(role = 'user') {
+  try {
+    if (!('serviceWorker' in navigator)) {
+      showToast('Push not supported on this browser', 'error');
+      return;
+    }
+
+    if (!('PushManager' in window)) {
+      showToast('Push notifications not supported', 'error');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+      showToast('Notification permission denied', 'warning');
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const subJson = subscription.toJSON();
+    const user = typeof getUser === 'function' ? getUser() : null;
+
+    if (!user?.id) {
+      showToast('Please login first to enable push', 'error');
+      return;
+    }
+
+    const { error } = await supabaseClient
+      .from('push_subscriptions')
+      .upsert({
+        user_id: user.id,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys?.p256dh,
+        auth: subJson.keys?.auth,
+        role,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'endpoint'
+      });
+
+    if (error) {
+      console.error('Push subscription save failed:', error);
+      showToast('Could not save push subscription', 'error');
+      return;
+    }
+
+    localStorage.setItem('push-enabled', 'true');
+    showToast('Push notifications enabled', 'success');
+
+  } catch (err) {
+    console.error('Enable push failed:', err);
+    showToast('Push setup failed', 'error');
+  }
+}
     
 
     // ============== MODAL ==============
@@ -1202,13 +1292,93 @@ const BADGES = [
   { id: 'champion',    icon: '👑', name: 'Champion',      desc: '#1 on the board' },
   { id: 'nostradamus', icon: '🔮', name: 'Nostradamus',   desc: '2+ exact scores total' },
   { id: 'sharpshoot',  icon: '🎯', name: 'Sharpshooter',  desc: '5+ exact scores' },
-  { id: 'combo',       icon: '⚡', name: 'Combo King',     desc: '3+ exact combos' },
+  { id: 'combo',       icon: '🔗', name: 'Combo King',     desc: '3+ exact combos' },
   { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 72h+ early' },
-  { id: 'underdog',    icon: '🐴', name: 'Underdog King', desc: '3+ correct draws' },
+  { id: 'underdog',    icon: '🐴', name: 'Draw Master', desc: '3+ correct draws' },
   { id: 'streak',      icon: '🔥', name: 'Hot Streak',     desc: '3+ scoring in a row' },
-  { id: 'centurion',   icon: '💯', name: 'Centurion',     desc: '100+ points' },
+  { id: 'centurion',   icon: '🏅', name: 'Centurion',     desc: '100+ points' },
   { id: 'allin',       icon: '🎲', name: 'All In',        desc: 'Predict every match' }
 ]
+
+// Premium PNG achievement icons.
+// Keeps badges dynamic: logic still uses badge IDs; only the UI image changes.
+// Put the PNG files in: /image/badges/
+const BADGE_VISUALS = {
+  champion: {
+    emoji: '👑',
+    img: '/image/badges/champion.png'
+  },
+  nostradamus: {
+    emoji: '🔮',
+    img: '/image/badges/nostradamus.png'
+  },
+  sharpshoot: {
+    emoji: '🎯',
+    img: '/image/badges/sharpshooter.png'
+  },
+  combo: {
+    emoji: '🔗',
+    img: '/image/badges/combo-king.png'
+  },
+  earlybird: {
+    emoji: '🐦',
+    img: '/image/badges/early-bird.png'
+  },
+  underdog: {
+    emoji: '🐴',
+    img: '/image/badges/underdog-king.png'
+  },
+  streak: {
+    emoji: '🔥',
+    img: '/image/badges/hot-streak.png'
+  },
+  centurion: {
+    emoji: '🏅',
+    img: '/image/badges/centurion.png'
+  },
+  allin: {
+    emoji: '🎲',
+    img: '/image/badges/all-in.png'
+  },
+  overflow: {
+    emoji: '🏆',
+    img: '/image/badges/overflow.png'
+  }
+}
+
+function normalizeBadgeIconId(id) {
+  if (id === 'streak-chip') return 'streak'
+  if (id === 'combo-chip') return 'combo'
+  return id || 'overflow'
+}
+
+function badgeShareEmoji(id) {
+  return (BADGE_VISUALS[normalizeBadgeIconId(id)] || BADGE_VISUALS.overflow).emoji
+}
+
+function badgeIconHtml(id, className = 'badge-icon-art') {
+  const key = normalizeBadgeIconId(id)
+  const visual = BADGE_VISUALS[key] || BADGE_VISUALS.overflow
+  const isLeaderboard = className.includes('lb-badge')
+  const isInfoPopup = className.includes('info-popup')
+
+  const size = isLeaderboard ? 18 : (isInfoPopup ? 78 : 58)
+  const margin = isLeaderboard ? '0' : '0 auto 8px'
+  const wrapperStyle = `display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;`
+  const imgStyle = `width:${size}px;height:${size}px;object-fit:contain;display:block;margin:${margin};`
+
+  return `
+    <span class="${className} badge-${key}" aria-hidden="true" style="${wrapperStyle}">
+      <img
+        src="${visual.img}"
+        alt=""
+        class="badge-img-asset ${isLeaderboard ? 'lb-badge-img' : 'badge-img'}"
+        loading="lazy"
+        style="${imgStyle}"
+        onerror="this.replaceWith(document.createTextNode('${visual.emoji || '🏆'}'))"
+      >
+    </span>`
+}
 
 // ============== TIME HELPERS ==============
 function relativeTimeAgo(iso) {
@@ -1995,7 +2165,7 @@ return `
 
       const headerHtml = `
         <div class="info-popup-badge-display relative z-[1]">
-          <div class="info-popup-badge-icon">${def.icon}</div>
+          <div class="info-popup-badge-icon">${badgeIconHtml(badgeId, 'info-popup-badge-art')}</div>
           <div>
             <h3 id="info-popup-title" class="text-xl font-bold tracking-tight text-center">${escapeHtml(def.name)}</h3>
             <div class="flex justify-center mt-2">
@@ -2686,6 +2856,32 @@ recentEl.innerHTML = finished.map(f => {
 
     // Pure builder. Takes the same `overallStats` array used to render the
     // leaderboard, plus the fetched snapshot. Returns { uid: { dir, delta } }.
+
+    function normalizeRankTrend(raw) {
+      if (!raw) return null
+      if (typeof raw === 'object') {
+        const dir = raw.dir || raw.direction || raw.type
+        const delta = Number(raw.delta ?? raw.value ?? raw.change ?? 0)
+        if ((dir === 'up' || dir === 'down') && delta > 0) return { dir, delta }
+        if (dir === 'new') return { dir: 'new', delta: 0 }
+      }
+      if (typeof raw === 'number') {
+        if (raw > 0) return { dir: 'up', delta: raw }
+        if (raw < 0) return { dir: 'down', delta: Math.abs(raw) }
+      }
+      if (typeof raw === 'string') {
+        const m = raw.match(/(up|down|new|▲|▼)\s*([0-9]+)?/i)
+        if (m) {
+          const token = m[1].toLowerCase()
+          const delta = Number(m[2] || 1)
+          if (token === 'up' || token === '▲') return { dir: 'up', delta }
+          if (token === 'down' || token === '▼') return { dir: 'down', delta }
+          if (token === 'new') return { dir: 'new', delta: 0 }
+        }
+      }
+      return null
+    }
+
     function buildTrendMap(currentStats, snapshot) {
       if (!snapshot || !snapshot.ranks) return {}
       const ageMs = Date.now() - new Date(snapshot.stamped_at).getTime()
@@ -2706,6 +2902,73 @@ recentEl.innerHTML = finished.map(f => {
         }
       })
       return trend
+    }
+
+
+    // Fallback trend builder: if rank_snapshots is empty/missing, compare the
+    // current table against the table BEFORE the latest finished matchday.
+    // This keeps ▲/▼ movement visible without needing an admin snapshot first.
+    async function buildLatestMatchdayTrendMap(currentStats) {
+      try {
+        const md = getLatestMatchday()
+        if (!md || !md.fixtureIds || !md.fixtureIds.length || !currentStats?.length) return {}
+
+        const { data, error } = await supabaseClient
+          .from('prediction_results')
+          .select('user_id, base_points, final_points, points_awarded, fixture_id')
+          .in('fixture_id', md.fixtureIds)
+        if (error || !data || !data.length) return {}
+
+        const changes = {}
+        data.forEach(r => {
+          const uid = r.user_id
+          if (!uid) return
+          if (!changes[uid]) changes[uid] = { points: 0, exact: 0, gd: 0, result: 0 }
+          changes[uid].points += Number(r.final_points ?? r.points_awarded ?? 0) || 0
+          const base = Number(r.base_points ?? 0) || 0
+          if (base === 5) changes[uid].exact++
+          else if (base === 3) changes[uid].gd++
+          else if (base === 2) changes[uid].result++
+        })
+
+        const previousStats = currentStats.map((s, idx) => {
+          const uid = s.user_id || s.id
+          const ch = changes[uid] || { points: 0, exact: 0, gd: 0, result: 0 }
+          return {
+            user_id: uid,
+            _idx: idx,
+            points: Math.max(0, (Number(s.points) || 0) - ch.points),
+            exact: Math.max(0, (Number(s.exact) || 0) - ch.exact),
+            gd: Math.max(0, (Number(s.gd) || 0) - ch.gd),
+            result: Math.max(0, (Number(s.result) || 0) - ch.result)
+          }
+        })
+
+        previousStats.sort((a, b) => {
+          if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0)
+          if ((b.exact  || 0) !== (a.exact  || 0)) return (b.exact  || 0) - (a.exact  || 0)
+          if ((b.gd     || 0) !== (a.gd     || 0)) return (b.gd     || 0) - (a.gd     || 0)
+          if ((b.result || 0) !== (a.result || 0)) return (b.result || 0) - (a.result || 0)
+          return a._idx - b._idx
+        })
+
+        const oldRanks = {}
+        previousStats.forEach((s, i) => { oldRanks[s.user_id] = i + 1 })
+
+        const trend = {}
+        currentStats.forEach((s, i) => {
+          const uid = s.user_id || s.id
+          const newRank = i + 1
+          const oldRank = oldRanks[uid]
+          if (!oldRank) return
+          if (newRank < oldRank) trend[uid] = { dir: 'up', delta: oldRank - newRank }
+          else if (newRank > oldRank) trend[uid] = { dir: 'down', delta: newRank - oldRank }
+        })
+        return trend
+      } catch (e) {
+        console.warn('[trend] latest-matchday fallback failed:', e)
+        return {}
+      }
     }
 
     // Realtime: when admin stamps, everyone's badges refresh without manual reload.
@@ -3857,6 +4120,9 @@ async function loadLeaderboard() {
       // Always compute trend off the OVERALL standings (matchday tab has its own logic)
       const _trendSnapshot = await getLatestRankSnapshot()
       lbTrendMap = buildTrendMap(overallStats, _trendSnapshot)
+      if (!lbTrendMap || Object.keys(lbTrendMap).length === 0) {
+        lbTrendMap = await buildLatestMatchdayTrendMap(overallStats)
+      }
 
       // Pick stats for current sub-tab
       let stats = overallStats
@@ -3964,53 +4230,84 @@ async function loadLeaderboard() {
         </div>`
         : ''
 
-      // Render fresh HTML
-      c.innerHTML = mvpHtml + stats.map((s, i) => {
+      // Render fresh HTML — Leaderboard V2 list layout
+      c.classList.add('lb-v2-list')
+      const leaderboardHead = `
+        <div class="lb-v2-table-head" aria-hidden="true">
+          <span>Rank</span>
+          <span>Predictions</span>
+          <span>Points</span>
+        </div>`
+      const leaderboardLegend = `
+        <div class="lb-v2-legend" aria-label="Leaderboard legend">
+          <span>⚡ Streak</span>
+          <span>👑 Top Predictor</span>
+          <span>🔮 Nostradamus</span>
+          <span>Correct = right result</span>
+          <span>Exact = exact score</span>
+        </div>`
+
+      c.innerHTML = leaderboardHead + mvpHtml + stats.map((s, i) => {
         const rank = i + 1
         const uid = s.user_id || s.id
         const isMe = s.user_id === myId || s.id === myId
         const correct = (s.exact || 0) + (s.gd || 0) + (s.result || 0)
+        const exact = s.exact || 0
         const hasPoints = (s.points || 0) > 0
-        // The player directly above us (rank N-1) — used for the "almost there" hint
-        // on the user's own row to suggest who they could overtake next.
         const prevPlayer = i > 0 ? stats[i - 1] : null
-        // Top-3 row tint class — extends the medal's color across the whole row
-        // for a subtle podium feel. Only applied to ranks 1/2/3 with actual points.
         const rankClass = (rank <= 3 && hasPoints) ? `lb-row-rank-${rank}` : ''
-        // Medals ONLY when there are actual points
-        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
-        const medalClass = rank === 1 ? 'rank-medal-gold' : rank === 2 ? 'rank-medal-silver' : rank === 3 ? 'rank-medal-bronze' : ''
-        const rankDisplay = medal
-          ? `<div class="${medalClass}" data-rank-wrap title="${rank}${rank===1?'st':rank===2?'nd':'rd'} Place">${medal}</div>`
-          : `<div class="rank-num w-10 h-10 rounded-xl bg-paper border border-paper-border flex items-center justify-center font-bold text-sm text-ink-500" data-rank-wrap>${rank}</div>`
+        const rankTone = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''
+        const rankDisplay = (rank <= 3 && hasPoints)
+          ? `<div class="lb-v2-medal-shiny ${rankTone}" data-rank-wrap title="${rank}${rank===1?'st':rank===2?'nd':'rd'} Place">${rankMedalSvg(rank)}</div>`
+          : `<div class="lb-v2-rank-tile" data-rank-wrap title="Rank ${rank}">${rank}</div>`
 
-        // Persistent trend badge (overall tab only)
-        const tr = (lbSubtab === 'overall') ? lbTrendMap[uid] : null
+        // Persistent trend badge (overall tab only). A neutral dash keeps the
+        // movement column aligned, matching the V2 mockup.
+        const directTrend = normalizeRankTrend(s.trend || s.rank_trend || s.rankTrend || s.rank_change || s.rankChange || s.movement)
+        const tr = (lbSubtab === 'overall') ? (lbTrendMap[uid] || directTrend) : null
         const trendHtml = tr
           ? (tr.dir === 'up'
-              ? `<span class="rank-trend up" title="Up ${tr.delta} since last matchday">▲${tr.delta}</span>`
+              ? `<span class="rank-trend up" title="Up ${tr.delta} since last matchday">▲ ${tr.delta}</span>`
               : tr.dir === 'down'
-                ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼${tr.delta}</span>`
+                ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼ ${tr.delta}</span>`
                 : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
+          : `<span class="lb-v2-trend-empty" aria-hidden="true"></span>`
+
+        // Compact progress chips. They are purely presentational and reuse the
+        // already-computed leaderboard stats, so bonus-engine wiring remains intact.
+        const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || s.current_streak || 0) : 0
+        const streakProgress = Math.max(0, Math.min(streakN || (correct > 0 ? 1 : 0), 5))
+        const streakChip = (lbSubtab === 'overall' && (streakProgress > 0 || correct > 0))
+          ? `<span class="lb-v2-chip streak is-compact" title="Scoring streak progress" data-badge-id="streak-chip">⚡ ${streakProgress}/5</span>`
           : ''
 
-        // Streak flame (overall tab only)
-        const streakN = (lbSubtab === 'overall') ? (lbStreakMap[uid] || 0) : 0
-        const streakHtml = streakN >= 3 ? `<span class="lb-streak" title="${streakN} in a row" data-badge-id="streak-chip">🔥${streakN}</span>` : ''
+        const nostradamusProgress = Math.max(0, Math.min(exact, 3))
+        const nostradamusChip = (lbSubtab === 'overall' && exact > 0)
+          ? `<span class="lb-v2-chip nostradamus is-compact" title="Nostradamus progress: ${nostradamusProgress}/3 exact scores" data-badge-id="nostradamus">${badgeIconHtml('nostradamus', 'lb-v2-chip-icon')} ${nostradamusProgress}/3</span>`
+          : ''
 
-        // Combo bolt (overall tab only) — fires from the first combo so the rules
-        // sheet's "+3 Exact Combo" promise is visibly delivered, even before the
-        // 3+ Combo King badge threshold. Mirrors the streak chip pattern.
         const comboN = (lbSubtab === 'overall') ? (s.combo_count || 0) : 0
-        const comboHtml = comboN >= 1 ? `<span class="lb-combo" title="${comboN} exact combo${comboN > 1 ? 's' : ''}" data-badge-id="combo-chip">⚡${comboN}</span>` : ''
+        const comboChip = comboN > 0
+          ? `<span class="lb-v2-chip bonus is-compact" title="${comboN} exact combo${comboN > 1 ? 's' : ''}" data-badge-id="combo-chip">${badgeIconHtml('combo', 'lb-v2-chip-icon')} +${comboN}</span>`
+          : ''
 
-        // (Projected winnings used to render here per row — moved to the Prize Pool
-        // dashboard card to reduce row clutter and avoid noisy mid-tournament estimates.)
+        const topChip = (rank === 1 && hasPoints)
+          ? `<span class="lb-v2-chip top is-compact" title="Current league leader" data-badge-id="champion">${badgeIconHtml('champion', 'lb-v2-chip-icon')} +1</span>`
+          : ''
 
-        // Matchday tab uses simpler stats
-       const hasAnyStats = (s.points || 0) > 0 || (s.exact || 0) > 0 || (s.gd || 0) > 0 || (s.result || 0) > 0 || (s.wrong || 0) > 0
+        // V2.3: use the new custom achievement badge icons on the leaderboard,
+        // but cap progress chips so top players do not slide under the trend/points column.
+        const progressChips = [streakChip, nostradamusChip, comboChip, topChip].filter(Boolean)
+        // V2.4: show only the two most useful progress chips on the row.
+        // Anything extra goes into a compact +N chip so it cannot slide under trend/points.
+        const visibleProgressChips = progressChips.slice(0, 2).join('')
+        const hiddenProgressCount = Math.max(0, progressChips.length - 2)
+        const moreProgressChip = hiddenProgressCount > 0
+          ? `<span class="lb-v2-chip more" title="${hiddenProgressCount} more progress item${hiddenProgressCount > 1 ? 's' : ''}">+${hiddenProgressCount}</span>`
+          : ''
+        // Keep the row clean: show progress chips only. Full earned badges remain available in the profile/badge views.
+        const chipsHtml = `${visibleProgressChips}${moreProgressChip}`
 
-        // Tournament state — drives the empty-row copy on both tabs
         const now = Date.now()
         const anyKickedOff = (fixtures || []).some(f => new Date(f.kickoff).getTime() <= now)
         const anyScored    = (fixtures || []).some(f => f.home_score !== null && f.away_score !== null)
@@ -4020,54 +4317,43 @@ async function loadLeaderboard() {
             ? 'Match in progress…'
             : 'No points yet'
 
-        const statsLineOverall = hasAnyStats
-          ? `<span><b class="text-ink-900">${correct}</b> correct</span>
-             <span class="text-ink-300">·</span>
-             <span><b class="text-brand-700">${s.exact || 0}</b> exact</span>`
-          : `<span class="text-ink-400 italic">${emptyLabel}</span>`
-        const statsLineMatchday = (s.points || 0) > 0
-          ? `<span><b class="text-brand-700">${s.points || 0}</b> on this matchday</span>`
-          : `<span class="text-ink-400 italic">${emptyLabel}</span>`
-        const statsLine = lbSubtab === 'matchday' ? statsLineMatchday : statsLineOverall
+        const statsLine = lbSubtab === 'matchday'
+          ? ((s.points || 0) > 0
+              ? `<span class="lb-v2-stat"><b>${s.points || 0}</b> on this matchday</span>`
+              : `<span class="text-ink-400 italic">${emptyLabel}</span>`)
+          : ((hasPoints || correct > 0 || exact > 0)
+              ? `<span class="lb-v2-stat"><b>${correct}</b> Correct</span>
+                 <span class="lb-v2-stat"><b>${exact}</b> Exact</span>`
+              : `<span class="text-ink-400 italic">${emptyLabel}</span>`)
 
-        // Compute chips+badges as a combined block. Built once so we can decide
-        // whether to render the achievements row at all (skip the empty extra line).
-        const badgesHtml = leaderboardBadgeIcons(s, rank)
-        const achievementsHtml = `${streakHtml}${comboHtml}${badgesHtml}`
-        const hasAchievements = achievementsHtml.trim().length > 0
+        const hint = (isMe && lbSubtab === 'overall') ? computeRowHint(s, rank, prevPlayer) : null
 
         return `
-        <div class="lb-row lb-row-compact ${isMe ? 'is-me' : ''} ${rankClass} flex items-center gap-3"
+        <div class="lb-row lb-v2-row ${isMe ? 'is-me' : ''} ${rankClass}"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
-          <div class="shrink-0">${rankDisplay}</div>
-          <div class="shrink-0" data-avatar-wrap>
-            ${getAvatarHtml(s.name, s.avatar_url, rank, 32)}
+          <div class="lb-v2-rank-avatar">
+            ${rankDisplay}
+            <div data-avatar-wrap>${getAvatarHtml(s.name, s.avatar_url, rank, 42)}</div>
           </div>
-          <div class="flex-1 min-w-0">
-            <!-- Line 1: identity — name + YOU pill, nothing else competing here -->
-            <div class="flex items-center gap-1.5 min-w-0">
-              <span class="player-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
-              ${isMe ? '<span class="you-label text-[10px] font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded shrink-0">YOU</span>' : ''}
+
+          <div class="min-w-0">
+            <div class="lb-v2-name-line">
+              <span class="lb-v2-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
+              ${rank === 1 && hasPoints ? '<span class="lb-v2-leader">🔥 Leader</span>' : ''}
+              ${isMe ? '<span class="lb-v2-you">YOU</span>' : ''}
             </div>
-            <!-- Line 2: the actual ranking data — stats only; trend lives in its own aligned column -->
-            <div class="player-stats text-ink-500 flex items-center gap-2 flex-wrap">
-              ${statsLine}
-            </div>
-            <!-- Line 3: achievements row — chips + badges, free to wrap. Only rendered if there's something to show. -->
-            ${hasAchievements ? `<div class="lb-achievements-row flex items-center gap-1.5 flex-wrap">${achievementsHtml}</div>` : ''}
-            <!-- Line 4: motivational hint for self-row only (Overall tab only) -->
-            ${isMe && lbSubtab === 'overall' ? (() => {
-              const hint = computeRowHint(s, rank, prevPlayer)
-              return hint ? `<div class="lb-row-hint">${escapeHtml(hint)}</div>` : ''
-            })() : ''}
+            <div class="lb-v2-stats">${statsLine}</div>
+            ${chipsHtml.trim() ? `<div class="lb-v2-chips">${chipsHtml}</div>` : ''}
+            ${hint ? `<div class="lb-v2-hint">${escapeHtml(hint)}</div>` : ''}
           </div>
-          <div class="lb-trend-col shrink-0">${trendHtml}</div>
-          <div class="text-right shrink-0">
-            <div class="points-num font-bold text-brand-700" data-points-el>${s.points || 0}</div>
-            <div class="points-label text-ink-400 uppercase tracking-wider font-semibold">pts</div>
+
+          <div class="lb-v2-trend shrink-0">${trendHtml}</div>
+          <div class="lb-v2-points shrink-0">
+            <div class="points-num" data-points-el>${s.points || 0}</div>
+            <div class="points-label uppercase tracking-wider font-semibold">PTS</div>
           </div>
         </div>`
-      }).join('')
+      }).join('') + leaderboardLegend
 
       // Update tournament progress strip — derived from current fixtures state.
       // Called on every leaderboard render so it stays in sync after realtime updates.
@@ -5396,6 +5682,18 @@ function buildShareCaption(opts, appUrl) {
   }
 }
 
+function loadCanvasImage(src) {
+  return new Promise((resolve, reject) => {
+    if (!src) return reject(new Error('Missing image source'))
+
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
 // Renders the achievement card to a 1080x1080 canvas and returns a PNG Blob.
 async function generateAchievementCardBlob(opts) {
   const SIZE = 1080
@@ -5551,8 +5849,28 @@ async function drawCardContent(ctx, opts, SIZE) {
     }
     case 'badge': {
       // Badge emoji huge
-      ctx.font = '260px system-ui, -apple-system, sans-serif'
-      ctx.fillText(opts.emoji || '🎯', cx, 430)
+      try {
+  const imgSrc = opts.badgeImg || BADGE_VISUALS[normalizeBadgeIconId(opts.badgeId)]?.img
+  const badgeImg = await loadCanvasImage(imgSrc)
+
+  const maxW = 260
+  const maxH = 260
+  const ratio = Math.min(maxW / badgeImg.width, maxH / badgeImg.height)
+  const drawW = badgeImg.width * ratio
+  const drawH = badgeImg.height * ratio
+
+  ctx.drawImage(
+    badgeImg,
+    cx - drawW / 2,
+    250,
+    drawW,
+    drawH
+  )
+} catch (e) {
+  console.warn('[share] badge image failed, using emoji fallback:', e)
+  ctx.font = '220px system-ui, -apple-system, sans-serif'
+  ctx.fillText(opts.emoji || '🎯', cx, 430)
+}
 
       // "UNLOCKED" label
       ctx.fillStyle = 'rgba(212, 162, 76, 0.7)'
@@ -5666,9 +5984,19 @@ async function shareStreakAchievement(streak, tier) {
   return shareAchievementCard({ type: 'streak', name: myName, streak, tier })
 }
 
-async function shareBadgeAchievement(badge, emoji, description) {
+async function shareBadgeAchievement(badgeId, badge, description) {
   const myName = (getUser()?.user_metadata?.name) || 'Player'
-  return shareAchievementCard({ type: 'badge', name: myName, badge, emoji, description })
+  const visual = BADGE_VISUALS[normalizeBadgeIconId(badgeId)] || BADGE_VISUALS.overflow
+
+  return shareAchievementCard({
+    type: 'badge',
+    name: myName,
+    badgeId,
+    badge,
+    description,
+    emoji: visual.emoji,
+    badgeImg: visual.img
+  })
 }
 
 async function shareExactAchievement(matchLabel, score, points) {
@@ -5850,15 +6178,15 @@ window.promptShareScore = promptShareScore
       host.innerHTML = BADGES.map(b => {
         const got = earned.has(b.id)
         const shareAttr = got
-          ? ` onclick="shareBadgeAchievement('${b.name.replace(/'/g, "\\'")}', '${b.icon.replace(/'/g, "\\'")}', '${b.desc.replace(/'/g, "\\'")}').catch(e => console.warn(e))" style="cursor:pointer;" title="Tap to share"`
+          ? ` onclick="shareBadgeAchievement('${b.id}', '${b.name.replace(/'/g, "\\'")}', '${b.desc.replace(/'/g, "\\'")}').catch(e => console.warn(e))" style="cursor:pointer;" title="Tap to share"`
           : ''
         return `
           <div class="badge-card ${got ? 'earned' : 'locked'}"${shareAttr}>
             ${got ? '<div class="badge-earned-tick">✓</div>' : ''}
-            ${got ? '<div class="badge-share-hint" style="position:absolute;top:6px;left:6px;font-size:11px;background:rgba(212,162,76,0.9);color:#0B1221;padding:2px 6px;border-radius:8px;font-weight:bold;">SHARE</div>' : ''}
-            <div class="badge-icon">${b.icon}</div>
+            <div class="badge-icon">${badgeIconHtml(b.id)}</div>
             <div class="badge-name">${b.name}</div>
             <div class="badge-desc">${b.desc}</div>
+            ${got ? '<div class="badge-share-hint">↗ Share</div>' : '<div class="badge-lock-hint">🔒 Locked</div>'}
           </div>`
       }).join('')
 
@@ -5900,27 +6228,26 @@ window.promptShareScore = promptShareScore
       const combos = s.combo_count || 0
 
       // Priority order: rarest / most prestigious first.
-      if (rank === 1 && points > 0) earned.push({ id: 'champion',   icon: '👑' })
-      if (exact >= 5)               earned.push({ id: 'sharpshoot', icon: '🎯' })
-      if (points >= 100)            earned.push({ id: 'centurion',  icon: '💯' })
+      if (rank === 1 && points > 0) earned.push({ id: 'champion' })
+      if (exact >= 5)               earned.push({ id: 'sharpshoot' })
+      if (points >= 100)            earned.push({ id: 'centurion' })
       // Nostradamus is the entry tier of the exact-score axis — suppress it
       // whenever a higher exact-score achievement (Sharpshooter or Combo King-
       // level combo activity) is already shown via badge or chip, so we don't
       // double-represent the same skill on the row.
       const hasHigherExactSignal = exact >= 5 || combos >= 3
-      if (exact >= 2 && !hasHigherExactSignal) earned.push({ id: 'nostradamus', icon: '🔮' })
+      if (exact >= 2 && !hasHigherExactSignal) earned.push({ id: 'nostradamus' })
 
       if (earned.length === 0) return ''
 
-      // Cap visible badges. Now that achievements have their own row (line 3 of
-      // the leaderboard row), we can afford 3 visible before overflowing — keeps
-      // top performers' recognition intact without forcing chips onto a 2nd row.
-      const MAX = 3
+      // V2.4: keep the list readable. Show one premium badge icon, then +N.
+      // Full badge wall remains available in the Extras/Me badge area.
+      const MAX = 1
       const visible = earned.slice(0, MAX)
       const overflow = earned.length - visible.length
 
       const iconsHtml = visible
-        .map(b => `<span class="lb-badge" title="${b.id}" data-badge-id="${b.id}">${b.icon}</span>`)
+        .map(b => `<span class="lb-badge" title="${b.id}" data-badge-id="${b.id}">${badgeIconHtml(b.id, 'lb-badge-art')}</span>`)
         .join('')
       const overflowHtml = overflow > 0
         ? `<span class="lb-badge lb-badge-more" title="${overflow} more badge${overflow > 1 ? 's' : ''}" data-badge-id="overflow">+${overflow}</span>`
@@ -5932,26 +6259,42 @@ window.promptShareScore = promptShareScore
 // inconsistently across platforms and look like placeholders on Apple devices.
 function rankMedalSvg(rank) {
   const presets = {
-    1: { fill1: '#FFE57A', fill2: '#F4C430', fill3: '#A87808', rim1: '#FFF2A8', rim2: '#8A5E08', num: '#5E3D00' },
-    2: { fill1: '#F5F5F5', fill2: '#C0C0C0', fill3: '#7A7A7A', rim1: '#FAFAFA', rim2: '#6A6A6A', num: '#3A3A3A' },
-    3: { fill1: '#E8B88A', fill2: '#CD7F32', fill3: '#7A4615', rim1: '#F0C9A0', rim2: '#6B3A10', num: '#3D1F08' }
+    1: { a: '#FFF7B8', b: '#F6C343', c: '#B77905', ring: '#F2B72E', text: '#5C3900', ribbonA: '#EF4444', ribbonB: '#B91C1C' },
+    2: { a: '#F8FAFC', b: '#CBD5E1', c: '#64748B', ring: '#94A3B8', text: '#1E293B', ribbonA: '#60A5FA', ribbonB: '#1D4ED8' },
+    3: { a: '#FFE6C7', b: '#D98B3A', c: '#8A4617', ring: '#C26A24', text: '#4A2408', ribbonA: '#F97316', ribbonB: '#9A3412' }
   }
   const p = presets[rank]
   if (!p) return ''
-  const id = `m${rank}`
-  return `<svg width="26" height="30" viewBox="0 0 26 30" xmlns="http://www.w3.org/2000/svg" aria-label="${rank===1?'1st':rank===2?'2nd':'3rd'} place" style="display:block">
+  const id = `rankCrest${rank}`
+  const label = rank === 1 ? '1st place' : rank === 2 ? '2nd place' : '3rd place'
+  return `<svg width="34" height="38" viewBox="0 0 34 38" xmlns="http://www.w3.org/2000/svg" aria-label="${label}" role="img" style="display:block">
     <defs>
-      <linearGradient id="${id}f" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${p.fill1}"/><stop offset="50%" stop-color="${p.fill2}"/><stop offset="100%" stop-color="${p.fill3}"/></linearGradient>
-      <linearGradient id="${id}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${p.rim1}"/><stop offset="100%" stop-color="${p.rim2}"/></linearGradient>
+      <linearGradient id="${id}r" x1="9" y1="2" x2="25" y2="20" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="${p.ribbonA}"/>
+        <stop offset="100%" stop-color="${p.ribbonB}"/>
+      </linearGradient>
+      <linearGradient id="${id}m" x1="7" y1="11" x2="27" y2="32" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="${p.a}"/>
+        <stop offset="52%" stop-color="${p.b}"/>
+        <stop offset="100%" stop-color="${p.c}"/>
+      </linearGradient>
+      <radialGradient id="${id}shine" cx="34%" cy="25%" r="70%">
+        <stop offset="0%" stop-color="#fff" stop-opacity=".95"/>
+        <stop offset="42%" stop-color="#fff" stop-opacity=".20"/>
+        <stop offset="100%" stop-color="#000" stop-opacity=".08"/>
+      </radialGradient>
+      <filter id="${id}shadow" x="-30%" y="-20%" width="160%" height="170%">
+        <feDropShadow dx="0" dy="3" stdDeviation="2.2" flood-color="#0F172A" flood-opacity=".18"/>
+      </filter>
     </defs>
-    <path d="M6 2 L10 16 L13 13 L16 16 L20 2 Z" fill="#D63341"/>
-    <path d="M6 2 L10 16 L13 13 Z" fill="#A8232E"/>
-    <circle cx="13" cy="19" r="8.5" fill="url(#${id}r)"/>
-    <circle cx="13" cy="19" r="7" fill="url(#${id}f)"/>
-    <text x="13" y="22.5" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="800" fill="${p.num}">${rank}</text>
+    <path d="M10 3h6.8l-2.6 11.5H6.4L10 3Z" fill="url(#${id}r)" opacity=".98"/>
+    <path d="M24 3h-6.8l2.6 11.5h7.8L24 3Z" fill="url(#${id}r)" opacity=".86"/>
+    <circle cx="17" cy="22" r="12.2" fill="url(#${id}m)" stroke="${p.ring}" stroke-width="1.25" filter="url(#${id}shadow)"/>
+    <circle cx="17" cy="22" r="8.7" fill="url(#${id}shine)" stroke="rgba(255,255,255,.72)" stroke-width=".9"/>
+    <path d="M10.5 19.3c1-3 3.45-4.75 6.5-4.75s5.5 1.75 6.5 4.75" fill="none" stroke="rgba(255,255,255,.58)" stroke-width="1.2" stroke-linecap="round"/>
+    <text x="17" y="25.5" text-anchor="middle" font-family="Plus Jakarta Sans, system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="${p.text}">${rank}</text>
   </svg>`
 }
-
     // ============== PREVIEW MODE (Feature 4) ==============
     async function enterPreviewMode() {
       previewMode = true;
@@ -6749,6 +7092,7 @@ if (typeof getPrizePool !== 'function') {
     }
   }
 }
+
 
   async function initApp() {
   // Stage v3: parse and validate the invite code (if present) BEFORE auth runs.
