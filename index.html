@@ -3524,7 +3524,134 @@
       .profile-premium-name { font-size: 20px !important; }
     }
 
-  </style>
+  
+
+    /* ============================================================
+       FINAL S24 ULTRA MICRO-FIXES — profile one-line name,
+       safer points lane, trend closer to points, less rounded rows.
+       Added after all previous responsive rules so it wins the cascade.
+       ============================================================ */
+
+    /* 1) Profile name: force one clean line on S24 Ultra and similar phones. */
+    .profile-premium-name,
+    #profile-header-name {
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      overflow-wrap: normal !important;
+      word-break: normal !important;
+      max-width: 100% !important;
+      font-size: 20.5px !important;
+      line-height: 1.12 !important;
+      letter-spacing: -0.04em !important;
+    }
+    .profile-premium-card .flex-1.min-w-0.pt-1 {
+      min-width: 0 !important;
+      padding-right: 54px !important;
+    }
+    .profile-premium-card .profile-edit-btn {
+      right: 14px !important;
+      top: 20px !important;
+      width: 42px !important;
+      height: 42px !important;
+    }
+
+    /* 2) Leaderboard: sharper premium rows, no pill-like over-rounding. */
+    .lb-row.lb-v2-row {
+      border-radius: 12px !important;
+      grid-template-columns: 68px minmax(0, 1fr) 36px 60px !important;
+      column-gap: 2px !important;
+      padding: 9px 10px 9px 8px !important;
+      overflow: hidden !important;
+    }
+    .lb-row.lb-v2-row::before {
+      top: 8px !important;
+      bottom: 8px !important;
+      border-radius: 2px !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 68px minmax(0, 1fr) 36px 60px !important;
+      column-gap: 2px !important;
+      padding-left: 8px !important;
+      padding-right: 10px !important;
+    }
+    .lb-v2-rank-tile,
+    .lb-v2-medal-simple {
+      border-radius: 9px !important;
+    }
+
+    /* 3) Trend: keep it visually attached to points, not to badges/chips. */
+    .lb-v2-trend {
+      width: 36px !important;
+      min-width: 36px !important;
+      justify-self: end !important;
+      justify-content: flex-end !important;
+      transform: translateX(5px) !important;
+      margin: 0 !important;
+      z-index: 2 !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 29px !important;
+      padding: 3px 5px !important;
+      font-size: 9px !important;
+    }
+
+    /* 4) Points: reserve a safer lane and prevent any chevron/arrow collision. */
+    .lb-v2-points {
+      width: 60px !important;
+      min-width: 60px !important;
+      padding-right: 2px !important;
+      margin-left: 2px !important;
+      text-align: right !important;
+      justify-self: end !important;
+      z-index: 2 !important;
+    }
+    .lb-v2-points .points-num {
+      font-size: 23px !important;
+      line-height: .95 !important;
+      letter-spacing: -0.05em !important;
+    }
+
+    /* Hide old/detail chevrons inside leaderboard rows if any legacy arrow is still rendered. */
+    .lb-row.lb-v2-row > svg:last-child,
+    .lb-row.lb-v2-row .chevron,
+    .lb-row.lb-v2-row .row-chevron,
+    .lb-row.lb-v2-row [class*="chevron"],
+    .lb-row.lb-v2-row [data-chevron] {
+      display: none !important;
+      width: 0 !important;
+      min-width: 0 !important;
+      opacity: 0 !important;
+    }
+
+    @media (min-width: 390px) and (max-width: 460px) {
+      .profile-premium-name,
+      #profile-header-name {
+        font-size: 20px !important;
+        white-space: nowrap !important;
+      }
+      .lb-row.lb-v2-row,
+      .lb-v2-table-head {
+        grid-template-columns: 68px minmax(0, 1fr) 36px 60px !important;
+        column-gap: 2px !important;
+      }
+      .lb-v2-trend { transform: translateX(5px) !important; }
+      .lb-v2-points { width: 60px !important; min-width: 60px !important; }
+    }
+
+    @media (max-width: 360px) {
+      .profile-premium-name,
+      #profile-header-name { font-size: 18.5px !important; }
+      .lb-row.lb-v2-row,
+      .lb-v2-table-head {
+        grid-template-columns: 62px minmax(0, 1fr) 32px 56px !important;
+        column-gap: 1px !important;
+      }
+      .lb-v2-trend { width: 32px !important; min-width: 32px !important; transform: translateX(4px) !important; }
+      .lb-v2-points { width: 56px !important; min-width: 56px !important; }
+      .lb-v2-points .points-num { font-size: 21px !important; }
+    }
+</style>
 
   <!-- FIFA World Rankings (June 2026) -->
   <script>
