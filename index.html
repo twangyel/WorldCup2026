@@ -3169,6 +3169,361 @@
       .lb-v2-trend .rank-trend { min-width: 29px !important; padding: 3px 5px !important; font-size: 9px !important; }
     }
 
+  
+
+    /* ============================================================
+       S24 ULTRA FINAL RESPONSIVE FIX — profile + leaderboard
+       Date: 2026-06-19
+       Purpose: stop bottom-nav clipping, reduce leaderboard crowding,
+       give names more room, and make profile/achievement sections fit
+       cleanly on tall Samsung mobile screens.
+       ============================================================ */
+
+    :root { --app-bottom-safe: calc(112px + env(safe-area-inset-bottom)); }
+
+    /* Every screen needs enough scroll room above the fixed bottom nav. */
+    main, #app-shell, .tab-content {
+      scroll-padding-bottom: var(--app-bottom-safe) !important;
+    }
+    .tab-content {
+      padding-bottom: var(--app-bottom-safe) !important;
+    }
+    #tab-profile,
+    #tab-leaderboard,
+    #tab-home,
+    #tab-predictions,
+    #tab-extras {
+      padding-bottom: var(--app-bottom-safe) !important;
+    }
+    #leaderboard-list,
+    #profile-badges {
+      padding-bottom: 22px !important;
+    }
+
+    /* Bottom nav: keep it premium but slightly slimmer and less intrusive. */
+    #app-nav {
+      border-top-left-radius: 22px !important;
+      border-top-right-radius: 22px !important;
+      box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.10) !important;
+    }
+    #app-nav .max-w-lg {
+      padding-top: 6px !important;
+      padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+    }
+    #app-nav .nav-btn {
+      min-height: 58px !important;
+      justify-content: center !important;
+    }
+    #app-nav .nav-btn.active::before {
+      inset: -2px 5px !important;
+      border-radius: 18px !important;
+    }
+
+    /* PROFILE: more breathing room for names, less height pressure. */
+    .profile-premium-card {
+      border-radius: 26px !important;
+      padding: 20px !important;
+    }
+    .profile-premium-card > .relative.flex.items-start {
+      gap: 14px !important;
+    }
+    .profile-premium-avatar {
+      width: 82px !important;
+      height: 82px !important;
+      border-width: 4px !important;
+    }
+    .profile-premium-online {
+      width: 23px !important;
+      height: 23px !important;
+      border-width: 4px !important;
+    }
+    .profile-premium-name {
+      font-size: 22px !important;
+      line-height: 1.08 !important;
+      letter-spacing: -0.045em !important;
+      max-width: 100% !important;
+      overflow-wrap: anywhere !important;
+    }
+    .profile-premium-card .flex-1.min-w-0.pt-1 {
+      padding-right: 58px !important;
+    }
+    .profile-premium-card .profile-edit-btn {
+      top: 20px !important;
+      right: 16px !important;
+      width: 44px !important;
+      height: 44px !important;
+      border-radius: 16px !important;
+    }
+    #profile-header-dept {
+      margin-top: 12px !important;
+      font-size: 14px !important;
+      color: rgba(255,255,255,.92) !important;
+    }
+    #profile-header-phone,
+    #profile-header-phone ~ * {
+      color: rgba(255,255,255,.62) !important;
+    }
+    .profile-premium-card .border-t {
+      margin-top: 20px !important;
+      padding-top: 16px !important;
+    }
+    .profile-stat-module {
+      gap: 8px !important;
+      justify-content: center !important;
+    }
+    .profile-stat-icon {
+      width: 36px !important;
+      height: 36px !important;
+    }
+    .profile-stat-number {
+      font-size: 22px !important;
+    }
+    .profile-stat-label {
+      font-size: 8.5px !important;
+      letter-spacing: .09em !important;
+      color: rgba(255,255,255,.62) !important;
+    }
+
+    /* Achievements: avoid crop behind nav and keep cards readable. */
+    .achievement-panel {
+      border-radius: 26px !important;
+      padding: 18px 16px 20px !important;
+    }
+    #profile-badges {
+      gap: 12px !important;
+    }
+    .badge-card {
+      min-height: 168px !important;
+      padding: 16px 10px 14px !important;
+    }
+    .badge-icon-art {
+      width: 62px !important;
+      height: 62px !important;
+    }
+    .badge-name {
+      font-size: 12px !important;
+      line-height: 1.18 !important;
+    }
+    .badge-desc {
+      font-size: 10.5px !important;
+      min-height: 24px !important;
+    }
+
+    /* LEADERBOARD: one stable production layout for S24 Ultra/mobile. */
+    #tab-leaderboard {
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+    }
+    .lb-v2-hero {
+      padding: 0 2px !important;
+    }
+    .lb-v2-title {
+      font-size: 21px !important;
+      letter-spacing: -0.045em !important;
+    }
+    .lb-v2-subtitle {
+      font-size: 12px !important;
+    }
+    .lb-v2-table-head {
+      grid-template-columns: 66px minmax(0, 1fr) 30px 50px !important;
+      column-gap: 4px !important;
+      padding: 2px 8px 7px !important;
+    }
+    .lb-row.lb-v2-row {
+      grid-template-columns: 66px minmax(0, 1fr) 30px 50px !important;
+      column-gap: 4px !important;
+      min-height: 74px !important;
+      padding: 9px 9px 9px 8px !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+    }
+    .lb-v2-rank-avatar {
+      grid-template-columns: 28px 34px !important;
+      gap: 4px !important;
+      align-items: center !important;
+    }
+    .lb-v2-medal-shiny {
+      width: 28px !important;
+      height: 34px !important;
+    }
+    .lb-v2-medal-shiny svg {
+      width: 28px !important;
+      height: 34px !important;
+    }
+    .lb-v2-rank-tile,
+    .lb-v2-medal-simple {
+      width: 28px !important;
+      height: 28px !important;
+      border-radius: 10px !important;
+      font-size: 12px !important;
+    }
+    .lb-v2-row .lb-avatar {
+      width: 34px !important;
+      height: 34px !important;
+      border-radius: 999px !important;
+      font-size: 12px !important;
+    }
+
+    /* Name gets priority. Tags are smaller and no longer steal the whole row. */
+    .lb-v2-name-line {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      align-items: center !important;
+      gap: 4px !important;
+      min-width: 0 !important;
+    }
+    .lb-v2-name {
+      display: block !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      font-size: 13.5px !important;
+      line-height: 1.12 !important;
+      font-weight: 900 !important;
+      letter-spacing: -0.03em !important;
+    }
+    .lb-v2-leader,
+    .lb-v2-you {
+      height: 15px !important;
+      padding: 0 5px !important;
+      border-radius: 999px !important;
+      font-size: 7.5px !important;
+      letter-spacing: .015em !important;
+      max-width: 54px !important;
+    }
+    .lb-v2-leader {
+      animation: none !important;
+      box-shadow: 0 3px 8px rgba(245,158,11,.14) !important;
+    }
+
+    /* Cleaner stats/chips. Keep only the two most useful progress chips on mobile. */
+    .lb-v2-stats {
+      margin-top: 4px !important;
+      gap: 8px !important;
+      font-size: 10px !important;
+      line-height: 1.15 !important;
+      color: #334155 !important;
+    }
+    .lb-v2-chips {
+      margin-top: 5px !important;
+      display: flex !important;
+      flex-wrap: nowrap !important;
+      gap: 4px !important;
+      max-height: 19px !important;
+      overflow: hidden !important;
+      max-width: 100% !important;
+    }
+    .lb-v2-chip {
+      height: 18px !important;
+      padding: 0 6px !important;
+      font-size: 8.5px !important;
+      flex: 0 0 auto !important;
+    }
+    .lb-v2-chip:nth-of-type(n+3) {
+      display: none !important;
+    }
+    .lb-v2-badge-icons {
+      display: none !important;
+    }
+    .lb-v2-hint {
+      max-width: 100% !important;
+      font-size: 9px !important;
+      margin-top: 4px !important;
+    }
+
+    /* Trend and points get fixed lanes; no overlap, no floating into names. */
+    .lb-v2-trend {
+      position: static !important;
+      width: 30px !important;
+      min-width: 30px !important;
+      justify-self: end !important;
+      align-self: center !important;
+      transform: none !important;
+      margin: 0 !important;
+      display: flex !important;
+      justify-content: flex-end !important;
+      pointer-events: none !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 28px !important;
+      padding: 3px 5px !important;
+      font-size: 9px !important;
+      line-height: 1 !important;
+      border-radius: 999px !important;
+      box-shadow: 0 2px 6px rgba(15,23,42,.06) !important;
+    }
+    .lb-v2-points {
+      min-width: 50px !important;
+      width: 50px !important;
+      text-align: right !important;
+      justify-self: end !important;
+      padding-right: 0 !important;
+    }
+    .lb-v2-points .points-num {
+      font-size: 23px !important;
+      line-height: .95 !important;
+      letter-spacing: -0.055em !important;
+    }
+    .lb-v2-points .points-label {
+      font-size: 8px !important;
+      margin-top: 3px !important;
+    }
+
+    /* User row should be clear, but not overpower #1. */
+    .lb-row.lb-v2-row.is-me {
+      background: linear-gradient(135deg, rgba(239,246,255,.72), rgba(255,255,255,.96) 70%) !important;
+      border-color: rgba(59,130,246,.38) !important;
+      box-shadow: 0 0 0 1px rgba(59,130,246,.06), 0 4px 12px rgba(15,23,42,.045) !important;
+    }
+
+    /* S24 Ultra and similar 390-440px phones: use the extra width for names. */
+    @media (min-width: 390px) and (max-width: 460px) {
+      .lb-v2-table-head,
+      .lb-row.lb-v2-row {
+        grid-template-columns: 68px minmax(0, 1fr) 32px 52px !important;
+        column-gap: 5px !important;
+      }
+      .lb-v2-rank-avatar {
+        grid-template-columns: 28px 36px !important;
+        gap: 4px !important;
+      }
+      .lb-v2-row .lb-avatar {
+        width: 36px !important;
+        height: 36px !important;
+      }
+      .lb-v2-name {
+        font-size: 14px !important;
+      }
+      .lb-v2-points {
+        width: 52px !important;
+        min-width: 52px !important;
+      }
+      .lb-v2-points .points-num {
+        font-size: 24px !important;
+      }
+    }
+
+    /* Very small phones still fit without horizontal squeeze. */
+    @media (max-width: 360px) {
+      :root { --app-bottom-safe: calc(104px + env(safe-area-inset-bottom)); }
+      #tab-leaderboard { padding-left: 8px !important; padding-right: 8px !important; }
+      .lb-v2-table-head,
+      .lb-row.lb-v2-row {
+        grid-template-columns: 62px minmax(0, 1fr) 28px 48px !important;
+        column-gap: 3px !important;
+      }
+      .lb-v2-rank-avatar { grid-template-columns: 26px 32px !important; gap: 4px !important; }
+      .lb-v2-row .lb-avatar { width: 32px !important; height: 32px !important; }
+      .lb-v2-name { font-size: 12.5px !important; }
+      .lb-v2-stats { font-size: 9px !important; gap: 6px !important; }
+      .lb-v2-chip { font-size: 8px !important; padding: 0 5px !important; }
+      .lb-v2-points .points-num { font-size: 22px !important; }
+      .profile-premium-avatar { width: 76px !important; height: 76px !important; }
+      .profile-premium-name { font-size: 20px !important; }
+    }
+
   </style>
 
   <!-- FIFA World Rankings (June 2026) -->
