@@ -3651,6 +3651,88 @@
       .lb-v2-points { width: 56px !important; min-width: 56px !important; }
       .lb-v2-points .points-num { font-size: 21px !important; }
     }
+
+
+    /* ============================================================
+       FINAL MICRO-FIX V2 — wider leaderboard rows + trend nearer points
+       Requested on 2026-06-19.
+       ============================================================ */
+
+    /* Use more horizontal space on leaderboard so rows feel longer/full-width. */
+    #tab-leaderboard {
+      padding-left: 4px !important;
+      padding-right: 4px !important;
+    }
+    .lb-v2-hero {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .lb-v2-table-head {
+      padding-left: 6px !important;
+      padding-right: 6px !important;
+      grid-template-columns: 68px minmax(0, 1fr) 30px 60px !important;
+      column-gap: 0 !important;
+    }
+    .lb-row.lb-v2-row {
+      width: 100% !important;
+      grid-template-columns: 68px minmax(0, 1fr) 30px 60px !important;
+      column-gap: 0 !important;
+      padding: 9px 8px 9px 6px !important;
+      border-radius: 11px !important;
+    }
+
+    /* Put trend visually next to the points column, not the badges area. */
+    .lb-v2-trend {
+      width: 30px !important;
+      min-width: 30px !important;
+      justify-self: end !important;
+      justify-content: flex-end !important;
+      transform: translateX(10px) !important;
+      margin-right: -2px !important;
+    }
+    .lb-v2-trend .rank-trend {
+      min-width: 27px !important;
+      padding: 3px 4px !important;
+    }
+    .lb-v2-points {
+      width: 60px !important;
+      min-width: 60px !important;
+      margin-left: 0 !important;
+      padding-right: 1px !important;
+    }
+
+    @media (min-width: 390px) and (max-width: 460px) {
+      #tab-leaderboard {
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+      }
+      .lb-v2-table-head,
+      .lb-row.lb-v2-row {
+        grid-template-columns: 68px minmax(0, 1fr) 30px 60px !important;
+        column-gap: 0 !important;
+      }
+      .lb-v2-trend {
+        transform: translateX(10px) !important;
+      }
+    }
+
+    @media (max-width: 360px) {
+      #tab-leaderboard {
+        padding-left: 3px !important;
+        padding-right: 3px !important;
+      }
+      .lb-v2-table-head,
+      .lb-row.lb-v2-row {
+        grid-template-columns: 62px minmax(0, 1fr) 28px 56px !important;
+        column-gap: 0 !important;
+      }
+      .lb-v2-trend {
+        width: 28px !important;
+        min-width: 28px !important;
+        transform: translateX(8px) !important;
+      }
+    }
+
 </style>
 
   <!-- FIFA World Rankings (June 2026) -->
