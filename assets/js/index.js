@@ -4006,7 +4006,7 @@ async function generateMatchReportCardBlob(fixtureId) {
     .sort((a, b) => {
       if (b.final_points !== a.final_points) return b.final_points - a.final_points
       if (b.base_points !== a.base_points) return b.base_points - a.base_points
-      return 0
+      return String(a.name || '').localeCompare(String(b.name || ''))
     })
 
   if (!picks.length) throw new Error('No eligible predictions for this report')
@@ -4028,19 +4028,25 @@ async function generateMatchReportCardBlob(fixtureId) {
     loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
   ])
 
-  // --- Layout constants ----------------------------------------------------
+  // ------------------------------------------------------------------------
+  // PHONE-FIRST MATCH REPORT LAYOUT
+  // The old card tried to show PLAYER / PICK / BASE / BONUS / TOTAL in two
+  // narrow columns. WhatsApp scales the image down, so 16px canvas text became
+  // ~8px on phones. This version removes low-value columns from each row and
+  // makes the important items much larger: player, pick and points.
+  // ------------------------------------------------------------------------
   const WIDTH        = 1080
-  const SIDE_PAD     = 60
-  const HEADER_H     = 130
-  const SCORE_H      = 240
-  const STATS_H      = 130
-  const SEC_LABEL_H  = 60
-  const COL_HDR_H    = 40
-  const ROW_H        = 62        // ← bumped from 58 to fit larger total
-  const COL_GUTTER   = 28
-  const SUMMARY_H    = 200
-  const FOOTER_H     = 80
-  const PAD_BOTTOM   = 30
+  const SIDE_PAD     = 54
+  const HEADER_H     = 124
+  const SCORE_H      = 220
+  const STATS_H      = 124
+  const SEC_LABEL_H  = 64
+  const COL_HDR_H    = 38
+  const ROW_H        = 78
+  const COL_GUTTER   = 22
+  const SUMMARY_H    = 198
+  const FOOTER_H     = 72
+  const PAD_BOTTOM   = 28
 
   const INNER_W      = WIDTH - SIDE_PAD * 2
   const COL_W        = (INNER_W - COL_GUTTER) / 2
@@ -4052,270 +4058,295 @@ async function generateMatchReportCardBlob(fixtureId) {
               + (ROWS_PER_COL * ROW_H) + SUMMARY_H + FOOTER_H + PAD_BOTTOM
 
   const canvas = document.createElement('canvas')
-  canvas.width = WIDTH; canvas.height = HEIGHT
+  canvas.width = WIDTH
+  canvas.height = HEIGHT
   const ctx = canvas.getContext('2d')
 
   // ----- Background --------------------------------------------------------
   const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
-  bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
-  ctx.fillStyle = 'rgba(255,255,255,0.04)'
-  for (let yy = 0; yy < HEIGHT; yy += 32) for (let xx = 0; xx < WIDTH; xx += 32) {
-    ctx.beginPath(); ctx.arc(xx, yy, 1.5, 0, Math.PI * 2); ctx.fill()
+  bg.addColorStop(0, '#08111F')
+  bg.addColorStop(0.46, '#102542')
+  bg.addColorStop(1, '#183B63')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.035)'
+  for (let yy = 0; yy < HEIGHT; yy += 34) {
+    for (let xx = 0; xx < WIDTH; xx += 34) {
+      ctx.beginPath()
+      ctx.arc(xx, yy, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
-  const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
-  glow.addColorStop(0, 'rgba(212,162,76,0.30)'); glow.addColorStop(1, 'rgba(212,162,76,0)')
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  const topGlow = ctx.createRadialGradient(WIDTH - 90, 95, 0, WIDTH - 90, 95, 580)
+  topGlow.addColorStop(0, 'rgba(212,162,76,0.30)')
+  topGlow.addColorStop(1, 'rgba(212,162,76,0)')
+  ctx.fillStyle = topGlow
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
   const cx = WIDTH / 2
 
   // ----- Header ------------------------------------------------------------
-  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 32px system-ui, sans-serif'
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-  ctx.fillText(`📊 ${fixture.stage || 'Match'} · Match Report`, SIDE_PAD, 75)
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '800 34px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`📊 ${fixture.stage || 'Match'} · Match Report`, SIDE_PAD, 72)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.66)'
+  ctx.font = '600 22px system-ui, sans-serif'
   ctx.textAlign = 'right'
-  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - SIDE_PAD, 75)
+  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - SIDE_PAD, 72)
   ctx.textBaseline = 'alphabetic'
 
   // ----- Score block with flags -------------------------------------------
   let y = HEADER_H
-  const flagY = y + 40, fw = 96, fh = 64
-  const leftFX = cx - 220, rightFX = cx + 220
+  const flagY = y + 32
+  const fw = 104
+  const fh = 70
+  const leftFX = cx - 230
+  const rightFX = cx + 230
 
   function drawFlag(img, name, x) {
     if (img) {
       ctx.save()
-      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.clip()
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 12)
+      ctx.clip()
       ctx.drawImage(img, x - fw / 2, flagY, fw, fh)
       ctx.restore()
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2
-      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.stroke()
+      ctx.strokeStyle = 'rgba(255,255,255,0.32)'
+      ctx.lineWidth = 2
+      roundRect(ctx, x - fw / 2, flagY, fw, fh, 12)
+      ctx.stroke()
     } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2
-      ctx.beginPath(); ctx.arc(x, flagY + fh / 2, 38, 0, Math.PI * 2); ctx.stroke()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 28px system-ui, sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.strokeStyle = 'rgba(255,255,255,0.26)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(x, flagY + fh / 2, 40, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.fillStyle = '#fff'
+      ctx.font = '800 30px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
       ctx.fillText(teamCodeFallback(name), x, flagY + fh / 2)
       ctx.textBaseline = 'alphabetic'
     }
-    ctx.fillStyle = '#fff'; ctx.font = '24px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(truncateForCanvas(ctx, name, 280), x, flagY + fh + 36)
+
+    ctx.fillStyle = '#fff'
+    ctx.font = '700 26px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(truncateForCanvas(ctx, name, 300), x, flagY + fh + 38)
   }
+
   drawFlag(homeImg, fixture.home_team, leftFX)
   drawFlag(awayImg, fixture.away_team, rightFX)
 
-  ctx.fillStyle = '#F4C430'; ctx.font = 'bold 80px system-ui, sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
-  ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 22px system-ui, sans-serif'
-  ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 56)
+  ctx.fillStyle = '#F4C430'
+  ctx.font = '900 90px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 24)
+  ctx.fillStyle = '#4ADE80'
+  ctx.font = '800 23px system-ui, sans-serif'
+  ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 64)
 
   // ----- Top stats strip ---------------------------------------------------
   y = HEADER_H + SCORE_H
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y); ctx.lineTo(WIDTH - SIDE_PAD, y); ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,0.11)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(SIDE_PAD, y)
+  ctx.lineTo(WIDTH - SIDE_PAD, y)
+  ctx.stroke()
 
   const avgPts = picks.length ? (totalPoints / picks.length) : 0
   const topStats = [
     ['PLAYERS', picks.length, '#fff'],
-    ['EXACT',   exactCount,   '#F4C430'],
+    ['EXACT', exactCount, '#F4C430'],
     ['CORRECT', correctCount + gdOnlyCount, '#4ADE80'],
-    ['POINTS',  totalPoints,  '#F4C430'],
-    ['AVG',     avgPts.toFixed(1), 'rgba(255,255,255,0.85)']
+    ['POINTS', totalPoints, '#F4C430'],
+    ['AVG', avgPts.toFixed(1), 'rgba(255,255,255,0.92)']
   ]
   const stepW = (WIDTH - SIDE_PAD * 2) / topStats.length
   topStats.forEach((st, i) => {
     const sx = SIDE_PAD + stepW * i + stepW / 2
-    ctx.fillStyle = st[2]; ctx.font = 'bold 42px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillStyle = st[2]
+    ctx.font = '900 48px system-ui, sans-serif'
+    ctx.textAlign = 'center'
     ctx.fillText(String(st[1]), sx, y + 56)
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 16px system-ui, sans-serif'
-    ctx.fillText(st[0], sx, y + 90)
+    ctx.fillStyle = 'rgba(255,255,255,0.58)'
+    ctx.font = '800 17px system-ui, sans-serif'
+    ctx.fillText(st[0], sx, y + 92)
   })
-  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + STATS_H - 8); ctx.lineTo(WIDTH - SIDE_PAD, y + STATS_H - 8); ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(SIDE_PAD, y + STATS_H - 6)
+  ctx.lineTo(WIDTH - SIDE_PAD, y + STATS_H - 6)
+  ctx.stroke()
   y += STATS_H
 
-  // ----- Section label (table) ---------------------------------------------
-  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 24px system-ui, sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText(`🏅 SCORING BREAKDOWN · Stage ×${stageMult}`, SIDE_PAD, y + 36)
+  // ----- Section label -----------------------------------------------------
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '900 26px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText(`🏅 SCORING BREAKDOWN · Stage ×${stageMult}`, SIDE_PAD, y + 40)
   y += SEC_LABEL_H
 
-  // ----- Per-column geometry -----------------------------------------------
+  // ----- Per-column geometry ----------------------------------------------
   function colGeometry(colX) {
     return {
-      rankR:  colX + 28,
-      nameL:  colX + 40,
-      pickR:  colX + COL_W - 200,
-      baseR:  colX + COL_W - 155,
-      bonusL: colX + COL_W - 145,
-      totalR: colX + COL_W - 12
+      rankR:  colX + 32,
+      nameL:  colX + 46,
+      pickR:  colX + COL_W - 95,
+      totalR: colX + COL_W - 14
     }
   }
 
-  // ----- Column headers ----------------------------------------------------
   function drawColHeader(colX) {
     const g = colGeometry(colX)
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'
-    ctx.font = 'bold 12px system-ui, sans-serif'
-    ctx.textBaseline = 'middle'
     const hY = y + COL_HDR_H / 2
-    ctx.textAlign = 'right'; ctx.fillText('#',       g.rankR, hY)
-    ctx.textAlign = 'left';  ctx.fillText('PLAYER',  g.nameL, hY)
-    ctx.textAlign = 'right'; ctx.fillText('PICK',    g.pickR, hY)
-    ctx.textAlign = 'right'; ctx.fillText('BASE',    g.baseR, hY)
-    ctx.textAlign = 'left';  ctx.fillText('BONUSES', g.bonusL, hY)
-    ctx.textAlign = 'right'; ctx.fillText('TOTAL',   g.totalR, hY)
+    ctx.fillStyle = 'rgba(255,255,255,0.56)'
+    ctx.font = '900 14px system-ui, sans-serif'
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'right'
+    ctx.fillText('#', g.rankR, hY)
+    ctx.textAlign = 'left'
+    ctx.fillText('PLAYER', g.nameL, hY)
+    ctx.textAlign = 'right'
+    ctx.fillText('PICK', g.pickR, hY)
+    ctx.fillText('PTS', g.totalR, hY)
     ctx.textBaseline = 'alphabetic'
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(colX, y + COL_HDR_H); ctx.lineTo(colX + COL_W, y + COL_HDR_H); ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(colX, y + COL_HDR_H)
+    ctx.lineTo(colX + COL_W, y + COL_HDR_H)
+    ctx.stroke()
   }
+
   drawColHeader(COL1_X)
   drawColHeader(COL2_X)
   y += COL_HDR_H
 
-  // ----- Bonus chip helper -------------------------------------------------
-  function drawBonusChip(text, color, bgRgba, chipX, chipY) {
-    ctx.font = 'bold 13px system-ui, sans-serif'
-    const padX = 7
-    const w = ctx.measureText(text).width + padX * 2
-    const h = 24
-    ctx.fillStyle = bgRgba
-    roundRect(ctx, chipX, chipY - h / 2, w, h, 6); ctx.fill()
-    ctx.fillStyle = color
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-    ctx.fillText(text, chipX + padX, chipY)
-    ctx.textBaseline = 'alphabetic'
-    return w
+  function bonusTextForRow(p) {
+    const parts = []
+    if (p.streak_bonus > 0) parts.push(`🔥 +${p.streak_bonus}`)
+    if (Array.isArray(p.combos_earned) && p.combos_earned.length) {
+      p.combos_earned.slice(0, 2).forEach(c => {
+        const emoji = c.emoji || '⚡'
+        const val = c.value != null ? c.value : (p.combo_bonus || 0)
+        if (val > 0) parts.push(`${emoji} +${val}`)
+      })
+    }
+    return parts.join('   ')
   }
 
-  // ----- Row renderer ------------------------------------------------------
   function drawRow(p, displayIdx, colX, rowTopY) {
     const g = colGeometry(colX)
     const win = p.final_points > 0
     const isExact = p.base_points === 5
-
+    const bonusTxt = bonusTextForRow(p)
     const rowFill = isExact
-      ? 'rgba(244,196,48,0.10)'
-      : (win ? 'rgba(212,162,76,0.07)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
+      ? 'rgba(244,196,48,0.14)'
+      : (win ? 'rgba(255,255,255,0.065)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.032)' : 'rgba(255,255,255,0.018)'))
+
     ctx.fillStyle = rowFill
-    ctx.strokeStyle = isExact ? 'rgba(244,196,48,0.40)' : (win ? 'rgba(212,162,76,0.25)' : 'rgba(255,255,255,0)')
-    ctx.lineWidth = 1.2
-    roundRect(ctx, colX, rowTopY + 4, COL_W, ROW_H - 8, 9)
-    ctx.fill(); if (win) ctx.stroke()
+    ctx.strokeStyle = isExact ? 'rgba(244,196,48,0.55)' : (win ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)')
+    ctx.lineWidth = isExact ? 1.8 : 1
+    roundRect(ctx, colX, rowTopY + 5, COL_W, ROW_H - 10, 12)
+    ctx.fill()
+    ctx.stroke()
 
     const cyl = rowTopY + ROW_H / 2
     ctx.textBaseline = 'middle'
 
-    // Rank
-    ctx.font = 'bold 14px system-ui, sans-serif'; ctx.textAlign = 'right'
-    ctx.fillStyle = 'rgba(255,255,255,0.40)'
+    ctx.font = '900 17px system-ui, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(255,255,255,0.54)'
     ctx.fillText(String(displayIdx + 1), g.rankR, cyl)
 
-    // Name
-    ctx.font = win ? 'bold 17px system-ui, sans-serif' : '16px system-ui, sans-serif'
-    ctx.fillStyle = win ? '#fff' : 'rgba(255,255,255,0.78)'
     ctx.textAlign = 'left'
-    const nameMaxW = g.pickR - g.nameL - 50
-    ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, cyl)
+    const nameY = bonusTxt ? cyl - 12 : cyl
+    ctx.font = win ? '900 22px system-ui, sans-serif' : '800 21px system-ui, sans-serif'
+    ctx.fillStyle = win ? '#FFFFFF' : 'rgba(255,255,255,0.82)'
+    const nameMaxW = g.pickR - g.nameL - 60
+    ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, nameY)
 
-    // Pick
-    ctx.font = 'bold 17px system-ui, sans-serif'
-    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#fff' : 'rgba(255,255,255,0.65)')
+    if (bonusTxt) {
+      ctx.font = '800 14px system-ui, sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.58)'
+      ctx.fillText(truncateForCanvas(ctx, bonusTxt, nameMaxW + 20), g.nameL, cyl + 17)
+    }
+
+    ctx.font = '900 23px system-ui, sans-serif'
+    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#F8FAFC' : 'rgba(255,255,255,0.62)')
     ctx.textAlign = 'right'
     ctx.fillText(`${p.home}–${p.away}`, g.pickR, cyl)
 
-    // Base
-    ctx.font = '15px system-ui, sans-serif'
-    ctx.fillStyle = p.base_points > 0 ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.30)'
-    ctx.textAlign = 'right'
-    const baseTxt = (p.stage_mult > 1 && p.base_points > 0)
-      ? `${p.base_points}×${p.stage_mult}`
-      : `${p.multiplied_base}`
-    ctx.fillText(baseTxt, g.baseR, cyl)
-
-    // Bonus chips
-    let chipX = g.bonusL
-    const chipLimit = g.totalR - 55
-    if (p.streak_bonus > 0 && p.streak_tier) {
-      const emoji = p.streak_tier.emoji || '🔥'
-      const w = drawBonusChip(`${emoji} +${p.streak_bonus}`, '#FB923C', 'rgba(251,146,60,0.16)', chipX, cyl)
-      chipX += w + 4
-    }
-    if (Array.isArray(p.combos_earned)) {
-      p.combos_earned.forEach(c => {
-        if (chipX > chipLimit) return
-        const emoji = c.emoji || '⚡'
-        const val = c.value != null ? c.value : (p.combo_bonus || 0)
-        const w = drawBonusChip(`${emoji} +${val}`, '#A78BFA', 'rgba(167,139,250,0.16)', chipX, cyl)
-        chipX += w + 4
-      })
-    }
-    if (p.streak_bonus === 0 && (!p.combos_earned || !p.combos_earned.length)) {
-      ctx.font = '14px system-ui, sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.25)'
-      ctx.textAlign = 'left'
-      ctx.fillText('—', g.bonusL, cyl)
-    }
-
-    // Total — BIGGER, more readable on phones
-    ctx.font = 'bold 24px system-ui, sans-serif'      // ← bumped from 19px
-    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#4ADE80' : 'rgba(255,255,255,0.30)')
-    ctx.textAlign = 'right'
+    ctx.font = '900 29px system-ui, sans-serif'
+    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#4ADE80' : 'rgba(255,255,255,0.34)')
     ctx.fillText(`+${p.final_points}`, g.totalR, cyl)
 
     ctx.textBaseline = 'alphabetic'
   }
 
   picks.forEach((p, i) => {
-    const inLeft  = i < ROWS_PER_COL
-    const colX    = inLeft ? COL1_X : COL2_X
-    const rowIdx  = inLeft ? i : (i - ROWS_PER_COL)
-    const rowTopY = y + rowIdx * ROW_H
-    drawRow(p, i, colX, rowTopY)
+    const inLeft = i < ROWS_PER_COL
+    const colX = inLeft ? COL1_X : COL2_X
+    const rowIdx = inLeft ? i : (i - ROWS_PER_COL)
+    drawRow(p, i, colX, y + rowIdx * ROW_H)
   })
   y += ROWS_PER_COL * ROW_H
 
-  // ----- Scoring summary footer --------------------------------------------
-  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + 10); ctx.lineTo(WIDTH - SIDE_PAD, y + 10); ctx.stroke()
+  // ----- Scoring summary footer -------------------------------------------
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(SIDE_PAD, y + 10)
+  ctx.lineTo(WIDTH - SIDE_PAD, y + 10)
+  ctx.stroke()
 
-  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '900 24px system-ui, sans-serif'
+  ctx.textAlign = 'left'
   ctx.fillText('📈 BREAKDOWN', SIDE_PAD, y + 50)
 
-  const sumY = y + 80
+  const sumY = y + 84
   const colAx = SIDE_PAD + 20
   const colBx = SIDE_PAD + INNER_W / 2 + 20
+  const valGap = INNER_W / 2 - 34
 
   function drawBreakdownLine(label, value, valColor, lx, ly) {
-    ctx.font = '18px system-ui, sans-serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.65)'
+    ctx.font = '700 21px system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.72)'
     ctx.textAlign = 'left'
     ctx.fillText(label, lx, ly)
-    ctx.font = 'bold 18px system-ui, sans-serif'
+    ctx.font = '900 22px system-ui, sans-serif'
     ctx.fillStyle = valColor
     ctx.textAlign = 'right'
-    ctx.fillText(String(value), lx + INNER_W / 2 - 40, ly)
+    ctx.fillText(String(value), lx + valGap, ly)
   }
 
   drawBreakdownLine('⭐ Exact scores',     exactCount,   '#F4C430', colAx, sumY)
-  drawBreakdownLine('✅ Correct result',   correctCount, '#4ADE80', colAx, sumY + 30)
-  drawBreakdownLine('➖ GD only',          gdOnlyCount,  'rgba(255,255,255,0.8)', colAx, sumY + 60)
-  drawBreakdownLine('❌ Wrong',            wrongCount,   'rgba(255,255,255,0.45)', colAx, sumY + 90)
+  drawBreakdownLine('✅ Correct result',   correctCount, '#4ADE80', colAx, sumY + 34)
+  drawBreakdownLine('➖ GD only',          gdOnlyCount,  'rgba(255,255,255,0.90)', colAx, sumY + 68)
+  drawBreakdownLine('❌ Wrong',            wrongCount,   'rgba(255,255,255,0.54)', colAx, sumY + 102)
 
   drawBreakdownLine('🔥 Streak bonuses',   streakAwards, '#FB923C', colBx, sumY)
-  drawBreakdownLine('⚡ Combos awarded',   comboAwards,  '#A78BFA', colBx, sumY + 30)
-  drawBreakdownLine('🎯 Stage multiplier', `×${stageMult}`, '#fff', colBx, sumY + 60)
-  drawBreakdownLine('💰 Total awarded',    totalPoints,  '#F4C430', colBx, sumY + 90)
+  drawBreakdownLine('⚡ Combos awarded',   comboAwards,  '#A78BFA', colBx, sumY + 34)
+  drawBreakdownLine('🎯 Stage multiplier', `×${stageMult}`, '#fff', colBx, sumY + 68)
+  drawBreakdownLine('💰 Total awarded',    totalPoints,  '#F4C430', colBx, sumY + 102)
 
   // ----- Footer ------------------------------------------------------------
-  ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'
-  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '900 28px system-ui, sans-serif'
+  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 38)
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.98)
   })
 }
-
  
 // ---- Admin share (mirrors sharePickList's 3-path fallback) ----------------
 async function shareMatchReport(fixtureId) {
@@ -4622,12 +4653,9 @@ function podiumName(name) {
 }
 
 function leaderboardDisplayName(name) {
-  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
-  const parts = clean.split(/\s+/).filter(Boolean)
-  // Keep one-word and two-word names full. For 3+ word names, keep the row clean
-  // by showing first + last while the full name remains in the title tooltip.
-  if (parts.length <= 2) return clean
-  return `${parts[0]} ${parts[parts.length - 1]}`
+  // Show the real full name in the leaderboard. The CSS patch below gives
+  // the name lane more width and allows controlled wrapping instead of JS truncation.
+  return String(name || 'Anonymous').trim() || 'Anonymous'
 }
 
 function leaderboardTop3Html(stats, myId) {
@@ -9603,3 +9631,286 @@ loadRememberedEmail()
   // Other panels can be added here later if needed:
   // attachPanelScrollAutoHide('some-other-panel-content')
 })()
+
+/* ============================================================
+   LEADERBOARD READABILITY + PERFORMANCE POLISH
+   Added 2026-06-21
+   Keeps this as a JS-only patch: injects final CSS after index.html styles.
+   ============================================================ */
+(function installLeaderboardReadabilityPolish() {
+  const STYLE_ID = 'wcpl-leaderboard-readability-polish';
+
+  function injectPolishStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      /* ---------- Leaderboard rows: more name space, smaller avatars, trend closer to points ---------- */
+      #leaderboard-list.lb-v2-list,
+      #leaderboard-list {
+        gap: 8px !important;
+        -webkit-overflow-scrolling: touch !important;
+        transform: translateZ(0) !important;
+        will-change: scroll-position !important;
+      }
+
+      .lb-row.lb-v2-row {
+        grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
+        min-height: 88px !important;
+        padding: 10px 12px 10px 7px !important;
+        column-gap: 0 !important;
+        contain: layout paint style !important;
+        content-visibility: auto !important;
+        contain-intrinsic-size: 88px !important;
+        transform: translateZ(0) !important;
+        backface-visibility: hidden !important;
+        transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease !important;
+      }
+
+      .lb-v2-table-head {
+        grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
+        padding-left: 7px !important;
+        padding-right: 12px !important;
+        column-gap: 0 !important;
+      }
+
+      .lb-v2-rank-avatar {
+        grid-template-columns: 28px 48px !important;
+        gap: 7px !important;
+        align-items: center !important;
+      }
+
+      .lb-v2-row .lb-avatar {
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        min-height: 48px !important;
+        font-size: 14px !important;
+        border-width: 2.5px !important;
+        box-shadow: 0 7px 15px rgba(15,23,42,.12) !important;
+      }
+
+      .lb-v2-main {
+        min-width: 0 !important;
+        padding-left: 6px !important;
+        overflow: visible !important;
+      }
+
+      .lb-v2-name-line {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 5px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+      }
+
+      .lb-v2-name {
+        display: block !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: normal !important;
+        overflow-wrap: anywhere !important;
+        font-size: 13.6px !important;
+        line-height: 1.12 !important;
+        letter-spacing: -0.035em !important;
+      }
+
+      .lb-v2-stats {
+        margin-top: 4px !important;
+        font-size: 9.6px !important;
+        gap: 7px !important;
+      }
+
+      .lb-v2-chips {
+        margin-top: 5px !important;
+        max-height: 20px !important;
+      }
+
+      .lb-v2-trend {
+        width: 26px !important;
+        min-width: 26px !important;
+        justify-self: end !important;
+        justify-content: flex-end !important;
+        transform: translateX(12px) !important;
+        z-index: 4 !important;
+      }
+
+      .lb-v2-trend .rank-trend {
+        min-width: 26px !important;
+        height: 20px !important;
+        line-height: 18px !important;
+        padding: 0 5px !important;
+        font-size: 8.5px !important;
+        box-shadow: 0 3px 8px rgba(15,23,42,.08) !important;
+      }
+
+      .lb-v2-points {
+        width: 62px !important;
+        min-width: 62px !important;
+        padding-right: 3px !important;
+        text-align: right !important;
+      }
+
+      .lb-v2-points .points-num,
+      .points-num[data-points-el] {
+        animation: lbPointsBreath 2.65s ease-in-out infinite !important;
+        transform-origin: center !important;
+        will-change: transform, text-shadow !important;
+      }
+
+      @keyframes lbPointsBreath {
+        0%, 100% { transform: translateZ(0) scale(1); text-shadow: 0 0 0 rgba(18,52,90,0); }
+        50% { transform: translateZ(0) scale(1.045); text-shadow: 0 5px 14px rgba(18,52,90,.20); }
+      }
+
+      .pts-pulse,
+      .points-num.pts-pulse {
+        animation: lbPointsPop 720ms cubic-bezier(.2,.85,.2,1) 1 !important;
+      }
+
+      @keyframes lbPointsPop {
+        0% { transform: scale(1); }
+        38% { transform: scale(1.24); text-shadow: 0 0 18px rgba(212,162,76,.55); }
+        100% { transform: scale(1); }
+      }
+
+      /* ---------- Less jank while the user is actively scrolling ---------- */
+      body.is-scrolling-leaderboard .lb-row.lb-v2-row,
+      body.is-scrolling-leaderboard .lb-row.lb-v2-row *,
+      body.is-scrolling-leaderboard .lb-v2-points .points-num,
+      body.is-scrolling-leaderboard .leader-crown-svg,
+      body.is-scrolling-leaderboard .lb-v2-leader-crown,
+      body.is-scrolling-leaderboard .leader-crown-sparkle {
+        animation-play-state: paused !important;
+        transition: none !important;
+      }
+
+      body.is-scrolling-leaderboard .lb-row.lb-v2-row {
+        box-shadow: 0 3px 10px rgba(15,23,42,.045), inset 0 1px 0 rgba(255,255,255,.92) !important;
+      }
+
+      /* ---------- Achievement icons: slightly bigger without stretching the card ---------- */
+      .badge-flip-front .badge-icon-art,
+      .badge-flip-front .badge-img-asset {
+        width: 54px !important;
+        height: 54px !important;
+      }
+
+      .badge-flip-front .badge-icon {
+        margin-bottom: 5px !important;
+      }
+
+      .badge-flip-front .badge-name {
+        font-size: 11.5px !important;
+        line-height: 1.12 !important;
+      }
+
+      .badge-icon-art {
+        width: 68px !important;
+        height: 68px !important;
+      }
+
+      /* Profile header avatar: a touch smaller so the header breathes better. */
+      .profile-premium-avatar {
+        width: 76px !important;
+        height: 76px !important;
+        font-size: 27px !important;
+      }
+      .profile-premium-online {
+        width: 21px !important;
+        height: 21px !important;
+        border-width: 3px !important;
+      }
+
+      /* Dark mode versions for the new overrides. */
+      html.dark-mode .lb-v2-points .points-num,
+      html.dark-mode .points-num[data-points-el] {
+        color: #EAF0FA !important;
+      }
+      html.dark-mode .lb-v2-name { color: #F8FAFC !important; }
+
+      @media (min-width: 390px) and (max-width: 460px) {
+        .lb-row.lb-v2-row,
+        .lb-v2-table-head {
+          grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
+        }
+        .lb-v2-name { font-size: 13.8px !important; }
+        .lb-v2-trend { transform: translateX(12px) !important; }
+      }
+
+      @media (max-width: 380px) {
+        .lb-row.lb-v2-row,
+        .lb-v2-table-head {
+          grid-template-columns: 78px minmax(0, 1fr) 24px 58px !important;
+          padding-right: 10px !important;
+        }
+        .lb-row.lb-v2-row { min-height: 84px !important; }
+        .lb-v2-rank-avatar { grid-template-columns: 26px 43px !important; gap: 6px !important; }
+        .lb-v2-row .lb-avatar {
+          width: 43px !important;
+          height: 43px !important;
+          min-width: 43px !important;
+          min-height: 43px !important;
+          font-size: 13px !important;
+        }
+        .lb-v2-main { padding-left: 5px !important; }
+        .lb-v2-name { font-size: 12.6px !important; line-height: 1.12 !important; }
+        .lb-v2-stats { font-size: 8.8px !important; gap: 6px !important; }
+        .lb-v2-trend { width: 24px !important; min-width: 24px !important; transform: translateX(9px) !important; }
+        .lb-v2-trend .rank-trend { min-width: 24px !important; height: 19px !important; line-height: 17px !important; font-size: 8px !important; padding: 0 4px !important; }
+        .lb-v2-points { width: 58px !important; min-width: 58px !important; padding-right: 2px !important; }
+        .lb-v2-points .points-num { font-size: 22px !important; }
+        .badge-flip-front .badge-icon-art,
+        .badge-flip-front .badge-img-asset { width: 50px !important; height: 50px !important; }
+        .badge-icon-art { width: 64px !important; height: 64px !important; }
+        .profile-premium-avatar { width: 72px !important; height: 72px !important; font-size: 25px !important; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lb-v2-points .points-num,
+        .points-num[data-points-el],
+        .pts-pulse,
+        .points-num.pts-pulse {
+          animation: none !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function markLeaderboardScroll() {
+    const active = document.getElementById('tab-leaderboard');
+    if (!active || active.classList.contains('hidden')) return;
+    document.body.classList.add('is-scrolling-leaderboard');
+    clearTimeout(markLeaderboardScroll._timer);
+    markLeaderboardScroll._timer = setTimeout(() => {
+      document.body.classList.remove('is-scrolling-leaderboard');
+    }, 140);
+  }
+
+  function bindScrollPerformanceGuard() {
+    if (bindScrollPerformanceGuard._bound) return;
+    bindScrollPerformanceGuard._bound = true;
+    window.addEventListener('scroll', markLeaderboardScroll, { passive: true });
+    window.addEventListener('touchmove', markLeaderboardScroll, { passive: true });
+    const main = document.getElementById('app-main');
+    if (main) main.addEventListener('scroll', markLeaderboardScroll, { passive: true });
+  }
+
+  function init() {
+    injectPolishStyles();
+    bindScrollPerformanceGuard();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+})();
+
