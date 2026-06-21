@@ -1,0 +1,415 @@
+/* ============================================
+   BRACKET PANEL STYLES
+   User-facing bracket UI
+   ============================================ */
+
+/* ---------- PANEL HEADER ---------- */
+.bp-header {
+  position: sticky;
+  top: 0;
+  background: rgba(245, 240, 235, 0.95);
+  backdrop-filter: blur(12px);
+  padding: 12px 16px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  z-index: 10;
+}
+
+.bp-phase-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+  scrollbar-width: none;
+}
+
+.bp-phase-tabs::-webkit-scrollbar { display: none; }
+
+.bp-tab {
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.bp-tab:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.bp-tab.active {
+  background: #7c3aed;
+  color: white;
+  border-color: #7c3aed;
+}
+
+.bp-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.bp-btn-primary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: #7c3aed;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.bp-btn-primary:hover { opacity: 0.9; }
+
+.bp-btn-secondary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bp-btn-secondary:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.bp-btn-large {
+  padding: 14px 24px;
+  font-size: 14px;
+}
+
+/* ---------- PHASE CONTENT ---------- */
+.bp-phase-content {
+  padding: 16px;
+}
+
+.bp-phase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.bp-phase-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.bp-points-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(124,58,237,0.08);
+  color: #7c3aed;
+}
+
+/* ---------- MATCHES ---------- */
+.bp-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bp-match {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.bp-match-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.bp-match-teams {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bp-team {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: #f8fafc;
+  cursor: default;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.bp-team.pickable {
+  cursor: pointer;
+}
+
+.bp-team.pickable:hover {
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.04);
+}
+
+.bp-team.selected {
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.08);
+}
+
+.bp-team.correct {
+  border-color: #22c55e;
+  background: rgba(34,197,94,0.08);
+}
+
+.bp-team.wrong {
+  border-color: #ef4444;
+  background: rgba(239,68,68,0.06);
+  opacity: 0.6;
+}
+
+.bp-team:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bp-team .bp-flag {
+  font-size: 24px;
+}
+
+.bp-team .bp-team-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.bp-team .bp-winner-mark {
+  margin-left: auto;
+  font-size: 16px;
+  color: #22c55e;
+}
+
+.bp-vs {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.bp-result {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bp-result-correct { color: #22c55e; }
+.bp-result-wrong { color: #ef4444; }
+.bp-result-missed { color: #94a3b8; }
+
+/* ---------- CHAMPION PHASE ---------- */
+.bp-champion-area {
+  padding: 20px 0;
+}
+
+.bp-champion-selected {
+  text-align: center;
+  padding: 30px 20px;
+  background: white;
+  border-radius: 20px;
+  border: 2px solid #7c3aed;
+}
+
+.bp-champion-flag {
+  font-size: 64px;
+  margin-bottom: 12px;
+}
+
+.bp-champion-name {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.bp-champion-picker {
+  text-align: center;
+  padding: 30px 20px;
+  background: white;
+  border-radius: 20px;
+  border: 2px dashed #cbd5e1;
+}
+
+.bp-champion-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.bp-champion-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.bp-champion-option:hover {
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.04);
+}
+
+/* ---------- PAYMENT GATE ---------- */
+.bp-payment-gate {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.bp-gate-icon {
+  font-size: 56px;
+  margin-bottom: 20px;
+}
+
+.bp-payment-gate h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.bp-payment-gate > p {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 24px;
+  line-height: 1.5;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.bp-gate-features {
+  text-align: left;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(0,0,0,0.06);
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.bp-gate-feature {
+  font-size: 14px;
+  color: #1e293b;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.bp-gate-feature:last-child {
+  border-bottom: none;
+}
+
+.bp-gate-price {
+  margin-bottom: 20px;
+}
+
+.bp-price-label {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.bp-price-amount {
+  font-size: 32px;
+  font-weight: 800;
+  color: #7c3aed;
+}
+
+/* ---------- TOO LATE ---------- */
+.bp-too-late {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.bp-too-late h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.bp-too-late p {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+/* ---------- SUBMITTED BANNER ---------- */
+.bp-submitted-banner {
+  position: fixed;
+  bottom: 80px;
+  left: 16px;
+  right: 16px;
+  background: #22c55e;
+  color: white;
+  padding: 14px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(34,197,94,0.3);
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 400px) {
+  .bp-champion-list {
+    grid-template-columns: 1fr;
+  }
+
+  .bp-match-teams {
+    flex-direction: column;
+  }
+
+  .bp-vs {
+    padding: 4px 0;
+  }
+}

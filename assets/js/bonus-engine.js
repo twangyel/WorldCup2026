@@ -683,6 +683,7 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
   const cardUpdates = []; // batch resolution updates
 
   // ---- PHASE 1: write base rows for EVERY prediction (no history needed) ----
+// ---- PHASE 1: write base rows for EVERY prediction (no history needed) ----
   // Streak/combo come out as 0 here (history = []); Phase 2 fills them in.
   for (const pred of predictions) {
     try {
@@ -724,6 +725,10 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
       }
 
       // --- Step 3: Double Points — multiply base
+      // Capture the raw base BEFORE doubling so we can store it cleanly.
+      // `basePoints` continues forward (doubled) for stage/streak/combo math,
+      // but `rawBaseBeforeDouble` is what we persist to prediction_results.base_points.
+      const rawBaseBeforeDouble = basePoints;
       const doublePointsApplied = hasDoublePoints && basePoints > 0;
       if (hasDoublePoints) {
         basePoints = basePoints * 2;
@@ -761,7 +766,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           home_prediction: winningHome,
           away_prediction: winningAway,
           stage: fixture.stage,
-          base_points: fullResult.base_points,
+          base_points: rawBaseBeforeDouble,            // ← raw, undoubled
+          double_points_applied: doublePointsApplied,  // ← new flag
           stage_multiplier: fullResult.stage_multiplier,
           multiplied_base: fullResult.multiplied_base,
           streak_bonus: fullResult.streak_bonus,

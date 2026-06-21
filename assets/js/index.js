@@ -173,6 +173,66 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+
+// ============== APP THEME / DARK MODE ==============
+const WCPL_THEME_STORAGE_KEY = 'wcpl-theme';
+
+function getSavedThemeMode() {
+  try {
+    return localStorage.getItem(WCPL_THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  } catch (_) {
+    return 'light';
+  }
+}
+
+function updateDarkModeToggleUI(isDark) {
+  const toggle = document.getElementById('dark-mode-toggle');
+  const status = document.getElementById('dark-mode-status-text');
+  const knob = toggle?.querySelector('.dark-theme-switch-knob');
+
+  if (toggle) {
+    toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    toggle.classList.toggle('is-on', !!isDark);
+  }
+  if (status) {
+    status.textContent = isDark
+      ? 'Night theme is active — easy on the eyes'
+      : 'Premium night theme for match days';
+  }
+  if (knob) {
+    knob.textContent = isDark ? '☀' : '✦';
+  }
+}
+
+function applyThemeMode(mode, options = {}) {
+  const isDark = mode === 'dark';
+  document.documentElement.classList.toggle('dark-mode', isDark);
+  if (document.body) document.body.classList.toggle('dark-mode', isDark);
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', isDark ? '#070A12' : '#FAFAF7');
+
+  if (options.persist !== false) {
+    try { localStorage.setItem(WCPL_THEME_STORAGE_KEY, isDark ? 'dark' : 'light'); } catch (_) {}
+  }
+
+  updateDarkModeToggleUI(isDark);
+}
+
+function toggleDarkMode() {
+  const nextMode = document.documentElement.classList.contains('dark-mode') ? 'light' : 'dark';
+  applyThemeMode(nextMode);
+  if (typeof showToast === 'function') {
+    showToast(nextMode === 'dark' ? 'Dark mode enabled' : 'Light mode enabled', 'info');
+  }
+}
+
+function initThemeMode() {
+  applyThemeMode(getSavedThemeMode(), { persist: false });
+}
+
+document.addEventListener('DOMContentLoaded', initThemeMode);
+
 // ============== PROFILE AVATAR ==============
 let pendingAvatarFile = null;
 
@@ -988,7 +1048,7 @@ function showPaymentGate() {
             const cached = (typeof getProfile === 'function') ? getProfile() : null
             if (cached) cached.fee_paid = false
             showModal({
-              icon: '🔒',
+              icon: 'lock',
               title: 'Payment status revoked',
               message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
               actions: [
@@ -1295,7 +1355,7 @@ const BADGES = [
   { id: 'combo',       icon: '🔗', name: 'Combo King',     desc: '3+ exact combos' },
   { id: 'earlybird',   icon: '🐦', name: 'Early Bird',    desc: 'Predict 72h+ early' },
   { id: 'underdog',    icon: '🐴', name: 'Draw Master', desc: '3+ correct draws' },
-  { id: 'streak',      icon: '🔥', name: 'Hot Streak',     desc: '3+ scoring in a row' },
+  { id: 'streak',      icon: 'flame', name: 'Hot Streak',     desc: '3+ scoring in a row' },
   { id: 'centurion',   icon: '🏅', name: 'Centurion',     desc: '100+ points' },
   { id: 'allin',       icon: '🎲', name: 'All In',        desc: 'Predict every match' }
 ]
@@ -1583,12 +1643,18 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
                     class="flex-1 text-xs font-semibold text-ink-600 hover:text-ink-900 tap py-2">
               See all picks (${hotTakesByFixture[f.id].length})
             </button>
-            ${isAdmin() ? `<button onclick="sharePickList('${f.id}')"
+           ${isAdmin() ? `<button onclick="sharePickList('${f.id}')"
                     class="text-xs font-bold text-brand-700 hover:text-brand-900 tap py-2 px-3 rounded-lg"
                     style="background:rgba(212,162,76,0.10);"
                     title="Share pick list to WhatsApp">
-              📤 Share
-            </button>` : ''}
+              📤 Picks
+            </button>
+            ${(f.home_score !== null && f.away_score !== null) ? `<button onclick="shareMatchReport('${f.id}')"
+                    class="text-xs font-bold text-emerald-700 hover:text-emerald-900 tap py-2 px-3 rounded-lg"
+                    style="background:rgba(74,222,128,0.12);"
+                    title="Share scoring breakdown to WhatsApp">
+              📊 Report
+            </button>` : ''}` : ''}
           </div>
           <div id="hot-takes-${f.id}" class="hidden mt-1"></div>
         </div>`
@@ -2142,7 +2208,7 @@ return `
         'centurion':   { icon: '💯', name: 'Centurion',    criteria: 'Reach 100 or more total points.',
                          progress: () => `${points} pts so far`,
                          earned: () => points >= 100 },
-        'streak-chip': { icon: '🔥', name: 'Hot Streak',   criteria: 'Score points in 3 or more consecutive resolved matches.',
+        'streak-chip': { icon: 'flame', name: 'Hot Streak',   criteria: 'Score points in 3 or more consecutive resolved matches.',
                          progress: () => `${streak} match${streak === 1 ? '' : 'es'} in a row`,
                          earned: () => streak >= 3 },
         'combo-chip':  { icon: '⚡', name: 'Exact Combo',   criteria: '2 exact scores back-to-back. +3 bonus per combo. Earn 3+ combos to unlock the Combo King badge.',
@@ -2151,7 +2217,7 @@ return `
         'combo':       { icon: '⚡', name: 'Combo King',    criteria: 'Earn 3 or more exact combos (back-to-back exact scores) across the tournament.',
                          progress: () => `${combos} combo${combos === 1 ? '' : 's'} so far`,
                          earned: () => combos >= 3 },
-        'overflow':    { icon: '🏆', name: 'More badges',  criteria: 'Other achievements earned by this player. Tap the player to see their full profile.',
+        'overflow':    { icon: 'cup', name: 'More badges',  criteria: 'Other achievements earned by this player. Tap the player to see their full profile.',
                          progress: () => '',
                          earned: () => true }
       }
@@ -2408,6 +2474,7 @@ async function getLeaderboardFromResults() {
         gd: 0,
         result: 0,
         combo_count: 0,
+        form: [],
         total_predictions: 0
       }))
       return { data: stats, error: null }
@@ -2429,6 +2496,20 @@ async function getLeaderboardFromResults() {
     // Count combo bonuses earned (2 exact scores in a row → combo_bonus > 0).
     // Cheap because we're already iterating these rows below.
     const comboCount = userResults.filter(r => (r.combo_bonus || 0) > 0).length
+    const form = userResults
+      .slice()
+      .sort((a, b) => {
+        const ad = new Date(a.kickoff || a.created_at || 0).getTime()
+        const bd = new Date(b.kickoff || b.created_at || 0).getTime()
+        return bd - ad
+      })
+      .slice(0, 5)
+      .map(r => {
+        const base = Number((r.base_points != null) ? r.base_points : (r.points_awarded || r.final_points || 0))
+        if (base === 5) return 'exact'
+        if (base > 0) return 'correct'
+        return 'miss'
+      })
     let engineStats
     try {
       if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
@@ -2459,6 +2540,7 @@ return {
       department: profile.department || '',
       avatar_url: profile.avatar_url || null,
       combo_count: comboCount,
+      form,
       ...engineStats
     }
   })
@@ -2488,7 +2570,391 @@ async function getUserResults(userId) {
   return data || []
 }
 
+
+
+// ============== BRACKET CHALLENGE HOME CARD ==============
+// This card is injected by JS so it still appears even if the home HTML was not updated.
+// It now reads bracket_settings.status from Supabase so live/locked/completed are not controlled by the countdown.
+let homeBracketStatusCache = null;
+let homeBracketStatusLoadedAt = 0;
+
+function getBracketHomeDefaultLockAt() {
+  return new Date('2026-06-28T18:50:00.000Z'); // 29 Jun 2026 12:50 AM BTT (UTC+6)
+}
+
+function normalizeBracketHomeStatus(status) {
+  return String(status || 'coming_soon').trim().toLowerCase();
+}
+
+function isPublicBracketHomeStatus(status) {
+  return ['locked', 'live', 'completed'].includes(normalizeBracketHomeStatus(status));
+}
+
+function isEntryOpenBracketHomeStatus(status) {
+  return normalizeBracketHomeStatus(status) === 'open';
+}
+
+function formatBracketHomeCountdown(lockAt) {
+  const lockDate = lockAt instanceof Date && !Number.isNaN(lockAt.getTime())
+    ? lockAt
+    : getBracketHomeDefaultLockAt();
+
+  const now = new Date();
+  const diff = Math.max(0, lockDate.getTime() - now.getTime());
+
+  if (diff <= 0) return 'Lock reached';
+
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+
+  if (days > 0) return `${days}d ${hours}h ${mins}m left`;
+  if (hours > 0) return `${hours}h ${mins}m left`;
+  return `${mins}m left`;
+}
+
+async function fetchHomeBracketMeta(force = false) {
+  const now = Date.now();
+  if (!force && homeBracketStatusCache && now - homeBracketStatusLoadedAt < 12000) {
+    return homeBracketStatusCache;
+  }
+
+  const fallback = {
+    status: 'coming_soon',
+    lockAt: getBracketHomeDefaultLockAt(),
+    isPaid: false,
+    hasSubmitted: false,
+    entryCount: 0
+  };
+
+  try {
+    const [{ data: settings }, entryCountResult] = await Promise.all([
+      supabaseClient.from('bracket_settings').select('*').single(),
+      supabaseClient.from('bracket_entries').select('*', { count: 'exact', head: true }).eq('payment_status', 'paid')
+    ]);
+
+    const user = typeof getUser === 'function' ? getUser() : null;
+    let entry = null;
+    if (user?.id) {
+      const { data } = await supabaseClient
+        .from('bracket_entries')
+        .select('payment_status, submitted_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      entry = data || null;
+    }
+
+    const parsedLockAt = new Date(settings?.lock_at || getBracketHomeDefaultLockAt());
+    const meta = {
+      status: normalizeBracketHomeStatus(settings?.status),
+      lockAt: Number.isNaN(parsedLockAt.getTime()) ? getBracketHomeDefaultLockAt() : parsedLockAt,
+      isPaid: entry?.payment_status === 'paid',
+      hasSubmitted: !!entry?.submitted_at,
+      entryCount: entryCountResult?.count || 0
+    };
+
+    homeBracketStatusCache = meta;
+    homeBracketStatusLoadedAt = now;
+    return meta;
+  } catch (e) {
+    console.warn('[Bracket] Failed to fetch home bracket status:', e);
+    return homeBracketStatusCache || fallback;
+  }
+}
+
+function getHomeBracketCopy(meta) {
+  const status = normalizeBracketHomeStatus(meta?.status);
+  const hasSubmitted = !!meta?.hasSubmitted;
+  const countdown = formatBracketHomeCountdown(meta?.lockAt);
+
+  if (status === 'hidden') {
+    // Bracket is admin-hidden. Card is also hidden via CSS (body.bracket-status-hidden),
+    // but return an empty-ish copy so nothing misleading flashes if CSS hasn't loaded.
+    return {
+      icon: 'cup',
+      kicker: '',
+      title: '',
+      subtitle: '',
+      statusLabel: '',
+      statusValue: '',
+      statusClass: '',
+      button: '',
+      buttonDisabled: true,
+      footer: ''
+    };
+  }
+
+  if (status === 'coming_soon') {
+    return {
+      icon: 'flag',
+      kicker: 'Mystery Game',
+      title: 'Coming Soon',
+      subtitle: 'A new game mode will be revealed soon.',
+      statusLabel: 'Reveal',
+      statusValue: countdown,
+      statusClass: 'text-amber-200',
+      button: 'Opening Soon',
+      buttonDisabled: true,
+      footer: 'Stay ready. The bracket challenge will open once admin activates it.'
+    };
+  }
+
+  if (status === 'open') {
+    return {
+      icon: 'cup',
+      kicker: 'Fantasy Bracket League',
+      title: hasSubmitted ? 'Bracket Submitted' : 'Bracket Challenge',
+      subtitle: hasSubmitted ? 'You can still edit before lock.' : 'R32 → Champion · Max 119 pts',
+      statusLabel: 'Open',
+      statusValue: countdown,
+      statusClass: 'text-emerald-200',
+      button: hasSubmitted ? 'Edit Bracket' : 'Enter Bracket',
+      buttonDisabled: false,
+      footer: 'Bracket entry is open now. Before lock, only your own bracket is visible.'
+    };
+  }
+
+  if (status === 'locked') {
+    return {
+      icon: 'lock',
+      kicker: 'Entries Closed',
+      title: 'Bracket Locked',
+      subtitle: 'Picks are sealed. Public leaderboard is available.',
+      statusLabel: 'Status',
+      statusValue: 'Locked',
+      statusClass: 'text-slate-200',
+      button: hasSubmitted ? 'View My Picks' : 'View Leaderboard',
+      buttonDisabled: false,
+      footer: hasSubmitted ? 'Your bracket is sealed. You can view your picks and the leaderboard.' : 'Entries are closed. You can now view the public leaderboard.'
+    };
+  }
+
+  if (status === 'live') {
+    return {
+      icon: 'flame',
+      kicker: 'Live Now',
+      title: 'Bracket Challenge Live',
+      subtitle: 'Public leaderboard is now active.',
+      statusLabel: 'Status',
+      statusValue: 'Live',
+      statusClass: 'text-emerald-200',
+      button: hasSubmitted ? 'View Bracket' : 'View Leaderboard',
+      buttonDisabled: false,
+      footer: 'Scoring is active. Countdown is bypassed while the bracket is live.'
+    };
+  }
+
+  if (status === 'completed') {
+    return {
+      icon: 'flag',
+      kicker: 'Final Results',
+      title: 'Bracket Completed',
+      subtitle: 'Final leaderboard is ready.',
+      statusLabel: 'Status',
+      statusValue: 'Completed',
+      statusClass: 'text-slate-200',
+      button: 'View Results',
+      buttonDisabled: false,
+      footer: 'The bracket challenge is completed. View the final standings and champion picks.'
+    };
+  }
+
+  return {
+    icon: 'cup',
+    kicker: 'Fantasy Bracket League',
+    title: 'Bracket Challenge',
+    subtitle: 'R32 → Champion · Max 119 pts',
+    statusLabel: 'Status',
+    statusValue: status || 'Unknown',
+    statusClass: 'text-white/70',
+    button: 'Open Bracket',
+    buttonDisabled: false,
+    footer: 'Bracket Challenge is separate from the main league leaderboard.'
+  };
+}
+
+
+function bracketHomeIconHtml(type = 'cup') {
+  const icons = {
+    cup: `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="homeBracketCup" x1="10" y1="4" x2="54" y2="58"><stop stop-color="#FDE68A"/><stop offset=".45" stop-color="#F59E0B"/><stop offset="1" stop-color="#7C2D12"/></linearGradient></defs><path d="M18 12h28v10c0 11-5.8 19-14 19S18 33 18 22V12Z" fill="url(#homeBracketCup)"/><path d="M18 17H9v5c0 7 4.9 12 11 12" fill="none" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/><path d="M46 17h9v5c0 7-4.9 12-11 12" fill="none" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/><path d="M28 41h8v8h9v6H19v-6h9v-8Z" fill="#F59E0B"/></svg>`,
+    lock: `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="homeBracketLock" x1="12" y1="8" x2="52" y2="56"><stop stop-color="#C084FC"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect x="14" y="28" width="36" height="26" rx="8" fill="url(#homeBracketLock)"/><path d="M22 28v-7c0-7 4.5-12 10-12s10 5 10 12v7" fill="none" stroke="#F5F3FF" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="40" r="4" fill="#fff"/></svg>`,
+    flame: `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="homeBracketFlame" x1="16" y1="6" x2="48" y2="58"><stop stop-color="#FDE68A"/><stop offset=".45" stop-color="#F97316"/><stop offset="1" stop-color="#7C2D12"/></linearGradient></defs><path d="M34 4c4 11-7 15 3 25 2-5 7-8 8-15 8 8 11 17 8 27-3 11-12 18-25 17C16 57 8 48 10 37c2-10 10-15 15-22 3-4 5-7 9-11Z" fill="url(#homeBracketFlame)"/><path d="M30 54c-8-2-11-9-8-16 2-4 6-7 9-12 1 6 8 9 6 17-1 5-3 8-7 11Z" fill="#FDE68A" opacity=".85"/></svg>`,
+    flag: `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="homeBracketFlag" x1="12" y1="8" x2="52" y2="56"><stop stop-color="#A78BFA"/><stop offset="1" stop-color="#312E81"/></linearGradient></defs><path d="M18 52V11" stroke="#E9D5FF" stroke-width="5" stroke-linecap="round"/><path d="M21 12h28l-5 10 5 10H21V12Z" fill="url(#homeBracketFlag)"/></svg>`
+  };
+  return `<span class="bracket-home-svg-icon">${icons[type] || icons.cup}</span>`;
+}
+
+function renderHomeBracketCard(card, meta) {
+  const copy = getHomeBracketCopy(meta);
+  const isLive = normalizeBracketHomeStatus(meta?.status) === 'live';
+  const isCompleted = normalizeBracketHomeStatus(meta?.status) === 'completed';
+  const isPublic = isPublicBracketHomeStatus(meta?.status);
+  const entryCount = Number(meta?.entryCount || 0);
+
+  const bg = isLive
+    ? 'radial-gradient(circle at top right, rgba(16,185,129,.30), transparent 38%), radial-gradient(circle at 80% 0%, rgba(168,85,247,.28), transparent 36%), linear-gradient(145deg, #06251f 0%, #070612 78%)'
+    : isCompleted
+      ? 'radial-gradient(circle at top right, rgba(251,191,36,.25), transparent 38%), linear-gradient(145deg, #140a2e 0%, #070612 76%)'
+      : 'radial-gradient(circle at top right, rgba(168,85,247,.42), transparent 38%), radial-gradient(circle at 8% 0%, rgba(56,189,248,.10), transparent 26%), linear-gradient(145deg, #140a2e 0%, #070612 76%)';
+
+  card.innerHTML = `
+    <div class="absolute inset-0 pointer-events-none" style="background:${bg};"></div>
+    <div class="relative text-white">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-12 h-12 rounded-2xl bg-white/12 border border-white/15 flex items-center justify-center text-2xl shadow-soft shrink-0">${bracketHomeIconHtml(copy.icon)}</div>
+          <div class="min-w-0">
+            <div class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-brand-100/80">${copy.kicker}</div>
+            <h3 class="text-lg font-extrabold leading-tight truncate">${copy.title}</h3>
+            <p class="text-xs text-white/70 mt-0.5">${copy.subtitle}</p>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-[10px] uppercase tracking-wider text-white/55 font-bold">${copy.statusLabel}</div>
+          <div class="text-xs font-extrabold ${copy.statusClass}">${copy.statusValue}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 mb-4">
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-3 text-center">
+          <div class="text-lg font-extrabold">32</div>
+          <div class="text-[10px] text-white/60 font-bold uppercase tracking-wider">Teams</div>
+        </div>
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-3 text-center">
+          <div class="text-lg font-extrabold">6</div>
+          <div class="text-[10px] text-white/60 font-bold uppercase tracking-wider">Rounds</div>
+        </div>
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-3 text-center">
+          <div class="text-lg font-extrabold">119</div>
+          <div class="text-[10px] text-white/60 font-bold uppercase tracking-wider">Max Pts</div>
+        </div>
+      </div>
+
+      ${isPublic ? `
+        <div class="mb-3 rounded-2xl bg-white/10 border border-white/10 px-3 py-2 flex items-center justify-between text-xs">
+          <span class="text-white/65 font-bold">Public leaderboard</span>
+          <span class="font-extrabold ${isLive ? 'text-emerald-200' : 'text-brand-100'}">${entryCount.toLocaleString()} paid entries</span>
+        </div>
+      ` : ''}
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="openBracketChallengeFromHome()" class="flex-1 py-3 rounded-2xl bg-white text-brand-900 font-extrabold text-sm tap shadow-soft ${copy.buttonDisabled ? 'opacity-70 cursor-not-allowed' : ''}" ${copy.buttonDisabled ? 'disabled' : ''}>
+          ${copy.button}
+        </button>
+        <button type="button" onclick="showBracketChallengeInfo()" class="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center font-extrabold tap">?</button>
+      </div>
+
+      <p class="text-[11px] text-white/58 mt-3 leading-relaxed">
+        ${copy.footer}
+      </p>
+    </div>
+  `;
+}
+
+async function ensureBracketChallengeHomeCard(force = false) {
+  try {
+    const homeTab = document.getElementById('tab-home');
+    if (!homeTab) return;
+
+    let card = document.getElementById('home-bracket-challenge-card');
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'home-bracket-challenge-card';
+      card.className = 'card p-5 overflow-hidden relative bracket-home-card';
+
+      const prizeDash = document.getElementById('home-prize-dashboard');
+      const nextMatch = document.getElementById('home-next-match');
+      const nextBlock = nextMatch ? nextMatch.closest('.card, section, div') : null;
+
+      if (prizeDash && prizeDash.parentNode) {
+        prizeDash.insertAdjacentElement('afterend', card);
+      } else if (nextBlock && nextBlock.parentNode) {
+        nextBlock.parentNode.insertBefore(card, nextBlock);
+      } else {
+        homeTab.prepend(card);
+      }
+    }
+
+    // Fast placeholder, replaced with live Supabase state below.
+    if (!homeBracketStatusCache) {
+      renderHomeBracketCard(card, {
+        status: 'coming_soon',
+        lockAt: getBracketHomeDefaultLockAt(),
+        isPaid: false,
+        hasSubmitted: false,
+        entryCount: 0
+      });
+    }
+
+    const meta = await fetchHomeBracketMeta(force);
+    renderHomeBracketCard(card, meta);
+
+    // Apply the bracket overlay (blur cover for coming_soon/locked, etc.) SYNCHRONOUSLY
+    // right after innerHTML is set. Defers to a no-op when bracket-challenge.js hasn't
+    // loaded yet. This prevents the brief flash of un-overlaid content on refresh.
+    try {
+      if (typeof window.applyHomeBracketStatusOverlay === 'function') {
+        window.applyHomeBracketStatusOverlay();
+      }
+    } catch (e) {
+      // Silent — overlay is a best-effort visual.
+    }
+  } catch (e) {
+    console.warn('[Bracket] home card render failed:', e);
+  }
+}
+
+function openBracketChallengeFromHome() {
+  try {
+    // Your Bracket Challenge is an in-page panel from bracket-challenge.js
+    if (typeof window.openBracketPanel === 'function') {
+      if (typeof window.initBracketChallenge === 'function') {
+        Promise.resolve(window.initBracketChallenge()).finally(() => window.openBracketPanel())
+      } else {
+        window.openBracketPanel()
+      }
+      return
+    }
+
+    if (document.getElementById('tab-bracket') && typeof switchTab === 'function') {
+      switchTab('bracket')
+      return
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('Bracket panel not loaded. Check bracket-challenge.js script path.', 'warning')
+    }
+
+    console.warn('[Bracket] openBracketPanel is missing. Do not redirect to bracket-challenge.html because that file does not exist.')
+  } catch (e) {
+    console.warn('[Bracket] open failed:', e)
+    if (typeof showToast === 'function') showToast('Bracket Challenge could not open', 'warning')
+  }
+}
+
+function showBracketChallengeInfo() {
+  const html = `
+    <div class="text-left space-y-2 text-sm leading-relaxed">
+      <p><b>Scoring:</b> R32 2 · R16 3 · QF 5 · SF 8 · Final 12 · Champion 15.</p>
+      <p><b>Lock:</b> 29 June 2026, 12:50 AM BTT.</p>
+      <p>No boosters, insurance, or streak bonuses. This is a separate paid competition.</p>
+      <p><b>Status rules:</b> Open shows the deadline countdown. Live bypasses countdown and opens the public leaderboard.</p>
+    </div>
+  `
+  if (typeof showModal === 'function') {
+    showModal({
+      icon: 'cup',
+      title: 'Bracket Challenge',
+      messageHtml: html,
+      actions: [{ text: 'Got it', onclick: 'hideModal()', class: 'bg-brand-900 text-white' }]
+    })
+  } else if (typeof showToast === 'function') {
+    showToast('Bracket Challenge: R32 to Champion. Live mode opens the public leaderboard.', 'info')
+  }
+}
+
 async function loadHome() {
+  ensureBracketChallengeHomeCard()
   const myId = getUser()?.id
   const { data: stats } = await getLeaderboardFromResults()
   const total = stats?.length || 0
@@ -3325,14 +3791,16 @@ function buildMatchHighlightData(fixtureId) {
   const picks = (hotTakesByFixture[fixtureId] || []) // sorted by final_points desc when finished
   const exact = picks.filter(p => p.base_points === 5).length
   const correctResult = picks.filter(p => p.base_points === 2 || p.base_points === 3).length
-  const pointsWon = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
-  const topPicks = picks.slice(0, 3)
+ const pointsWon = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
+
+  // Only show players who actually scored on the podium (was: picks.slice(0,3))
+  const scorers = picks.filter(p => (p.final_points || 0) > 0)
+  const topPicks = scorers.slice(0, 3)
 
   // Maverick / biggest upset: the scorer whose exact scoreline was predicted by
   // the fewest players. Exclude the MVP (top pick) when 2+ players scored, so we
   // don't surface the same person twice.
   let maverick = null, maverickPop = 0
-  const scorers = picks.filter(p => (p.final_points || 0) > 0)
   if (scorers.length) {
     const freq = {}
     picks.forEach(p => { const k = p.home + '-' + p.away; freq[k] = (freq[k] || 0) + 1 })
@@ -3477,294 +3945,117 @@ function drawCanvasStar(ctx, cx, cy, r, color) {
 }
 
 // ---- Canvas PNG generator for the admin share ----
-async function generateMatchHighlightCardBlob(fixtureId) {
-  const d = buildMatchHighlightData(fixtureId)
-  if (!d) throw new Error('Fixture not finished or not found')
-  const { fixture, summary, topPicks, maverick, maverickPop } = d
 
-  // Preload both flags (hi-res). getFlag is defined at the top of this file.
-  const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
-  const [homeImg, awayImg] = await Promise.all([
-    loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
-    loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
-  ])
-
-  const WIDTH = 1080
-  const ROW_H = 84
-  const HEADER_H = 150
-  const SCORE_H = 250
-  const STATS_H = 130
-  const SEC_LABEL = 56
-  const UPSET_H = maverick ? 140 : 0
-  const FOOTER_H = 80
-  const topRows = topPicks.length
-  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL + topRows * ROW_H + UPSET_H + FOOTER_H + 30
-
-  const canvas = document.createElement('canvas')
-  canvas.width = WIDTH; canvas.height = HEIGHT
-  const ctx = canvas.getContext('2d')
-
-  // Background
-  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
-  bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
-  ctx.fillStyle = 'rgba(255,255,255,0.04)'
-  for (let y = 0; y < HEIGHT; y += 32) for (let x = 0; x < WIDTH; x += 32) { ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill() }
-  const glow = ctx.createRadialGradient(WIDTH - 100, 100, 0, WIDTH - 100, 100, 600)
-  glow.addColorStop(0, 'rgba(212,162,76,0.30)'); glow.addColorStop(1, 'rgba(212,162,76,0)')
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, WIDTH, HEIGHT)
-
-  const cx = WIDTH / 2
-
-  // Header — mirror the in-app card: stage + "Highlights" on the left, date on the right.
-  const stageLabel = `🏆 ${fixture.stage || 'Match'} · Highlights`
-  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 34px system-ui, sans-serif'
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-  ctx.fillText(stageLabel, 60, 90)
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - 60, 90)
-  ctx.textBaseline = 'alphabetic'
-
-  // Score block with flags
-  let y = HEADER_H
-  const flagY = y + 56, fw = 96, fh = 64
-  const leftX = cx - 240, rightX = cx + 240
-
-  function drawFlag(img, name, x) {
-    if (img) {
-      ctx.save()
-      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.clip()
-      ctx.drawImage(img, x - fw / 2, flagY, fw, fh)
-      ctx.restore()
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2
-      roundRect(ctx, x - fw / 2, flagY, fw, fh, 10); ctx.stroke()
-    } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2
-      ctx.beginPath(); ctx.arc(x, flagY + fh / 2, 50, 0, Math.PI * 2); ctx.stroke()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 32px system-ui, sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(teamCodeFallback(name), x, flagY + fh / 2)
-      ctx.textBaseline = 'alphabetic'
-    }
-    ctx.fillStyle = '#fff'; ctx.font = '26px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(truncateForCanvas(ctx, name, 300), x, flagY + fh + 40)
-  }
-  drawFlag(homeImg, fixture.home_team, leftX)
-  drawFlag(awayImg, fixture.away_team, rightX)
-
-  ctx.fillStyle = '#F4C430'; ctx.font = 'bold 92px system-ui, sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
-  ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 24px system-ui, sans-serif'
-  ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 60)
-
-  // Summary stats
-  y = HEADER_H + SCORE_H
-  const stats = [
-    ['PREDICTIONS', summary.predictions, '#fff'],
-    ['EXACT', summary.exact, '#fff'],
-    ['RESULT', summary.correctResult, '#fff'],
-    ['POINTS', summary.pointsWon, '#F4C430']
-  ]
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(WIDTH - 60, y); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(60, y + STATS_H - 10); ctx.lineTo(WIDTH - 60, y + STATS_H - 10); ctx.stroke()
-  const stepW = (WIDTH - 120) / 4
-  stats.forEach((st, i) => {
-    const sx = 60 + stepW * i + stepW / 2
-    ctx.fillStyle = st[2]; ctx.font = 'bold 52px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(String(st[1]), sx, y + 58)
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 20px system-ui, sans-serif'
-    ctx.fillText(st[0], sx, y + 92)
-  })
-
-  // Top predictions
-  y = HEADER_H + SCORE_H + STATS_H
-  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText('⚡ TOP PREDICTIONS', 60, y + 36)
-  y += SEC_LABEL
-  const medals = ['🥇', '🥈', '🥉']
-  topPicks.forEach((p, i) => {
-    const win = (p.final_points || 0) > 0
-    const rowY = y + i * ROW_H
-    ctx.fillStyle = win ? 'rgba(212,162,76,0.13)' : 'rgba(255,255,255,0.05)'
-    ctx.strokeStyle = win ? 'rgba(212,162,76,0.45)' : 'rgba(255,255,255,0)'
-    ctx.lineWidth = 1.5
-    roundRect(ctx, 60, rowY + 8, WIDTH - 120, ROW_H - 16, 14); ctx.fill(); if (win) ctx.stroke()
-    const cyl = rowY + ROW_H / 2
-    ctx.textBaseline = 'middle'
-    ctx.font = '40px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'
-    ctx.fillText(medals[i] || '', 84, cyl)
-    // name + bonus emoji (MVP rendered separately below as a real gold pill)
-    const isMvp = i === 0 && win
-    let nameLabel = p.name
-    if ((p.combo_bonus || 0) > 0) nameLabel += ' ⚡'
-    if ((p.streak_bonus || 0) > 0) nameLabel += ' 🔥'
-    ctx.font = 'bold 30px system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
-    const nameMax = isMvp ? 360 : 540
-    const drawnName = truncateForCanvas(ctx, nameLabel, nameMax)
-    ctx.fillText(drawnName, 150, cyl)
-
-    if (isMvp) {
-      const nameW = ctx.measureText(drawnName).width
-      const pillX = 150 + nameW + 14
-      const pillH = 38, padX = 14, starSize = 20, starGap = 8
-      ctx.font = 'bold 22px system-ui, sans-serif'
-      const labelW = ctx.measureText('MATCH MVP').width
-      const pillW = padX + starSize + starGap + labelW + padX
-      // gold pill
-      ctx.fillStyle = '#D4A24C'
-      roundRect(ctx, pillX, cyl - pillH / 2, pillW, pillH, pillH / 2); ctx.fill()
-      // star + dark label
-      drawCanvasStar(ctx, pillX + padX + starSize / 2, cyl, starSize / 2, '#0B1221')
-      ctx.fillStyle = '#0B1221'; ctx.textAlign = 'left'
-      ctx.fillText('MATCH MVP', pillX + padX + starSize + starGap, cyl + 1)
-    }
-    ctx.font = 'bold 34px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'right'
-    ctx.fillText(`${p.home} – ${p.away}`, WIDTH - 200, cyl)
-    ctx.font = 'bold 28px system-ui, sans-serif'; ctx.fillStyle = win ? '#4ADE80' : '#F87171'
-    ctx.fillText(`+${p.final_points || 0}`, WIDTH - 84, cyl)
-    ctx.textBaseline = 'alphabetic'
-  })
-
-  // Biggest upset
-  y += topRows * ROW_H
-  if (maverick) {
-    const panelY = y + 12
-    ctx.fillStyle = 'rgba(96,165,250,0.12)'
-    ctx.strokeStyle = 'rgba(96,165,250,0.4)'; ctx.lineWidth = 1.5
-    roundRect(ctx, 60, panelY, WIDTH - 120, 104, 16); ctx.fill(); ctx.stroke()
-    ctx.fillStyle = '#93C5FD'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'left'
-    ctx.fillText('🎯 BOLDEST CALL', 88, panelY + 38)
-    // Two-segment draw so the player's name renders bold while the rest is regular weight.
-    const restTxt = ` called ${maverick.home}–${maverick.away} when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did`
-    const textX = 88, textY = panelY + 78
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
-    ctx.font = 'bold 26px system-ui, sans-serif'
-    ctx.fillText(maverick.name, textX, textY)
-    const nameW = ctx.measureText(maverick.name).width
-    ctx.font = '26px system-ui, sans-serif'
-    ctx.fillText(truncateForCanvas(ctx, restTxt, WIDTH - 260 - nameW), textX + nameW, textY)
-    ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 30px system-ui, sans-serif'; ctx.textAlign = 'right'
-    ctx.fillText(`+${maverick.final_points || 0}`, WIDTH - 88, panelY + 78)
-  }
-
-  // Footer
-  ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 28px system-ui, sans-serif'
-  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
-  })
-}
-
-// ---- Admin share (mirrors shareLeaderboard's 3-path fallback) ----
-async function shareMatchHighlight(fixtureId) {
-  const d = buildMatchHighlightData(fixtureId)
-  if (!d) { showToast('Match not finished yet', 'info'); return }
-  const f = d.fixture
-
-  let blob = null
-  try { blob = await generateMatchHighlightCardBlob(fixtureId) }
-  catch (e) { console.warn('[shareMatchHighlight] image gen failed:', e) }
-
-  const text = `🏆 WC 2026 Prediction League\n${f.home_team} ${f.home_score}–${f.away_score} ${f.away_team} (${f.stage || ''})\n${d.summary.exact} nailed the exact score · ${d.summary.pointsWon} pts won\n\nJoin 👇\nhttps://wcpredictionleague.vercel.app`
-
-  // WhatsApp's share intent silently drops the caption when a file is attached,
-  // so we copy it to the clipboard first — user can long-press paste in the chat.
-  let captionCopied = false
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text)
-      captionCopied = true
-    }
-  } catch (e) { console.warn('[shareMatchHighlight] clipboard copy failed:', e) }
-
-  if (blob && navigator.canShare) {
-    const file = new File([blob], `wcpl-match-${Date.now()}.png`, { type: 'image/png' })
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: 'WC 2026 Prediction League', text })
-        showToast(captionCopied ? 'Shared · caption copied, long-press to paste' : 'Shared!', 'success')
-        return
-      }
-      catch (e) { if (e.name === 'AbortError') return; console.warn('[shareMatchHighlight] native share failed:', e) }
-    }
-  }
-  if (blob) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `wcpl-match-${Date.now()}.png`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-    showToast('Image saved · attach it in WhatsApp', 'success')
-    setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'), 250)
-    return
-  }
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
-}
-
-
-// ---- Canvas PNG generator for the pick-list share ----
 // ============================================================
-// picklist-2col-patch.js
-// Drop-in replacement for generatePickListCardBlob() in index.js
-// Same function signature, same helpers — only the layout changes.
+// MATCH REPORT CARD v4 — WC 2026 Prediction League
+// ============================================================
+// Drop-in replacement for generateMatchReportCardBlob().
 //
-// Picks render in TWO columns:
-//   • ceil(N/2) rows on the left  (positions 1..K)
-//   • floor(N/2) rows on the right (positions K+1..N)
-// This roughly halves the card height and keeps text readable
-// after WhatsApp compression.
+// Changes vs v3:
+//   • Removed TOP PREDICTIONS + BOLDEST CALL block
+//     (generated separately by the Match Highlights card)
+//   • Bumped breakdown-table TOTAL font from 19px → 24px
+//   • Slight row-height bump (58 → 62) to accommodate larger total
+//
+// shareMatchReport() does not change.
 // ============================================================
 
-async function generatePickListCardBlob(fixtureId) {
+async function generateMatchReportCardBlob(fixtureId) {
   const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
     .find(f => f.id === fixtureId)
   if (!fixture) throw new Error('Fixture not found')
 
-  const picks = hotTakesByFixture[fixtureId] || []
-  if (!picks.length) throw new Error('No picks for this fixture')
-
   const finished = fixture.home_score !== null && fixture.away_score !== null
+  if (!finished) throw new Error('Match report is only available for finished matches')
 
-  // Summary stats
-  const exact         = picks.filter(p => p.base_points === 5).length
-  const correctResult = picks.filter(p => p.base_points === 2 || p.base_points === 3).length
-  const pointsWon     = picks.reduce((sum, p) => sum + (p.final_points || 0), 0)
+  // --- Fetch detailed prediction_results for this fixture ------------------
+  const { data: rows, error: resErr } = await supabaseClient
+    .from('prediction_results')
+    .select('user_id, base_points, stage_multiplier, multiplied_base, streak_bonus, combo_bonus, total_bonus, final_points, streak_count, streak_tier, combos_earned, bonus_breakdown, home_prediction, away_prediction')
+    .eq('fixture_id', fixtureId)
+  if (resErr) throw resErr
+  if (!rows || !rows.length) throw new Error('No scored predictions found for this match')
 
-  // Preload flags hi-res
+  // Paid, non-private profile names
+  const userIds = [...new Set(rows.map(r => r.user_id))]
+  const { data: profiles } = await supabaseClient
+    .from('profiles')
+    .select('id, name, fee_paid, entered_via_private')
+    .in('id', userIds)
+  const nameMap = {}
+  ;(profiles || []).forEach(p => {
+    if (p.fee_paid && !p.entered_via_private) nameMap[p.id] = p.name || 'Anonymous'
+  })
+
+  const picks = rows
+    .filter(r => nameMap[r.user_id])
+    .map(r => ({
+      name: nameMap[r.user_id],
+      home: r.home_prediction,
+      away: r.away_prediction,
+      base_points: r.base_points || 0,
+      stage_mult: r.stage_multiplier || 1,
+      multiplied_base: r.multiplied_base || 0,
+      streak_bonus: r.streak_bonus || 0,
+      combo_bonus: r.combo_bonus || 0,
+      final_points: r.final_points || 0,
+      streak_tier: r.streak_tier || null,
+      combos_earned: r.combos_earned || [],
+      breakdown: r.bonus_breakdown || []
+    }))
+    .sort((a, b) => {
+      if (b.final_points !== a.final_points) return b.final_points - a.final_points
+      if (b.base_points !== a.base_points) return b.base_points - a.base_points
+      return 0
+    })
+
+  if (!picks.length) throw new Error('No eligible predictions for this report')
+
+  // --- Aggregate stats -----------------------------------------------------
+  const exactCount   = picks.filter(p => p.base_points === 5).length
+  const correctCount = picks.filter(p => p.base_points === 3).length
+  const gdOnlyCount  = picks.filter(p => p.base_points === 2).length
+  const wrongCount   = picks.filter(p => p.base_points === 0).length
+  const totalPoints  = picks.reduce((s, p) => s + p.final_points, 0)
+  const streakAwards = picks.filter(p => p.streak_bonus > 0).length
+  const comboAwards  = picks.filter(p => p.combo_bonus > 0).length
+  const stageMult    = picks[0]?.stage_mult || 1
+
+  // --- Preload flags hi-res ------------------------------------------------
   const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
   const [homeImg, awayImg] = await Promise.all([
     loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
     loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
   ])
 
-  // ----- Layout constants -----
+  // --- Layout constants ----------------------------------------------------
   const WIDTH        = 1080
   const SIDE_PAD     = 60
   const HEADER_H     = 130
   const SCORE_H      = 240
-  const STATS_H      = finished ? 110 : 60
+  const STATS_H      = 130
   const SEC_LABEL_H  = 60
-  const ROW_H        = 62
+  const COL_HDR_H    = 40
+  const ROW_H        = 62        // ← bumped from 58 to fit larger total
   const COL_GUTTER   = 28
+  const SUMMARY_H    = 200
   const FOOTER_H     = 80
   const PAD_BOTTOM   = 30
 
-  // Two-column math
-  const INNER_W   = WIDTH - SIDE_PAD * 2
-  const COL_W     = (INNER_W - COL_GUTTER) / 2
-  const COL1_X    = SIDE_PAD
-  const COL2_X    = SIDE_PAD + COL_W + COL_GUTTER
+  const INNER_W      = WIDTH - SIDE_PAD * 2
+  const COL_W        = (INNER_W - COL_GUTTER) / 2
+  const COL1_X       = SIDE_PAD
+  const COL2_X       = SIDE_PAD + COL_W + COL_GUTTER
   const ROWS_PER_COL = Math.ceil(picks.length / 2)
 
-  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + (ROWS_PER_COL * ROW_H) + FOOTER_H + PAD_BOTTOM
+  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + COL_HDR_H
+              + (ROWS_PER_COL * ROW_H) + SUMMARY_H + FOOTER_H + PAD_BOTTOM
 
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH; canvas.height = HEIGHT
   const ctx = canvas.getContext('2d')
 
-  // ----- Background (unchanged) -----
+  // ----- Background --------------------------------------------------------
   const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
   bg.addColorStop(0, '#0B1221'); bg.addColorStop(0.5, '#152849'); bg.addColorStop(1, '#1E3A5F')
   ctx.fillStyle = bg; ctx.fillRect(0, 0, WIDTH, HEIGHT)
@@ -3778,16 +4069,16 @@ async function generatePickListCardBlob(fixtureId) {
 
   const cx = WIDTH / 2
 
-  // ----- Header -----
+  // ----- Header ------------------------------------------------------------
   ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 32px system-ui, sans-serif'
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-  ctx.fillText(`📋 ${fixture.stage || 'Match'} · Pick List`, SIDE_PAD, 75)
+  ctx.fillText(`📊 ${fixture.stage || 'Match'} · Match Report`, SIDE_PAD, 75)
   ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - SIDE_PAD, 75)
   ctx.textBaseline = 'alphabetic'
 
-  // ----- Score block with flags -----
+  // ----- Score block with flags -------------------------------------------
   let y = HEADER_H
   const flagY = y + 40, fw = 96, fh = 64
   const leftFX = cx - 220, rightFX = cx + 220
@@ -3814,106 +4105,167 @@ async function generatePickListCardBlob(fixtureId) {
   drawFlag(homeImg, fixture.home_team, leftFX)
   drawFlag(awayImg, fixture.away_team, rightFX)
 
-  if (finished) {
-    ctx.fillStyle = '#F4C430'; ctx.font = 'bold 80px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
-    ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 22px system-ui, sans-serif'
-    ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 56)
-  } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 56px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText('vs', cx, flagY + fh / 2 + 12)
-    ctx.fillStyle = '#60A5FA'; ctx.font = 'bold 20px system-ui, sans-serif'
-    ctx.fillText('LOCKED', cx, flagY + fh / 2 + 52)
-  }
+  ctx.fillStyle = '#F4C430'; ctx.font = 'bold 80px system-ui, sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 18)
+  ctx.fillStyle = '#4ADE80'; ctx.font = 'bold 22px system-ui, sans-serif'
+  ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 56)
 
-  // ----- Summary stats -----
+  // ----- Top stats strip ---------------------------------------------------
   y = HEADER_H + SCORE_H
   ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5
   ctx.beginPath(); ctx.moveTo(SIDE_PAD, y); ctx.lineTo(WIDTH - SIDE_PAD, y); ctx.stroke()
 
-  if (finished) {
-    const stats = [
-      ['PREDICTIONS', picks.length, '#fff'],
-      ['EXACT', exact, '#fff'],
-      ['RESULT', correctResult, '#fff'],
-      ['POINTS WON', pointsWon, '#F4C430']
-    ]
-    const stepW = (WIDTH - SIDE_PAD * 2) / 4
-    stats.forEach((st, i) => {
-      const sx = SIDE_PAD + stepW * i + stepW / 2
-      ctx.fillStyle = st[2]; ctx.font = 'bold 44px system-ui, sans-serif'; ctx.textAlign = 'center'
-      ctx.fillText(String(st[1]), sx, y + 50)
-      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 18px system-ui, sans-serif'
-      ctx.fillText(st[0], sx, y + 82)
-    })
-  } else {
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 28px system-ui, sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(`${picks.length} ${picks.length === 1 ? 'pick' : 'picks'} locked in`, cx, y + 38)
-  }
-  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + STATS_H - 10); ctx.lineTo(WIDTH - SIDE_PAD, y + STATS_H - 10); ctx.stroke()
+  const avgPts = picks.length ? (totalPoints / picks.length) : 0
+  const topStats = [
+    ['PLAYERS', picks.length, '#fff'],
+    ['EXACT',   exactCount,   '#F4C430'],
+    ['CORRECT', correctCount + gdOnlyCount, '#4ADE80'],
+    ['POINTS',  totalPoints,  '#F4C430'],
+    ['AVG',     avgPts.toFixed(1), 'rgba(255,255,255,0.85)']
+  ]
+  const stepW = (WIDTH - SIDE_PAD * 2) / topStats.length
+  topStats.forEach((st, i) => {
+    const sx = SIDE_PAD + stepW * i + stepW / 2
+    ctx.fillStyle = st[2]; ctx.font = 'bold 42px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(String(st[1]), sx, y + 56)
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 16px system-ui, sans-serif'
+    ctx.fillText(st[0], sx, y + 90)
+  })
+  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + STATS_H - 8); ctx.lineTo(WIDTH - SIDE_PAD, y + STATS_H - 8); ctx.stroke()
+  y += STATS_H
 
-  // ----- Section label -----
-  y = HEADER_H + SCORE_H + STATS_H
+  // ----- Section label (table) ---------------------------------------------
   ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 24px system-ui, sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText(finished ? '🏅 ALL PICKS · sorted by points' : '🔒 ALL PICKS · sorted by submission', SIDE_PAD, y + 36)
+  ctx.fillText(`🏅 SCORING BREAKDOWN · Stage ×${stageMult}`, SIDE_PAD, y + 36)
   y += SEC_LABEL_H
 
-  // ===== Picks: TWO COLUMNS =====
-  // Render a single row inside a column box at (colX, rowTopY) with width COL_W
-  function drawRow(p, displayIdx, colX, rowTopY) {
-    const win = (p.final_points || 0) > 0
+  // ----- Per-column geometry -----------------------------------------------
+  function colGeometry(colX) {
+    return {
+      rankR:  colX + 28,
+      nameL:  colX + 40,
+      pickR:  colX + COL_W - 200,
+      baseR:  colX + COL_W - 155,
+      bonusL: colX + COL_W - 145,
+      totalR: colX + COL_W - 12
+    }
+  }
 
-    // Row background
-    const rowFill = finished
-      ? (win ? 'rgba(212,162,76,0.13)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
-      : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)')
+  // ----- Column headers ----------------------------------------------------
+  function drawColHeader(colX) {
+    const g = colGeometry(colX)
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'
+    ctx.font = 'bold 12px system-ui, sans-serif'
+    ctx.textBaseline = 'middle'
+    const hY = y + COL_HDR_H / 2
+    ctx.textAlign = 'right'; ctx.fillText('#',       g.rankR, hY)
+    ctx.textAlign = 'left';  ctx.fillText('PLAYER',  g.nameL, hY)
+    ctx.textAlign = 'right'; ctx.fillText('PICK',    g.pickR, hY)
+    ctx.textAlign = 'right'; ctx.fillText('BASE',    g.baseR, hY)
+    ctx.textAlign = 'left';  ctx.fillText('BONUSES', g.bonusL, hY)
+    ctx.textAlign = 'right'; ctx.fillText('TOTAL',   g.totalR, hY)
+    ctx.textBaseline = 'alphabetic'
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(colX, y + COL_HDR_H); ctx.lineTo(colX + COL_W, y + COL_HDR_H); ctx.stroke()
+  }
+  drawColHeader(COL1_X)
+  drawColHeader(COL2_X)
+  y += COL_HDR_H
+
+  // ----- Bonus chip helper -------------------------------------------------
+  function drawBonusChip(text, color, bgRgba, chipX, chipY) {
+    ctx.font = 'bold 13px system-ui, sans-serif'
+    const padX = 7
+    const w = ctx.measureText(text).width + padX * 2
+    const h = 24
+    ctx.fillStyle = bgRgba
+    roundRect(ctx, chipX, chipY - h / 2, w, h, 6); ctx.fill()
+    ctx.fillStyle = color
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+    ctx.fillText(text, chipX + padX, chipY)
+    ctx.textBaseline = 'alphabetic'
+    return w
+  }
+
+  // ----- Row renderer ------------------------------------------------------
+  function drawRow(p, displayIdx, colX, rowTopY) {
+    const g = colGeometry(colX)
+    const win = p.final_points > 0
+    const isExact = p.base_points === 5
+
+    const rowFill = isExact
+      ? 'rgba(244,196,48,0.10)'
+      : (win ? 'rgba(212,162,76,0.07)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)'))
     ctx.fillStyle = rowFill
-    ctx.strokeStyle = win ? 'rgba(212,162,76,0.35)' : 'rgba(255,255,255,0)'
+    ctx.strokeStyle = isExact ? 'rgba(244,196,48,0.40)' : (win ? 'rgba(212,162,76,0.25)' : 'rgba(255,255,255,0)')
     ctx.lineWidth = 1.2
-    roundRect(ctx, colX, rowTopY + 4, COL_W, ROW_H - 8, 10); ctx.fill(); if (win) ctx.stroke()
+    roundRect(ctx, colX, rowTopY + 4, COL_W, ROW_H - 8, 9)
+    ctx.fill(); if (win) ctx.stroke()
 
     const cyl = rowTopY + ROW_H / 2
     ctx.textBaseline = 'middle'
 
-    // Geometry inside the column (narrower than 1-col, so tighter spacing)
-    const RANK_RIGHT  = colX + 38            // right edge of rank number
-    const NAME_LEFT   = colX + 50            // start of name
-    const PTS_RIGHT   = colX + COL_W - 14    // right edge of +points (or right of card if !finished)
-    const PRED_RIGHT  = finished ? PTS_RIGHT - 70 : PTS_RIGHT
-    const NAME_MAX_W  = PRED_RIGHT - NAME_LEFT - 70   // 70px reserved for the predicted score
+    // Rank
+    ctx.font = 'bold 14px system-ui, sans-serif'; ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(255,255,255,0.40)'
+    ctx.fillText(String(displayIdx + 1), g.rankR, cyl)
 
-    // Position number
-    ctx.font = 'bold 16px system-ui, sans-serif'; ctx.textAlign = 'right'
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'
-    ctx.fillText(String(displayIdx + 1), RANK_RIGHT, cyl)
-
-    // Name + bonus emojis
-    let nameLabel = p.name || 'Anonymous'
-    if ((p.combo_bonus  || 0) > 0) nameLabel += ' ⚡'
-    if ((p.streak_bonus || 0) > 0) nameLabel += ' 🔥'
-    ctx.font = win ? 'bold 21px system-ui, sans-serif' : '20px system-ui, sans-serif'
-    ctx.fillStyle = win ? '#fff' : 'rgba(255,255,255,0.82)'
+    // Name
+    ctx.font = win ? 'bold 17px system-ui, sans-serif' : '16px system-ui, sans-serif'
+    ctx.fillStyle = win ? '#fff' : 'rgba(255,255,255,0.78)'
     ctx.textAlign = 'left'
-    ctx.fillText(truncateForCanvas(ctx, nameLabel, NAME_MAX_W), NAME_LEFT, cyl)
+    const nameMaxW = g.pickR - g.nameL - 50
+    ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, cyl)
 
-    // Predicted score
-    ctx.font = 'bold 22px system-ui, sans-serif'
-    ctx.fillStyle = win ? '#F4C430' : 'rgba(255,255,255,0.85)'
+    // Pick
+    ctx.font = 'bold 17px system-ui, sans-serif'
+    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#fff' : 'rgba(255,255,255,0.65)')
     ctx.textAlign = 'right'
-    ctx.fillText(`${p.home}–${p.away}`, PRED_RIGHT, cyl)
+    ctx.fillText(`${p.home}–${p.away}`, g.pickR, cyl)
 
-    // Points badge
-    if (finished) {
-      ctx.font = 'bold 20px system-ui, sans-serif'
-      ctx.fillStyle = win ? '#4ADE80' : 'rgba(255,255,255,0.35)'
-      ctx.textAlign = 'right'
-      ctx.fillText(`+${p.final_points || 0}`, PTS_RIGHT, cyl)
+    // Base
+    ctx.font = '15px system-ui, sans-serif'
+    ctx.fillStyle = p.base_points > 0 ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.30)'
+    ctx.textAlign = 'right'
+    const baseTxt = (p.stage_mult > 1 && p.base_points > 0)
+      ? `${p.base_points}×${p.stage_mult}`
+      : `${p.multiplied_base}`
+    ctx.fillText(baseTxt, g.baseR, cyl)
+
+    // Bonus chips
+    let chipX = g.bonusL
+    const chipLimit = g.totalR - 55
+    if (p.streak_bonus > 0 && p.streak_tier) {
+      const emoji = p.streak_tier.emoji || '🔥'
+      const w = drawBonusChip(`${emoji} +${p.streak_bonus}`, '#FB923C', 'rgba(251,146,60,0.16)', chipX, cyl)
+      chipX += w + 4
     }
+    if (Array.isArray(p.combos_earned)) {
+      p.combos_earned.forEach(c => {
+        if (chipX > chipLimit) return
+        const emoji = c.emoji || '⚡'
+        const val = c.value != null ? c.value : (p.combo_bonus || 0)
+        const w = drawBonusChip(`${emoji} +${val}`, '#A78BFA', 'rgba(167,139,250,0.16)', chipX, cyl)
+        chipX += w + 4
+      })
+    }
+    if (p.streak_bonus === 0 && (!p.combos_earned || !p.combos_earned.length)) {
+      ctx.font = '14px system-ui, sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'
+      ctx.textAlign = 'left'
+      ctx.fillText('—', g.bonusL, cyl)
+    }
+
+    // Total — BIGGER, more readable on phones
+    ctx.font = 'bold 24px system-ui, sans-serif'      // ← bumped from 19px
+    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#4ADE80' : 'rgba(255,255,255,0.30)')
+    ctx.textAlign = 'right'
+    ctx.fillText(`+${p.final_points}`, g.totalR, cyl)
 
     ctx.textBaseline = 'alphabetic'
   }
 
-  // Split picks top-down: 1..K go left, K+1..N go right (K = ceil(N/2))
   picks.forEach((p, i) => {
     const inLeft  = i < ROWS_PER_COL
     const colX    = inLeft ? COL1_X : COL2_X
@@ -3921,14 +4273,106 @@ async function generatePickListCardBlob(fixtureId) {
     const rowTopY = y + rowIdx * ROW_H
     drawRow(p, i, colX, rowTopY)
   })
+  y += ROWS_PER_COL * ROW_H
 
-  // ----- Footer -----
+  // ----- Scoring summary footer --------------------------------------------
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(SIDE_PAD, y + 10); ctx.lineTo(WIDTH - SIDE_PAD, y + 10); ctx.stroke()
+
+  ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('📈 BREAKDOWN', SIDE_PAD, y + 50)
+
+  const sumY = y + 80
+  const colAx = SIDE_PAD + 20
+  const colBx = SIDE_PAD + INNER_W / 2 + 20
+
+  function drawBreakdownLine(label, value, valColor, lx, ly) {
+    ctx.font = '18px system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.65)'
+    ctx.textAlign = 'left'
+    ctx.fillText(label, lx, ly)
+    ctx.font = 'bold 18px system-ui, sans-serif'
+    ctx.fillStyle = valColor
+    ctx.textAlign = 'right'
+    ctx.fillText(String(value), lx + INNER_W / 2 - 40, ly)
+  }
+
+  drawBreakdownLine('⭐ Exact scores',     exactCount,   '#F4C430', colAx, sumY)
+  drawBreakdownLine('✅ Correct result',   correctCount, '#4ADE80', colAx, sumY + 30)
+  drawBreakdownLine('➖ GD only',          gdOnlyCount,  'rgba(255,255,255,0.8)', colAx, sumY + 60)
+  drawBreakdownLine('❌ Wrong',            wrongCount,   'rgba(255,255,255,0.45)', colAx, sumY + 90)
+
+  drawBreakdownLine('🔥 Streak bonuses',   streakAwards, '#FB923C', colBx, sumY)
+  drawBreakdownLine('⚡ Combos awarded',   comboAwards,  '#A78BFA', colBx, sumY + 30)
+  drawBreakdownLine('🎯 Stage multiplier', `×${stageMult}`, '#fff', colBx, sumY + 60)
+  drawBreakdownLine('💰 Total awarded',    totalPoints,  '#F4C430', colBx, sumY + 90)
+
+  // ----- Footer ------------------------------------------------------------
   ctx.textAlign = 'center'; ctx.fillStyle = '#D4A24C'; ctx.font = 'bold 26px system-ui, sans-serif'
   ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 40)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.95)
   })
+}
+
+ 
+// ---- Admin share (mirrors sharePickList's 3-path fallback) ----------------
+async function shareMatchReport(fixtureId) {
+  const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
+    .find(f => f.id === fixtureId)
+  if (!fixture) { showToast('Match not found', 'info'); return }
+ 
+  const finished = fixture.home_score !== null && fixture.away_score !== null
+  if (!finished) { showToast('Match not finished yet', 'info'); return }
+ 
+  let blob = null
+  try { blob = await generateMatchReportCardBlob(fixtureId) }
+  catch (e) {
+    console.warn('[shareMatchReport] image gen failed:', e)
+    showToast(e.message || 'Report generation failed', 'error')
+    return
+  }
+ 
+  const scoreLine = `${fixture.home_team} ${fixture.home_score}–${fixture.away_score} ${fixture.away_team}`
+  const text = `📊 WC 2026 Prediction League — Match Report
+${scoreLine} (${fixture.stage || ''})
+Full scoring breakdown with bonuses 👇
+ 
+https://wcpredictionleague.vercel.app`
+ 
+  // Copy caption first — WhatsApp drops captions when files are attached
+  let captionCopied = false
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      captionCopied = true
+    }
+  } catch (e) { console.warn('[shareMatchReport] clipboard copy failed:', e) }
+ 
+  if (blob && navigator.canShare) {
+    const file = new File([blob], `wcpl-report-${Date.now()}.png`, { type: 'image/png' })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'WC 2026 Prediction League · Match Report', text })
+        showToast(captionCopied ? 'Shared · caption copied, long-press to paste' : 'Shared!', 'success')
+        return
+      } catch (e) {
+        if (e.name === 'AbortError') return
+        console.warn('[shareMatchReport] native share failed:', e)
+      }
+    }
+  }
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `wcpl-report-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('Image saved · attach it in WhatsApp', 'success')
+    setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'), 250)
+    return
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
 }
  
  
@@ -4089,6 +4533,156 @@ function computeRowHint(s, rank, prevPlayer) {
   return null
 }
 
+
+// Premium 3D crown for the current leaderboard leader.
+// Uses inline SVG so it does not depend on emoji rendering or any external image asset.
+function leaderCrownHtml() {
+  return `
+    <span class="lb-v2-leader-crown" data-badge-id="champion" title="Current league leader" aria-label="Current league leader">
+      <svg class="leader-crown-svg" viewBox="0 0 112 82" role="img" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="lbCrownGoldFace" x1="10" y1="6" x2="92" y2="68" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#FFF9C7"/>
+            <stop offset="0.22" stop-color="#FDE68A"/>
+            <stop offset="0.42" stop-color="#F59E0B"/>
+            <stop offset="0.64" stop-color="#D97706"/>
+            <stop offset="0.84" stop-color="#FBBF24"/>
+            <stop offset="1" stop-color="#FFF1A8"/>
+          </linearGradient>
+          <linearGradient id="lbCrownGoldDepth" x1="34" y1="12" x2="106" y2="76" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#B45309"/>
+            <stop offset="0.55" stop-color="#78350F"/>
+            <stop offset="1" stop-color="#451A03"/>
+          </linearGradient>
+          <linearGradient id="lbCrownBase3D" x1="18" y1="50" x2="88" y2="72" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#92400E"/>
+            <stop offset="0.24" stop-color="#F59E0B"/>
+            <stop offset="0.52" stop-color="#FDE68A"/>
+            <stop offset="0.78" stop-color="#D97706"/>
+            <stop offset="1" stop-color="#78350F"/>
+          </linearGradient>
+          <linearGradient id="lbCrownSideShine" x1="16" y1="12" x2="92" y2="62" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#FFFFFF" stop-opacity=".95"/>
+            <stop offset=".30" stop-color="#FFFFFF" stop-opacity=".30"/>
+            <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+          </linearGradient>
+          <filter id="lbCrown3DShadow" x="-35%" y="-35%" width="175%" height="190%">
+            <feDropShadow dx="0" dy="6" stdDeviation="4" flood-color="#78350F" flood-opacity="0.30"/>
+            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#FACC15" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <g filter="url(#lbCrown3DShadow)">
+          <!-- dark offset layer creates the 3D thickness -->
+          <g class="crown-depth">
+            <path d="M20 54L14 18l24 20L56 9l16 29 24-20-7 36H20z" fill="url(#lbCrownGoldDepth)" stroke="#451A03" stroke-width="2.1" stroke-linejoin="round"/>
+            <path d="M23 52h66v13c0 4-3 7-7 7H30c-4 0-7-3-7-7V52z" fill="#78350F" stroke="#451A03" stroke-width="2"/>
+          </g>
+
+          <!-- small side faces for a stronger 3D look -->
+          <path d="M88 54l7-36 5 4-7 36z" fill="#92400E" opacity=".74"/>
+          <path d="M89 52v13c0 4-3 7-7 7l6 5c4 0 7-3 7-7V57z" fill="#78350F" opacity=".82"/>
+
+          <!-- front crown face -->
+          <g class="crown-face">
+            <path d="M20 54L14 18l24 20L56 9l16 29 24-20-7 36H20z" fill="url(#lbCrownGoldFace)" stroke="#92400E" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M23 52h66v13c0 4-3 7-7 7H30c-4 0-7-3-7-7V52z" fill="url(#lbCrownBase3D)" stroke="#92400E" stroke-width="2"/>
+            <path class="crown-highlight" d="M20 54L14 18l24 20L56 9l16 29 24-20-7 36H20z" fill="url(#lbCrownSideShine)"/>
+            <circle cx="14" cy="18" r="5" fill="#FFF7B8" stroke="#92400E" stroke-width="1.8"/>
+            <circle cx="56" cy="9" r="5.7" fill="#FFF7B8" stroke="#92400E" stroke-width="1.8"/>
+            <circle cx="96" cy="18" r="5" fill="#FFF7B8" stroke="#92400E" stroke-width="1.8"/>
+            <circle cx="42" cy="41" r="4.2" fill="#EF4444" stroke="#7F1D1D" stroke-width="1.25"/>
+            <circle cx="70" cy="41" r="4.2" fill="#3B82F6" stroke="#1E3A8A" stroke-width="1.25"/>
+            <path d="M33 59h46" stroke="#FFF7B8" stroke-width="3" stroke-linecap="round" opacity=".82"/>
+            <path d="M29 65h54" stroke="#78350F" stroke-width="1.4" stroke-linecap="round" opacity=".38"/>
+          </g>
+        </g>
+      </svg>
+      <span class="leader-crown-sparkle s1" aria-hidden="true">✦</span>
+      <span class="leader-crown-sparkle s2" aria-hidden="true">✧</span>
+    </span>`
+}
+
+
+function buildLeaderboardFormDots(form = []) {
+  const values = Array.isArray(form) ? form.slice(0, 5) : []
+  while (values.length < 5) values.push('idle')
+  const label = 'Recent form: gold = exact score, green = points, red = no points, grey = pending'
+  return `<span class="lb-form-dots" title="${label}" aria-label="${label}">${values.map(v => `<span class="lb-form-dot ${escapeHtml(v || 'idle')}"></span>`).join('')}</span>`
+}
+
+function podiumName(name) {
+  // Podium has enough space for the real name. Keep it full and let CSS wrap to 2 lines.
+  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
+  return clean.split(/\s+/).map(part => {
+    if (!part) return part
+    if (part.length <= 2 && part === part.toUpperCase()) return part
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+  }).join(' ')
+}
+
+function leaderboardDisplayName(name) {
+  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
+  const parts = clean.split(/\s+/).filter(Boolean)
+  // Keep one-word and two-word names full. For 3+ word names, keep the row clean
+  // by showing first + last while the full name remains in the title tooltip.
+  if (parts.length <= 2) return clean
+  return `${parts[0]} ${parts[parts.length - 1]}`
+}
+
+function leaderboardTop3Html(stats, myId) {
+  if (lbSubtab !== 'overall' || !Array.isArray(stats) || stats.length === 0) return ''
+  const ordered = [
+    { player: stats[1], rank: 2, cls: 'rank-2' },
+    { player: stats[0], rank: 1, cls: 'rank-1' },
+    { player: stats[2], rank: 3, cls: 'rank-3' }
+  ].filter(x => x.player)
+
+  if (!ordered.length) return ''
+
+  return `
+    <section class="lb-top3-podium" aria-label="Top three leaderboard podium">
+      <div class="lb-top3-title">Top 3 Podium</div>
+      <div class="lb-top3-grid">
+        ${ordered.map(({ player, rank, cls }) => {
+          const uid = player.user_id || player.id || ''
+          const isMe = uid && uid === myId
+          const hasPoints = (player.points || 0) > 0
+          const directTrend = normalizeRankTrend(player.trend || player.rank_trend || player.rankTrend || player.rank_change || player.rankChange || player.movement)
+          const tr = lbTrendMap?.[uid] || directTrend
+          const podiumTrendHtml = tr
+            ? (tr.dir === 'up'
+                ? `<span class="rank-trend up" title="Up ${tr.delta} since last matchday">▲ ${tr.delta}</span>`
+                : tr.dir === 'down'
+                  ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼ ${tr.delta}</span>`
+                  : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
+            : ''
+          return `
+            <button type="button" class="lb-podium-player ${cls}" onclick="showPlayerInfo('${escapeHtml(uid)}')" title="View ${escapeHtml(player.name || 'player')}">
+              <span class="lb-podium-avatar-wrap">
+                ${rank === 1 && hasPoints ? `<span class="lb-podium-crown">${leaderCrownHtml()}</span>` : ''}
+                ${getAvatarHtml(player.name, player.avatar_url, rank, rank === 1 ? 72 : 58)}
+                <span class="lb-podium-medal">${rankMedalSvg(rank)}</span>
+                <span class="lb-podium-trend">${podiumTrendHtml}</span>
+              </span>
+              <span class="lb-podium-name">${escapeHtml(podiumName(player.name || 'Anonymous'))}${isMe ? ' · YOU' : ''}</span>
+              <span class="lb-podium-scoreline">
+                <span class="lb-podium-points">${player.points || 0}<span>PTS</span></span>
+              </span>
+            </button>`
+        }).join('')}
+      </div>
+    </section>`
+}
+
+function competitionZoneHeaderHtml(stats, myIdx) {
+  if (lbSubtab !== 'overall' || myIdx < 0) return ''
+  return `
+    <div class="lb-zone-label" aria-label="Your competition zone">
+      <span class="lb-zone-label-title">Your Competition Zone</span>
+    </div>`
+}
+
 async function loadLeaderboard() {
       const c = document.getElementById('leaderboard-list')
       const myId = getUser()?.id
@@ -4153,7 +4747,7 @@ async function loadLeaderboard() {
         try {
           const { data: allProfiles } = await supabaseClient
             .from('profiles')
-            .select('id, full_name, department, name')
+            .select('id, full_name, department, name, avatar_url')
             .eq('fee_paid', true).neq('entered_via_private', true)
             .order('created_at', { ascending: false })
 
@@ -4164,6 +4758,8 @@ async function loadLeaderboard() {
               name: p.full_name || p.name || 'Unknown',
               full_name: p.full_name || p.name || 'Unknown',
               department: p.department || '',
+              avatar_url: p.avatar_url || null,
+              form: [],
               points: 0,
               exact: 0,
               gd: 0,
@@ -4236,6 +4832,7 @@ async function loadLeaderboard() {
         <div class="lb-v2-table-head" aria-hidden="true">
           <span>Rank</span>
           <span>Predictions</span>
+          <span>Trend</span>
           <span>Points</span>
         </div>`
       const leaderboardLegend = `
@@ -4247,7 +4844,22 @@ async function loadLeaderboard() {
           <span>Exact = exact score</span>
         </div>`
 
-      c.innerHTML = leaderboardHead + mvpHtml + stats.map((s, i) => {
+      const top3Html = leaderboardTop3Html(stats, myId)
+      const myIdxInStats = stats.findIndex(s => (s.user_id || s.id) === myId)
+      const hideTop3Rows = lbSubtab === 'overall'
+      // Do not repeat the same Top 3 players below the podium.
+      const visibleRows = stats
+        .map((s, i) => ({ s, i }))
+        .filter(({ i }) => !(hideTop3Rows && i < 3))
+
+      // Only show Your Competition Zone when the current user is outside the podium.
+      // If the player is already top 3, the podium itself is the spotlight.
+      const showCompetitionZone = lbSubtab === 'overall' && myIdxInStats >= 3
+      const zoneStartIdx = showCompetitionZone ? Math.max(3, myIdxInStats - 1) : -1
+      const zoneEndIdx = showCompetitionZone ? Math.min(stats.length - 1, myIdxInStats + 1) : -1
+      const zoneLabelIdx = zoneStartIdx
+
+      c.innerHTML = top3Html + leaderboardHead + mvpHtml + visibleRows.map(({ s, i }) => {
         const rank = i + 1
         const uid = s.user_id || s.id
         const isMe = s.user_id === myId || s.id === myId
@@ -4271,7 +4883,7 @@ async function loadLeaderboard() {
               : tr.dir === 'down'
                 ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼ ${tr.delta}</span>`
                 : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
-          : `<span class="lb-v2-trend-empty" aria-hidden="true"></span>`
+          : `<span class="rank-trend flat" title="No rank change">–</span>`
 
         // Compact progress chips. They are purely presentational and reuse the
         // already-computed leaderboard stats, so bonus-engine wiring remains intact.
@@ -4305,8 +4917,10 @@ async function loadLeaderboard() {
         const moreProgressChip = hiddenProgressCount > 0
           ? `<span class="lb-v2-chip more" title="${hiddenProgressCount} more progress item${hiddenProgressCount > 1 ? 's' : ''}">+${hiddenProgressCount}</span>`
           : ''
+        // Form dots were removed from the row because they competed with bonus badges on smaller phones.
+        const formDotsHtml = ''
         // Keep the row clean: show progress chips only. Full earned badges remain available in the profile/badge views.
-        const chipsHtml = `${visibleProgressChips}${moreProgressChip}`
+        const chipsHtml = `${visibleProgressChips}${moreProgressChip}${formDotsHtml}`
 
         const now = Date.now()
         const anyKickedOff = (fixtures || []).some(f => new Date(f.kickoff).getTime() <= now)
@@ -4328,18 +4942,21 @@ async function loadLeaderboard() {
 
         const hint = (isMe && lbSubtab === 'overall') ? computeRowHint(s, rank, prevPlayer) : null
 
-        return `
-        <div class="lb-row lb-v2-row ${isMe ? 'is-me' : ''} ${rankClass}"
+        const zoneLabelHtml = (showCompetitionZone && i === zoneLabelIdx) ? competitionZoneHeaderHtml(stats, myIdxInStats) : ''
+        const zoneClass = (showCompetitionZone && i >= zoneStartIdx && i <= zoneEndIdx) ? 'in-competition-zone' : ''
+
+        return `${zoneLabelHtml}
+        <div class="lb-row lb-v2-row ${isMe ? 'is-me' : ''} ${zoneClass} ${rankClass}"
              data-uid="${uid}" data-points="${s.points || 0}" data-rank="${rank}">
           <div class="lb-v2-rank-avatar">
             ${rankDisplay}
             <div data-avatar-wrap>${getAvatarHtml(s.name, s.avatar_url, rank, 42)}</div>
           </div>
 
-          <div class="min-w-0">
+          <div class="lb-v2-main min-w-0">
             <div class="lb-v2-name-line">
-              <span class="lb-v2-name truncate">${escapeHtml(s.name || 'Anonymous')}</span>
-              ${rank === 1 && hasPoints ? '<span class="lb-v2-leader">🔥 Leader</span>' : ''}
+              <span class="lb-v2-name" title="${escapeHtml(s.name || 'Anonymous')}">${escapeHtml(leaderboardDisplayName(s.name || 'Anonymous'))}</span>
+              ${rank === 1 && hasPoints ? leaderCrownHtml() : ''}
               ${isMe ? '<span class="lb-v2-you">YOU</span>' : ''}
             </div>
             <div class="lb-v2-stats">${statsLine}</div>
@@ -4600,7 +5217,7 @@ async function loadLeaderboard() {
         const cached = (typeof getProfile === 'function') ? getProfile() : null
         if (cached) cached.fee_paid = false
         showModal({
-          icon: '🔒',
+          icon: 'lock',
           title: 'Payment status revoked',
           message: 'An admin has marked your entry fee as unpaid. You will be signed out. Please contact the admin if this is a mistake.',
           actions: [
@@ -6177,16 +6794,26 @@ window.promptShareScore = promptShareScore
 
       host.innerHTML = BADGES.map(b => {
         const got = earned.has(b.id)
-        const shareAttr = got
-          ? ` onclick="shareBadgeAchievement('${b.id}', '${b.name.replace(/'/g, "\\'")}', '${b.desc.replace(/'/g, "\\'")}').catch(e => console.warn(e))" style="cursor:pointer;" title="Tap to share"`
-          : ''
+        const safeName = b.name.replace(/'/g, "\\'")
+        const safeDesc = b.desc.replace(/'/g, "\\'")
+        const shareBtn = got
+          ? `<button type="button" class="badge-back-share" onclick="event.stopPropagation(); shareBadgeAchievement('${b.id}', '${safeName}', '${safeDesc}').catch(e => console.warn(e))">↗ Share</button>`
+          : `<div class="badge-back-locked">🔒 Locked</div>`
         return `
-          <div class="badge-card ${got ? 'earned' : 'locked'}"${shareAttr}>
-            ${got ? '<div class="badge-earned-tick">✓</div>' : ''}
-            <div class="badge-icon">${badgeIconHtml(b.id)}</div>
-            <div class="badge-name">${b.name}</div>
-            <div class="badge-desc">${b.desc}</div>
-            ${got ? '<div class="badge-share-hint">↗ Share</div>' : '<div class="badge-lock-hint">🔒 Locked</div>'}
+          <div class="badge-flip ${got ? 'earned' : 'locked'}" onclick="this.classList.toggle('flipped')">
+            <div class="badge-flip-inner">
+              <div class="badge-flip-face badge-flip-front badge-card ${got ? 'earned' : 'locked'}">
+                ${got ? '<div class="badge-earned-tick">✓</div>' : ''}
+                <div class="badge-icon">${badgeIconHtml(b.id)}</div>
+                <div class="badge-name">${b.name}</div>
+                <div class="badge-flip-hint">Tap</div>
+              </div>
+              <div class="badge-flip-face badge-flip-back">
+                <div class="badge-back-name">${b.name}</div>
+                <div class="badge-back-desc">${b.desc}</div>
+                ${shareBtn}
+              </div>
+            </div>
           </div>`
       }).join('')
 
@@ -8917,4 +9544,62 @@ loadRememberedEmail()
   window.addEventListener('scroll', () => {
     if (!ticking) { requestAnimationFrame(update); ticking = true }
   }, { passive: true })
+
+  // ───────────────────────────────────────────────────────────
+  // Auto-hide header for in-panel scroll containers.
+  // Fixed-position overlays (e.g. #bracket-panel) scroll their own
+  // inner div, NOT window. Mirror the same behavior for each one.
+  // Hides only the header element *inside* that panel.
+  // ───────────────────────────────────────────────────────────
+  function attachPanelScrollAutoHide(scrollContainerId) {
+    const container = document.getElementById(scrollContainerId)
+    if (!container) return
+    const panel = container.closest('.fixed') || container.parentElement
+    if (!panel) return
+    const localHeader = panel.querySelector('.app-header, header')
+    if (!localHeader) return
+
+    localHeader.style.transition = 'transform 220ms ease-in-out'
+    localHeader.style.willChange = 'transform'
+
+    let lastLocalY = container.scrollTop || 0
+    let localHidden = false
+    let localTicking = false
+
+    function setLocalHidden(shouldHide) {
+      if (shouldHide === localHidden) return
+      localHeader.style.transform = shouldHide ? 'translateY(-110%)' : 'translateY(0)'
+      localHidden = shouldHide
+    }
+
+    function localUpdate() {
+      const y = container.scrollTop || 0
+      const delta = y - lastLocalY
+      if (Math.abs(delta) < THRESHOLD) { localTicking = false; return }
+      if (y < TOP_BUFFER)      setLocalHidden(false)
+      else if (delta > 0)      setLocalHidden(true)
+      else if (delta < 0)      setLocalHidden(false)
+      lastLocalY = y
+      localTicking = false
+    }
+
+    container.addEventListener('scroll', () => {
+      if (!localTicking) { requestAnimationFrame(localUpdate); localTicking = true }
+    }, { passive: true })
+
+    // Reset header on panel open (in case it was previously translated off-screen
+    // and the user re-opens the panel at the top).
+    const observer = new MutationObserver(() => {
+      const isOpen = !panel.classList.contains('hidden')
+      if (isOpen) {
+        lastLocalY = container.scrollTop || 0
+        setLocalHidden(false)
+      }
+    })
+    observer.observe(panel, { attributes: true, attributeFilter: ['class'] })
+  }
+
+  attachPanelScrollAutoHide('bracket-content')
+  // Other panels can be added here later if needed:
+  // attachPanelScrollAutoHide('some-other-panel-content')
 })()
