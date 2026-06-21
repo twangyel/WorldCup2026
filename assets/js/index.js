@@ -5036,9 +5036,29 @@ function podiumName(name) {
 }
 
 function leaderboardDisplayName(name) {
-  // Show the real full name in the leaderboard. The CSS patch below gives
-  // the name lane more width and allows controlled wrapping instead of JS truncation.
-  return String(name || 'Anonymous').trim() || 'Anonymous'
+  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
+  const parts = clean.split(/\s+/).filter(Boolean)
+
+  // Keep short names and emoji-style names readable.
+  // Example: "Wolf 🐺 Prince" stays full because only 2 real word tokens exist.
+  const wordLike = token => /[A-Za-zÀ-ÖØ-öø-ÿĀ-ſƀ-ɏ一-龯가-힣ぁ-ゟ゠-ヿ]/.test(token)
+  const wordIndexes = parts
+    .map((token, index) => ({ token, index }))
+    .filter(item => wordLike(item.token))
+    .map(item => item.index)
+
+  if (wordIndexes.length <= 2) return clean
+
+  const shortened = parts.map((token, index) => {
+    const wordPosition = wordIndexes.indexOf(index)
+    if (wordPosition <= 1) return token
+
+    // For the 3rd real word onward, show initial only.
+    const first = Array.from(token)[0] || ''
+    return first ? `${first.toUpperCase()}.` : token
+  })
+
+  return shortened.join(' ')
 }
 
 function leaderboardTop3Html(stats, myId) {
@@ -10296,4 +10316,3 @@ loadRememberedEmail()
     init();
   }
 })();
-
