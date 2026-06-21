@@ -4025,14 +4025,17 @@ async function generateMatchReportCardBlob(fixtureId) {
     loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
   ])
 
+  // Clean phone-first card: no tiny per-row chips. Bonus details are grouped
+  // in one readable band, while each player row stays large and sharp.
   const WIDTH        = 1080
   const SIDE_PAD     = 54
   const HEADER_H     = 124
   const SCORE_H      = 220
   const STATS_H      = 124
-  const SEC_LABEL_H  = 64
-  const COL_HDR_H    = 38
-  const ROW_H        = 94
+  const BONUS_H      = (streakAwards || comboAwards) ? 82 : 0
+  const SEC_LABEL_H  = 58
+  const COL_HDR_H    = 36
+  const ROW_H        = 72
   const COL_GUTTER   = 22
   const SUMMARY_H    = 198
   const FOOTER_H     = 72
@@ -4044,7 +4047,7 @@ async function generateMatchReportCardBlob(fixtureId) {
   const COL2_X       = SIDE_PAD + COL_W + COL_GUTTER
   const ROWS_PER_COL = Math.ceil(picks.length / 2)
 
-  const HEIGHT = HEADER_H + SCORE_H + STATS_H + SEC_LABEL_H + COL_HDR_H
+  const HEIGHT = HEADER_H + SCORE_H + STATS_H + BONUS_H + SEC_LABEL_H + COL_HDR_H
               + (ROWS_PER_COL * ROW_H) + SUMMARY_H + FOOTER_H + PAD_BOTTOM
 
   const canvas = document.createElement('canvas')
@@ -4059,11 +4062,11 @@ async function generateMatchReportCardBlob(fixtureId) {
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.035)'
-  for (let yy = 0; yy < HEIGHT; yy += 34) {
-    for (let xx = 0; xx < WIDTH; xx += 34) {
+  ctx.fillStyle = 'rgba(255,255,255,0.028)'
+  for (let yy = 0; yy < HEIGHT; yy += 38) {
+    for (let xx = 0; xx < WIDTH; xx += 38) {
       ctx.beginPath()
-      ctx.arc(xx, yy, 1.5, 0, Math.PI * 2)
+      ctx.arc(xx, yy, 1.4, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -4076,61 +4079,39 @@ async function generateMatchReportCardBlob(fixtureId) {
 
   const cx = WIDTH / 2
 
-  function pointChipsForPick(p) {
-    const chips = []
-    if (p.base_points === 5) chips.push({ label: 'Exact score +5', fill: 'rgba(244,196,48,0.22)', stroke: 'rgba(244,196,48,0.52)', text: '#F4C430' })
-    else if (p.base_points === 3) chips.push({ label: 'GD only +3', fill: 'rgba(125,211,252,0.18)', stroke: 'rgba(125,211,252,0.42)', text: '#7DD3FC' })
-    else if (p.base_points === 2) chips.push({ label: 'Correct result +2', fill: 'rgba(74,222,128,0.18)', stroke: 'rgba(74,222,128,0.40)', text: '#4ADE80' })
-    else chips.push({ label: 'Wrong +0', fill: 'rgba(255,255,255,0.10)', stroke: 'rgba(255,255,255,0.14)', text: 'rgba(255,255,255,0.72)' })
-
-    if (p.streak_bonus > 0) chips.push({ label: `🔥 Streak +${p.streak_bonus}`, fill: 'rgba(251,146,60,0.18)', stroke: 'rgba(251,146,60,0.44)', text: '#FB923C' })
-
-    const comboItems = Array.isArray(p.combos_earned) ? p.combos_earned : []
-    if (comboItems.length) {
-      comboItems.slice(0, 1).forEach(c => {
-        const emoji = c?.emoji || '⚡'
-        const val = Number(c?.value != null ? c.value : p.combo_bonus || 0) || 0
-        if (val > 0) chips.push({ label: `${emoji} Combo +${val}`, fill: 'rgba(167,139,250,0.18)', stroke: 'rgba(167,139,250,0.44)', text: '#C4B5FD' })
-      })
-    } else if (p.combo_bonus > 0) {
-      chips.push({ label: `⚡ Combo +${p.combo_bonus}`, fill: 'rgba(167,139,250,0.18)', stroke: 'rgba(167,139,250,0.44)', text: '#C4B5FD' })
-    }
-
-    return chips.slice(0, 2)
+  function reasonLabel(p) {
+    if (p.base_points === 5) return 'Exact'
+    if (p.base_points === 3) return 'GD'
+    if (p.base_points === 2) return 'Result'
+    return 'Wrong'
   }
 
-  function drawChip(x, y, label, opts = {}) {
-    ctx.save()
-    ctx.font = `${opts.fontWeight || 900} ${opts.fontSize || 15}px system-ui, sans-serif`
-    const padX = opts.padX || 10
-    const h = opts.h || 22
-    const w = Math.ceil(ctx.measureText(label).width + padX * 2)
-    ctx.fillStyle = opts.fill || 'rgba(255,255,255,0.12)'
-    ctx.strokeStyle = opts.stroke || 'rgba(255,255,255,0.16)'
-    ctx.lineWidth = 1
-    roundRect(ctx, x, y, w, h, h / 2)
-    ctx.fill()
-    ctx.stroke()
-    ctx.fillStyle = opts.text || '#fff'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, x + padX, y + h / 2 + 0.5)
-    ctx.restore()
-    return w
+  function bonusSummaryText() {
+    const parts = []
+    const bonusPlayers = picks.filter(p => (p.streak_bonus || 0) > 0 || (p.combo_bonus || 0) > 0)
+    bonusPlayers.slice(0, 4).forEach(p => {
+      const bits = []
+      if ((p.streak_bonus || 0) > 0) bits.push(`🔥 +${p.streak_bonus}`)
+      if ((p.combo_bonus || 0) > 0) bits.push(`⚡ +${p.combo_bonus}`)
+      parts.push(`${p.name.split(' ')[0]} ${bits.join(' ')}`)
+    })
+    return parts.join('   •   ')
   }
 
+  // Header
   ctx.fillStyle = '#F2C766'
-  ctx.font = '800 34px system-ui, sans-serif'
+  ctx.font = '900 34px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
   ctx.fillText(`📊 ${fixture.stage || 'Match'} · Match Report`, SIDE_PAD, 72)
 
   ctx.fillStyle = 'rgba(255,255,255,0.66)'
-  ctx.font = '600 22px system-ui, sans-serif'
+  ctx.font = '700 22px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - SIDE_PAD, 72)
   ctx.textBaseline = 'alphabetic'
 
+  // Score block
   let y = HEADER_H
   const flagY = y + 32
   const fw = 104
@@ -4156,7 +4137,7 @@ async function generateMatchReportCardBlob(fixtureId) {
       ctx.arc(x, flagY + fh / 2, 40, 0, Math.PI * 2)
       ctx.stroke()
       ctx.fillStyle = '#fff'
-      ctx.font = '800 30px system-ui, sans-serif'
+      ctx.font = '900 30px system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(teamCodeFallback(name), x, flagY + fh / 2)
@@ -4164,7 +4145,7 @@ async function generateMatchReportCardBlob(fixtureId) {
     }
 
     ctx.fillStyle = '#fff'
-    ctx.font = '700 26px system-ui, sans-serif'
+    ctx.font = '800 26px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText(truncateForCanvas(ctx, name, 300), x, flagY + fh + 38)
   }
@@ -4177,11 +4158,12 @@ async function generateMatchReportCardBlob(fixtureId) {
   ctx.textAlign = 'center'
   ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, flagY + fh / 2 + 24)
   ctx.fillStyle = '#4ADE80'
-  ctx.font = '800 23px system-ui, sans-serif'
+  ctx.font = '900 23px system-ui, sans-serif'
   ctx.fillText('FULL TIME', cx, flagY + fh / 2 + 64)
 
+  // Stats strip
   y = HEADER_H + SCORE_H
-  ctx.strokeStyle = 'rgba(255,255,255,0.11)'
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'
   ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.moveTo(SIDE_PAD, y)
@@ -4203,8 +4185,8 @@ async function generateMatchReportCardBlob(fixtureId) {
     ctx.font = '900 48px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText(String(st[1]), sx, y + 56)
-    ctx.fillStyle = 'rgba(255,255,255,0.58)'
-    ctx.font = '800 17px system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.60)'
+    ctx.font = '900 17px system-ui, sans-serif'
     ctx.fillText(st[0], sx, y + 92)
   })
   ctx.beginPath()
@@ -4213,18 +4195,44 @@ async function generateMatchReportCardBlob(fixtureId) {
   ctx.stroke()
   y += STATS_H
 
+  // One clear bonus band instead of tiny chips in every row
+  if (BONUS_H) {
+    const boxY = y + 10
+    ctx.fillStyle = 'rgba(251,146,60,0.10)'
+    ctx.strokeStyle = 'rgba(251,146,60,0.28)'
+    ctx.lineWidth = 1.2
+    roundRect(ctx, SIDE_PAD, boxY, INNER_W, BONUS_H - 20, 14)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.fillStyle = '#FB923C'
+    ctx.font = '900 22px system-ui, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(`🔥 BONUS AWARDS`, SIDE_PAD + 18, boxY + 32)
+    ctx.fillStyle = 'rgba(255,255,255,0.90)'
+    ctx.font = '800 21px system-ui, sans-serif'
+    ctx.fillText(truncateForCanvas(ctx, bonusSummaryText(), INNER_W - 250), SIDE_PAD + 210, boxY + 32)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.58)'
+    ctx.font = '800 17px system-ui, sans-serif'
+    ctx.fillText(`Streak awards: ${streakAwards}   •   Combo awards: ${comboAwards}`, SIDE_PAD + 18, boxY + 58)
+    y += BONUS_H
+  }
+
+  // Section label
   ctx.fillStyle = '#F2C766'
-  ctx.font = '900 26px system-ui, sans-serif'
+  ctx.font = '900 25px system-ui, sans-serif'
   ctx.textAlign = 'left'
-  ctx.fillText(`🏅 SCORING BREAKDOWN · Stage ×${stageMult}`, SIDE_PAD, y + 40)
+  ctx.fillText(`🏅 PLAYER POINTS · Stage ×${stageMult}`, SIDE_PAD, y + 38)
   y += SEC_LABEL_H
 
   function colGeometry(colX) {
     return {
       rankR:  colX + 32,
-      nameL:  colX + 46,
-      pickR:  colX + COL_W - 95,
-      totalR: colX + COL_W - 14
+      nameL:  colX + 50,
+      reasonL: colX + 50,
+      pickR:  colX + COL_W - 96,
+      totalR: colX + COL_W - 16
     }
   }
 
@@ -4259,51 +4267,51 @@ async function generateMatchReportCardBlob(fixtureId) {
     const g = colGeometry(colX)
     const win = p.final_points > 0
     const isExact = p.base_points === 5
+    const hasBonus = (p.streak_bonus || 0) > 0 || (p.combo_bonus || 0) > 0
     const rowFill = isExact
       ? 'rgba(244,196,48,0.14)'
-      : (win ? 'rgba(255,255,255,0.065)' : (displayIdx % 2 === 0 ? 'rgba(255,255,255,0.032)' : 'rgba(255,255,255,0.018)'))
+      : (win ? 'rgba(255,255,255,0.070)' : 'rgba(255,255,255,0.028)')
 
     ctx.fillStyle = rowFill
-    ctx.strokeStyle = isExact ? 'rgba(244,196,48,0.55)' : (win ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)')
-    ctx.lineWidth = isExact ? 1.8 : 1
-    roundRect(ctx, colX, rowTopY + 6, COL_W, ROW_H - 12, 12)
+    ctx.strokeStyle = isExact ? 'rgba(244,196,48,0.56)' : (hasBonus ? 'rgba(251,146,60,0.36)' : (win ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'))
+    ctx.lineWidth = isExact || hasBonus ? 1.7 : 1
+    roundRect(ctx, colX, rowTopY + 5, COL_W, ROW_H - 10, 12)
     ctx.fill()
     ctx.stroke()
 
-    const topY = rowTopY + 6
-    const nameY = topY + 26
-    const chipY = topY + 48
-    const midY = topY + (ROW_H - 12) / 2
-    const chips = pointChipsForPick(p)
-
+    const cy = rowTopY + ROW_H / 2
     ctx.textBaseline = 'middle'
+
     ctx.font = '900 17px system-ui, sans-serif'
     ctx.textAlign = 'right'
-    ctx.fillStyle = 'rgba(255,255,255,0.54)'
-    ctx.fillText(String(displayIdx + 1), g.rankR, midY)
+    ctx.fillStyle = 'rgba(255,255,255,0.58)'
+    ctx.fillText(String(displayIdx + 1), g.rankR, cy)
 
     ctx.textAlign = 'left'
-    ctx.font = win ? '900 22px system-ui, sans-serif' : '800 21px system-ui, sans-serif'
+    ctx.font = win ? '900 23px system-ui, sans-serif' : '800 22px system-ui, sans-serif'
     ctx.fillStyle = win ? '#FFFFFF' : 'rgba(255,255,255,0.82)'
-    const nameMaxW = g.pickR - g.nameL - 56
-    ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, nameY)
+    const nameMaxW = g.pickR - g.nameL - 58
+    ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, cy - 8)
 
-    let chipX = g.nameL
-    const chipMax = g.pickR - g.nameL - 10
-    chips.forEach((chip, idx) => {
-      const w = drawChip(chipX, chipY, chip.label, { fill: chip.fill, stroke: chip.stroke, text: chip.text, fontSize: 14, padX: 9, h: 22 })
-      chipX += w + 7
-      if (chipX - g.nameL > chipMax && idx === 0) chipX = g.nameL + chipMax + 1000
-    })
+    let reason = reasonLabel(p)
+    if (hasBonus) {
+      const bonusBits = []
+      if ((p.streak_bonus || 0) > 0) bonusBits.push(`🔥 +${p.streak_bonus}`)
+      if ((p.combo_bonus || 0) > 0) bonusBits.push(`⚡ +${p.combo_bonus}`)
+      reason += `  •  ${bonusBits.join(' ')}`
+    }
+    ctx.font = '800 15px system-ui, sans-serif'
+    ctx.fillStyle = hasBonus ? '#FB923C' : (isExact ? '#F4C430' : (win ? 'rgba(74,222,128,0.82)' : 'rgba(255,255,255,0.46)'))
+    ctx.fillText(truncateForCanvas(ctx, reason, nameMaxW), g.reasonL, cy + 17)
 
-    ctx.font = '900 23px system-ui, sans-serif'
-    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#F8FAFC' : 'rgba(255,255,255,0.62)')
+    ctx.font = '900 25px system-ui, sans-serif'
+    ctx.fillStyle = isExact ? '#F4C430' : (win ? '#F8FAFC' : 'rgba(255,255,255,0.55)')
     ctx.textAlign = 'right'
-    ctx.fillText(`${p.home}–${p.away}`, g.pickR, midY)
+    ctx.fillText(`${p.home}–${p.away}`, g.pickR, cy)
 
-    ctx.font = '900 29px system-ui, sans-serif'
+    ctx.font = '900 31px system-ui, sans-serif'
     ctx.fillStyle = isExact ? '#F4C430' : (win ? '#4ADE80' : 'rgba(255,255,255,0.34)')
-    ctx.fillText(`+${p.final_points}`, g.totalR, midY)
+    ctx.fillText(`+${p.final_points || 0}`, g.totalR, cy)
     ctx.textBaseline = 'alphabetic'
   }
 
@@ -4315,6 +4323,7 @@ async function generateMatchReportCardBlob(fixtureId) {
   })
   y += ROWS_PER_COL * ROW_H
 
+  // Footer breakdown
   ctx.strokeStyle = 'rgba(255,255,255,0.14)'
   ctx.lineWidth = 1.5
   ctx.beginPath()
@@ -4333,23 +4342,23 @@ async function generateMatchReportCardBlob(fixtureId) {
   const valGap = INNER_W / 2 - 34
 
   function drawBreakdownLine(label, value, valColor, lx, ly) {
-    ctx.font = '700 21px system-ui, sans-serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.72)'
+    ctx.font = '800 21px system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.76)'
     ctx.textAlign = 'left'
     ctx.fillText(label, lx, ly)
-    ctx.font = '900 22px system-ui, sans-serif'
+    ctx.font = '900 23px system-ui, sans-serif'
     ctx.fillStyle = valColor
     ctx.textAlign = 'right'
     ctx.fillText(String(value), lx + valGap, ly)
   }
 
-  drawBreakdownLine('⭐ Exact scores', exactCount, '#F4C430', colAx, sumY)
-  drawBreakdownLine('✅ Correct result', correctCount, '#4ADE80', colAx, sumY + 34)
-  drawBreakdownLine('➖ GD only', gdOnlyCount, 'rgba(255,255,255,0.90)', colAx, sumY + 68)
+  drawBreakdownLine('⭐ Exact score', exactCount, '#F4C430', colAx, sumY)
+  drawBreakdownLine('✅ Result only', gdOnlyCount, '#4ADE80', colAx, sumY + 34)
+  drawBreakdownLine('🎯 GD points', correctCount, '#7DD3FC', colAx, sumY + 68)
   drawBreakdownLine('❌ Wrong', wrongCount, 'rgba(255,255,255,0.54)', colAx, sumY + 102)
 
-  drawBreakdownLine('🔥 Streak bonuses', streakAwards, '#FB923C', colBx, sumY)
-  drawBreakdownLine('⚡ Combos awarded', comboAwards, '#A78BFA', colBx, sumY + 34)
+  drawBreakdownLine('🔥 Streak bonus', streakAwards, '#FB923C', colBx, sumY)
+  drawBreakdownLine('⚡ Combo bonus', comboAwards, '#A78BFA', colBx, sumY + 34)
   drawBreakdownLine('🎯 Stage multiplier', `×${stageMult}`, '#fff', colBx, sumY + 68)
   drawBreakdownLine('💰 Total awarded', totalPoints, '#F4C430', colBx, sumY + 102)
 
