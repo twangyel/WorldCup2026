@@ -3822,12 +3822,59 @@ function buildMatchHighlightData(fixtureId) {
   }
 }
 
-// Small bonus chips (🔥 streak, ⚡ combo) for a pick.
+// Clear point explanation helpers used by Highlights cards and share images.
+// Goal: players should immediately understand WHY someone got +7 / +5 etc.
+function pickBaseLabel(p) {
+  const base = Number(p?.base_points || 0)
+  const mult = Number(p?.stage_mult || p?.stage_multiplier || 1)
+  const multiplied = Number(p?.multiplied_base != null ? p.multiplied_base : base * mult)
+  let label = 'Wrong'
+  if (base === 5) label = 'Exact score'
+  else if (base === 3) label = 'Goal diff'
+  else if (base === 2) label = 'Correct result'
+
+  if (base <= 0) return 'Wrong +0'
+  if (mult > 1) return `${label} ${base}×${mult}=+${multiplied}`
+  return `${label} +${base}`
+}
+
+function pickBonusParts(p) {
+  const parts = []
+  const streak = Number(p?.streak_bonus || 0)
+  const combo = Number(p?.combo_bonus || 0)
+  if (streak > 0) parts.push({ emoji: '🔥', label: `Streak +${streak}`, type: 'streak' })
+  if (combo > 0) parts.push({ emoji: '⚡', label: `Combo +${combo}`, type: 'combo' })
+  return parts
+}
+
+function pickPointExplainText(p) {
+  const parts = [pickBaseLabel(p)]
+  pickBonusParts(p).forEach(b => parts.push(`${b.emoji} ${b.label}`))
+  return parts.join(' • ')
+}
+
+function pickPointExplainHtml(p) {
+  const base = Number(p?.base_points || 0)
+  const chips = [{ label: pickBaseLabel(p), type: base === 5 ? 'exact' : base > 0 ? 'base' : 'wrong' }, ...pickBonusParts(p)]
+  return chips.map(c => {
+    const palette = c.type === 'exact'
+      ? 'background:rgba(244,196,48,.18); color:#FDE68A; border-color:rgba(244,196,48,.35);'
+      : c.type === 'streak'
+        ? 'background:rgba(251,146,60,.15); color:#FDBA74; border-color:rgba(251,146,60,.35);'
+        : c.type === 'combo'
+          ? 'background:rgba(167,139,250,.16); color:#C4B5FD; border-color:rgba(167,139,250,.36);'
+          : c.type === 'wrong'
+            ? 'background:rgba(148,163,184,.10); color:rgba(255,255,255,.55); border-color:rgba(148,163,184,.18);'
+            : 'background:rgba(74,222,128,.12); color:#86EFAC; border-color:rgba(74,222,128,.28);'
+    const icon = c.emoji ? `${c.emoji} ` : ''
+    return `<span style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:999px; border:1px solid; ${palette} font-size:10px; font-weight:800; line-height:1; margin:3px 4px 0 0; white-space:nowrap;">${icon}${escapeHtml(c.label)}</span>`
+  }).join('')
+}
+
+// Small inline icons kept for older compact views.
 function bonusChips(p) {
-  let s = ''
-  if ((p.combo_bonus || 0) > 0) s += '<span style="margin-left:5px;">⚡</span>'
-  if ((p.streak_bonus || 0) > 0) s += '<span style="margin-left:3px;">🔥</span>'
-  return s
+  const parts = pickBonusParts(p)
+  return parts.map(b => `<span style="margin-left:4px;">${b.emoji}</span>`).join('')
 }
 
 // ---- DOM renderer: the in-app Highlights tab (view-only; admin gets share) ----
@@ -3863,20 +3910,23 @@ async function renderMatchHighlights() {
     const topRows = topPicks.map((p, i) => {
       const win = (p.final_points || 0) > 0
       const mvp = i === 0 && win
-        ? '<span style="margin-left:6px; background:#D4A24C; color:#0B1221; font-size:10px; font-weight:800; padding:2px 8px; border-radius:10px; display:inline-flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="#0B1221" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>MATCH MVP</span>'
+        ? '<span style="margin-left:6px; background:#D4A24C; color:#0B1221; font-size:10px; font-weight:900; padding:3px 8px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; vertical-align:middle;"><svg width="11" height="11" viewBox="0 0 24 24" fill="#0B1221" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>MATCH MVP</span>'
         : ''
-      return `<div style="display:flex; align-items:center; gap:8px; padding:7px 9px; margin:3px 0; border-radius:8px; background:${win ? 'rgba(212,162,76,.13)' : 'rgba(255,255,255,.05)'}; ${win ? 'border:1px solid rgba(212,162,76,.4);' : ''}">
-        <span style="font-size:14px;">${medals[i] || ''}</span>
-        <span style="flex:1; color:#fff; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.name}${bonusChips(p)}${mvp}</span>
-        <span style="color:rgba(255,255,255,.85); font-size:14px; font-weight:700;">${p.home}&nbsp;–&nbsp;${p.away}</span>
-        <span style="color:${win ? '#4ADE80' : '#F87171'}; font-size:11px; font-weight:700; width:34px; text-align:right;">+${p.final_points || 0}</span>
+      return `<div style="display:flex; align-items:center; gap:9px; padding:9px 10px; margin:5px 0; border-radius:11px; background:${win ? 'rgba(212,162,76,.13)' : 'rgba(255,255,255,.05)'}; ${win ? 'border:1px solid rgba(212,162,76,.42);' : 'border:1px solid rgba(255,255,255,.08);'}">
+        <span style="font-size:17px; width:22px; text-align:center; flex:0 0 22px;">${medals[i] || ''}</span>
+        <span style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px;">
+          <span style="color:#fff; font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name || 'Anonymous')}${mvp}</span>
+          <span style="display:flex; flex-wrap:wrap; align-items:center;">${pickPointExplainHtml(p)}</span>
+        </span>
+        <span style="color:rgba(255,255,255,.9); font-size:15px; font-weight:900; min-width:42px; text-align:right;">${p.home}&nbsp;–&nbsp;${p.away}</span>
+        <span style="color:${win ? '#4ADE80' : 'rgba(255,255,255,.45)'}; font-size:15px; font-weight:900; width:42px; text-align:right; font-variant-numeric:tabular-nums;">+${p.final_points || 0}</span>
       </div>`
     }).join('')
 
     const upsetBlock = maverick
       ? `<div style="margin-top:8px; padding:9px 11px; border-radius:10px; background:rgba(96,165,250,.12); border:1px solid rgba(96,165,250,.35);">
           <div style="color:#93C5FD; font-size:10px; font-weight:700; letter-spacing:.5px; margin-bottom:3px;">🎯 BOLDEST CALL</div>
-          <div style="color:#fff; font-size:12px;"><b>${maverick.name}</b> called <b>${maverick.home}–${maverick.away}</b> when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did · <span style="color:#4ADE80; font-weight:700;">+${maverick.final_points || 0}</span></div>
+          <div style="color:#fff; font-size:12px; line-height:1.35;"><b>${escapeHtml(maverick.name || 'Anonymous')}</b> called <b>${maverick.home}–${maverick.away}</b> when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did · <span style="color:#4ADE80; font-weight:900;">+${maverick.final_points || 0}</span><br><span style="color:rgba(255,255,255,.68);">${escapeHtml(pickPointExplainText(maverick))}</span></div>
         </div>`
       : ''
 
@@ -4229,16 +4279,19 @@ async function generateMatchReportCardBlob(fixtureId) {
   y += COL_HDR_H
 
   function bonusTextForRow(p) {
-    const parts = []
-    if (p.streak_bonus > 0) parts.push(`🔥 +${p.streak_bonus}`)
+    const parts = [pickBaseLabel(p)]
+    if (p.streak_bonus > 0) parts.push(`🔥 Streak +${p.streak_bonus}`)
     if (Array.isArray(p.combos_earned) && p.combos_earned.length) {
       p.combos_earned.slice(0, 2).forEach(c => {
         const emoji = c.emoji || '⚡'
+        const label = c.label || c.name || 'Combo'
         const val = c.value != null ? c.value : (p.combo_bonus || 0)
-        if (val > 0) parts.push(`${emoji} +${val}`)
+        if (val > 0) parts.push(`${emoji} ${label} +${val}`)
       })
+    } else if (p.combo_bonus > 0) {
+      parts.push(`⚡ Combo +${p.combo_bonus}`)
     }
-    return parts.join('   ')
+    return parts.join('  •  ')
   }
 
   function drawRow(p, displayIdx, colX, rowTopY) {
@@ -4273,8 +4326,8 @@ async function generateMatchReportCardBlob(fixtureId) {
     ctx.fillText(truncateForCanvas(ctx, p.name, nameMaxW), g.nameL, nameY)
 
     if (bonusTxt) {
-      ctx.font = '800 14px system-ui, sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.58)'
+      ctx.font = '850 15px system-ui, sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.72)'
       ctx.fillText(truncateForCanvas(ctx, bonusTxt, nameMaxW + 20), g.nameL, cyl + 17)
     }
 
@@ -4407,6 +4460,277 @@ https://wcpredictionleague.vercel.app`
 }
  
  
+// ---- Highlights share image generator ------------------------------------
+// This is the image used by the Highlights tab Share button. It is intentionally
+// simpler than the full Match Report: top winners + their exact scoring reason.
+async function generateMatchHighlightCardBlob(fixtureId) {
+  const d = buildMatchHighlightData(fixtureId)
+  if (!d) throw new Error('Highlights are available only after the match is finished')
+
+  const { fixture, summary, topPicks, maverick, maverickPop } = d
+  if (!topPicks.length) throw new Error('No scoring predictions to highlight yet')
+
+  const hf = getFlag(fixture.home_team), af = getFlag(fixture.away_team)
+  const [homeImg, awayImg] = await Promise.all([
+    loadFlagImage(hf.img ? hf.img.replace('/w40/', '/w160/') : null),
+    loadFlagImage(af.img ? af.img.replace('/w40/', '/w160/') : null)
+  ])
+
+  const WIDTH = 1080
+  const PAD = 56
+  const TOP_ROWS_H = topPicks.length * 162
+  const MAV_H = maverick ? 144 : 0
+  const HEIGHT = 1040 + TOP_ROWS_H + MAV_H
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH
+  canvas.height = HEIGHT
+  const ctx = canvas.getContext('2d')
+  const cx = WIDTH / 2
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
+  bg.addColorStop(0, '#08111F')
+  bg.addColorStop(0.48, '#102542')
+  bg.addColorStop(1, '#183B63')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  ctx.fillStyle = 'rgba(255,255,255,.035)'
+  for (let yy = 0; yy < HEIGHT; yy += 34) {
+    for (let xx = 0; xx < WIDTH; xx += 34) {
+      ctx.beginPath(); ctx.arc(xx, yy, 1.5, 0, Math.PI * 2); ctx.fill()
+    }
+  }
+  const glow = ctx.createRadialGradient(WIDTH - 80, 80, 0, WIDTH - 80, 80, 620)
+  glow.addColorStop(0, 'rgba(212,162,76,.30)')
+  glow.addColorStop(1, 'rgba(212,162,76,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  // Header
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '900 34px system-ui, sans-serif'
+  ctx.fillText(`🏆 ${fixture.stage || 'Match'} · Highlights`, PAD, 76)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = 'rgba(255,255,255,.68)'
+  ctx.font = '700 21px system-ui, sans-serif'
+  ctx.fillText(fmtMatchDate(fixture.kickoff), WIDTH - PAD, 76)
+
+  // Scoreboard
+  const scoreY = 145
+  function drawMiniFlag(img, name, x) {
+    const fw = 108, fh = 72
+    if (img) {
+      ctx.save(); roundRect(ctx, x - fw / 2, scoreY, fw, fh, 14); ctx.clip(); ctx.drawImage(img, x - fw / 2, scoreY, fw, fh); ctx.restore()
+      ctx.strokeStyle = 'rgba(255,255,255,.32)'; ctx.lineWidth = 2; roundRect(ctx, x - fw / 2, scoreY, fw, fh, 14); ctx.stroke()
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, scoreY + fh / 2, 40, 0, Math.PI * 2); ctx.stroke()
+      ctx.fillStyle = '#fff'; ctx.font = '900 28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(teamCodeFallback(name), x, scoreY + fh / 2); ctx.textBaseline = 'alphabetic'
+    }
+    ctx.fillStyle = '#fff'; ctx.font = '800 24px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(truncateForCanvas(ctx, name, 260), x, scoreY + fh + 38)
+  }
+  drawMiniFlag(homeImg, fixture.home_team, cx - 235)
+  drawMiniFlag(awayImg, fixture.away_team, cx + 235)
+  ctx.fillStyle = '#F4C430'
+  ctx.font = '950 86px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(`${fixture.home_score}  –  ${fixture.away_score}`, cx, scoreY + 66)
+  ctx.fillStyle = '#4ADE80'
+  ctx.font = '900 22px system-ui, sans-serif'
+  ctx.fillText('FULL TIME', cx, scoreY + 116)
+
+  // Stats row
+  const statsY = 330
+  const stats = [
+    ['PREDICTIONS', summary.predictions, '#fff'],
+    ['EXACT', summary.exact, '#F4C430'],
+    ['RESULT', summary.correctResult, '#4ADE80'],
+    ['POINTS', summary.pointsWon, '#F4C430']
+  ]
+  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(PAD, statsY - 16); ctx.lineTo(WIDTH - PAD, statsY - 16); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, statsY + 98); ctx.lineTo(WIDTH - PAD, statsY + 98); ctx.stroke()
+  const statW = (WIDTH - PAD * 2) / stats.length
+  stats.forEach((s, i) => {
+    const x = PAD + i * statW + statW / 2
+    ctx.fillStyle = s[2]
+    ctx.font = '950 45px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(String(s[1]), x, statsY + 34)
+    ctx.fillStyle = 'rgba(255,255,255,.58)'
+    ctx.font = '900 16px system-ui, sans-serif'
+    ctx.fillText(s[0], x, statsY + 72)
+  })
+
+  // Helper for chips
+  function chipPalette(type) {
+    if (type === 'exact') return ['rgba(244,196,48,.18)', '#FDE68A', 'rgba(244,196,48,.38)']
+    if (type === 'streak') return ['rgba(251,146,60,.17)', '#FDBA74', 'rgba(251,146,60,.38)']
+    if (type === 'combo') return ['rgba(167,139,250,.18)', '#C4B5FD', 'rgba(167,139,250,.38)']
+    if (type === 'wrong') return ['rgba(148,163,184,.10)', 'rgba(255,255,255,.62)', 'rgba(148,163,184,.18)']
+    return ['rgba(74,222,128,.13)', '#86EFAC', 'rgba(74,222,128,.30)']
+  }
+  function drawChip(text, type, x, y) {
+    ctx.font = '900 20px system-ui, sans-serif'
+    const w = Math.ceil(ctx.measureText(text).width) + 28
+    const h = 34
+    const pal = chipPalette(type)
+    ctx.fillStyle = pal[0]; ctx.strokeStyle = pal[2]; ctx.lineWidth = 1.5
+    roundRect(ctx, x, y, w, h, 17); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = pal[1]; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+    ctx.fillText(text, x + 14, y + h / 2 + 1)
+    ctx.textBaseline = 'alphabetic'
+    return w
+  }
+  function pickCanvasChips(p) {
+    const base = Number(p?.base_points || 0)
+    const chips = [{ text: pickBaseLabel(p), type: base === 5 ? 'exact' : base > 0 ? 'base' : 'wrong' }]
+    pickBonusParts(p).forEach(b => chips.push({ text: `${b.emoji} ${b.label}`, type: b.type }))
+    return chips
+  }
+
+  // Top winners
+  let y = 485
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '950 28px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('⚡ TOP WINNERS · points explained', PAD, y)
+  y += 30
+  const medals = ['🥇', '🥈', '🥉']
+
+  topPicks.forEach((p, i) => {
+    const rowY = y + i * 162
+    const rowFill = i === 0 ? 'rgba(212,162,76,.17)' : 'rgba(255,255,255,.065)'
+    ctx.fillStyle = rowFill; ctx.strokeStyle = i === 0 ? 'rgba(212,162,76,.56)' : 'rgba(255,255,255,.12)'; ctx.lineWidth = i === 0 ? 2 : 1.4
+    roundRect(ctx, PAD, rowY, WIDTH - PAD * 2, 138, 20); ctx.fill(); ctx.stroke()
+
+    ctx.fillStyle = i === 0 ? '#D4A24C' : 'rgba(255,255,255,.12)'
+    ctx.beginPath(); ctx.arc(PAD + 58, rowY + 69, 39, 0, Math.PI * 2); ctx.fill()
+    ctx.font = '900 32px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'
+    ctx.fillText(medals[i] || String(i + 1), PAD + 58, rowY + 69)
+    ctx.textBaseline = 'alphabetic'
+
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#fff'
+    ctx.font = '950 30px system-ui, sans-serif'
+    ctx.fillText(truncateForCanvas(ctx, p.name || 'Anonymous', 505), PAD + 118, rowY + 48)
+    if (i === 0) {
+      ctx.font = '900 17px system-ui, sans-serif'
+      const badgeW = 130
+      ctx.fillStyle = '#D4A24C'; roundRect(ctx, PAD + 118, rowY + 62, badgeW, 28, 14); ctx.fill()
+      ctx.fillStyle = '#0B1221'; ctx.textAlign = 'center'; ctx.fillText('MATCH MVP', PAD + 118 + badgeW / 2, rowY + 83)
+      ctx.textAlign = 'left'
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,.92)'
+    ctx.font = '950 34px system-ui, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(`${p.home}–${p.away}`, WIDTH - PAD - 160, rowY + 58)
+    ctx.fillStyle = '#4ADE80'
+    ctx.font = '950 44px system-ui, sans-serif'
+    ctx.fillText(`+${p.final_points || 0}`, WIDTH - PAD - 18, rowY + 60)
+
+    // Explain chips under the player name
+    let chipX = PAD + 118
+    const chipY = rowY + 94
+    pickCanvasChips(p).forEach(ch => {
+      const w = drawChip(ch.text, ch.type, chipX, chipY)
+      chipX += w + 10
+    })
+  })
+  y += TOP_ROWS_H + 10
+
+  // Boldest call block
+  if (maverick) {
+    ctx.fillStyle = 'rgba(96,165,250,.12)'; ctx.strokeStyle = 'rgba(96,165,250,.38)'; ctx.lineWidth = 1.6
+    roundRect(ctx, PAD, y, WIDTH - PAD * 2, 126, 18); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = '#93C5FD'; ctx.font = '950 21px system-ui, sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText('🎯 BOLDEST CALL', PAD + 28, y + 36)
+    ctx.fillStyle = '#fff'; ctx.font = '850 24px system-ui, sans-serif'
+    const boldText = `${maverick.name || 'Anonymous'} called ${maverick.home}–${maverick.away} when only ${maverickPop} ${maverickPop === 1 ? 'player' : 'players'} did`
+    ctx.fillText(truncateForCanvas(ctx, boldText, WIDTH - PAD * 2 - 56), PAD + 28, y + 73)
+    ctx.fillStyle = 'rgba(255,255,255,.68)'; ctx.font = '800 20px system-ui, sans-serif'
+    ctx.fillText(truncateForCanvas(ctx, pickPointExplainText(maverick), WIDTH - PAD * 2 - 56), PAD + 28, y + 104)
+    y += 150
+  }
+
+  // Legend / why this card is readable
+  ctx.fillStyle = 'rgba(255,255,255,.055)'; ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.5
+  roundRect(ctx, PAD, y, WIDTH - PAD * 2, 145, 18); ctx.fill(); ctx.stroke()
+  ctx.fillStyle = '#F2C766'; ctx.font = '950 24px system-ui, sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('📌 HOW TO READ POINTS', PAD + 28, y + 42)
+  ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.font = '800 22px system-ui, sans-serif'
+  ctx.fillText('Base score + visible bonuses = total points', PAD + 28, y + 78)
+  ctx.fillStyle = 'rgba(255,255,255,.58)'; ctx.font = '750 19px system-ui, sans-serif'
+  ctx.fillText('Exact +5 · Goal Diff +3 · Correct Result +2 · Streak/Combo bonuses shown as chips', PAD + 28, y + 112)
+
+  // Footer
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#F2C766'
+  ctx.font = '950 28px system-ui, sans-serif'
+  ctx.fillText('wcpredictionleague.vercel.app', cx, HEIGHT - 46)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png', 0.98)
+  })
+}
+
+// ---- Admin share from Highlights tab -------------------------------------
+async function shareMatchHighlight(fixtureId) {
+  const d = buildMatchHighlightData(fixtureId)
+  if (!d) { showToast('Highlights are available after the match is finished', 'info'); return }
+
+  let blob = null
+  try { blob = await generateMatchHighlightCardBlob(fixtureId) }
+  catch (e) {
+    console.warn('[shareMatchHighlight] image gen failed:', e)
+    showToast(e.message || 'Highlight generation failed', 'error')
+    return
+  }
+
+  const { fixture, topPicks } = d
+  const scoreLine = `${fixture.home_team} ${fixture.home_score}–${fixture.away_score} ${fixture.away_team}`
+  const topLine = topPicks[0]
+    ? `MVP: ${topPicks[0].name} · ${topPicks[0].home}–${topPicks[0].away} · +${topPicks[0].final_points || 0}`
+    : ''
+  const text = `🏆 WC 2026 Prediction League — Match Highlights\n${scoreLine} (${fixture.stage || ''})\n${topLine}\n\nBase + bonus points explained in the card 👇\n\nhttps://wcpredictionleague.vercel.app`
+
+  let captionCopied = false
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      captionCopied = true
+    }
+  } catch (e) { console.warn('[shareMatchHighlight] clipboard copy failed:', e) }
+
+  if (blob && navigator.canShare) {
+    const file = new File([blob], `wcpl-highlight-${Date.now()}.png`, { type: 'image/png' })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'WC 2026 Prediction League · Highlights', text })
+        showToast(captionCopied ? 'Shared · caption copied, long-press to paste' : 'Shared!', 'success')
+        return
+      } catch (e) {
+        if (e.name === 'AbortError') return
+        console.warn('[shareMatchHighlight] native share failed:', e)
+      }
+    }
+  }
+
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `wcpl-highlight-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('Image saved · attach it in WhatsApp', 'success')
+    setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'), 250)
+    return
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
 // ---- Admin share (mirrors shareMatchHighlight's 3-path fallback) ----
 async function sharePickList(fixtureId) {
   const fixture = (window.fixtures || (typeof fixtures !== 'undefined' ? fixtures : []) || [])
