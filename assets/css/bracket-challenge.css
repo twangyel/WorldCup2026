@@ -2371,3 +2371,34 @@
 .bracket-home-svg-icon { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; filter:drop-shadow(0 0 14px rgba(168,85,247,.35)); }
 .bracket-home-svg-icon svg { width:100%; height:100%; display:block; }
 .bracket-home-card .w-12.h-12 { background:linear-gradient(145deg, rgba(124,58,237,.24), rgba(15,23,42,.52)) !important; }
+
+
+/* ADMIN-ONLY HIDDEN PREVIEW */
+.admin-bracket-preview {
+  position: relative !important;
+  outline: 2px dashed rgba(251, 191, 36, 0.78) !important;
+  outline-offset: 4px !important;
+}
+
+.admin-preview-badge {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 2147483002 !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #f59e0b, #facc15) !important;
+  color: #111827 !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.28) !important;
+  pointer-events: none !important;
+}
+
+.bracket-status-badge.admin-preview {
+  background: rgba(251, 191, 36, 0.18) !important;
+  color: #facc15 !important;
+}

@@ -2905,6 +2905,87 @@ async function getUserResults(userId) {
 // It now reads bracket_settings.status from Supabase so live/locked/completed are not controlled by the countdown.
 let homeBracketStatusCache = null;
 let homeBracketStatusLoadedAt = 0;
+let homeBracketRealtimeChannel = null;
+let homeBracketRealtimePollTimer = null;
+let homeBracketRealtimeRefreshTimer = null;
+
+function invalidateHomeBracketStatusCache() {
+  homeBracketStatusCache = null;
+  homeBracketStatusLoadedAt = 0;
+}
+
+function scheduleHomeBracketRealtimeRefresh(source = 'event') {
+  if (homeBracketRealtimeRefreshTimer) clearTimeout(homeBracketRealtimeRefreshTimer);
+  homeBracketRealtimeRefreshTimer = setTimeout(() => {
+    invalidateHomeBracketStatusCache();
+    ensureBracketChallengeHomeCard(true).catch(e => console.warn('[Bracket] Home realtime refresh failed:', source, e));
+  }, 120);
+}
+
+function setupHomeBracketStatusRealtime() {
+  if (window.__homeBracketStatusRealtimeReady) return;
+
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+    setTimeout(setupHomeBracketStatusRealtime, 500);
+    return;
+  }
+
+  window.__homeBracketStatusRealtimeReady = true;
+
+  try {
+    if (supabaseClient?.channel) {
+      homeBracketRealtimeChannel = supabaseClient
+        .channel('home-bracket-settings-watch')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'bracket_settings' }, (payload) => {
+          console.log('[Bracket] Home realtime settings change:', payload?.new?.status || payload?.eventType);
+          scheduleHomeBracketRealtimeRefresh('supabase-realtime');
+        })
+        .subscribe((status) => {
+          console.log('[Bracket] Home realtime subscription:', status);
+        });
+    }
+  } catch (err) {
+    console.warn('[Bracket] Home realtime setup failed:', err);
+  }
+
+  try {
+    if ('BroadcastChannel' in window) {
+      const bc = new BroadcastChannel('bracket-status');
+      bc.onmessage = (event) => {
+        if (event?.data?.type === 'BRACKET_STATUS_CHANGED') {
+          scheduleHomeBracketRealtimeRefresh('broadcast-channel');
+        }
+      };
+      window.__homeBracketStatusBroadcastChannel = bc;
+    }
+  } catch (err) {
+    console.warn('[Bracket] Home BroadcastChannel setup failed:', err);
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'bracket_status_changed_at' || event.key === 'bracket_status_value') {
+      scheduleHomeBracketRealtimeRefresh('local-storage');
+    }
+  });
+
+  window.addEventListener('bracket-status-changed', () => {
+    scheduleHomeBracketRealtimeRefresh('same-window-event');
+  });
+
+  window.addEventListener('focus', () => scheduleHomeBracketRealtimeRefresh('window-focus'));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleHomeBracketRealtimeRefresh('tab-visible');
+  });
+
+  // Guaranteed fallback: even if Supabase realtime is disabled for bracket_settings,
+  // users will still see status changes without reopening the app.
+  if (!homeBracketRealtimePollTimer) {
+    homeBracketRealtimePollTimer = setInterval(() => {
+      if (document.hidden) return;
+      scheduleHomeBracketRealtimeRefresh('poll');
+    }, 5000);
+  }
+}
 
 function getBracketHomeDefaultLockAt() {
   return new Date('2026-06-28T18:50:00.000Z'); // 29 Jun 2026 12:50 AM BTT (UTC+6)
@@ -2912,6 +2993,19 @@ function getBracketHomeDefaultLockAt() {
 
 function normalizeBracketHomeStatus(status) {
   return String(status || 'coming_soon').trim().toLowerCase();
+}
+
+function canPreviewHiddenBracketHome() {
+  const profile = (typeof getProfile === 'function') ? getProfile() : null;
+
+  return Boolean(
+    profile?.role === 'admin' ||
+    profile?.user_role === 'admin' ||
+    profile?.is_admin === true ||
+    ((typeof isAdmin === 'function') && isAdmin()) ||
+    ((typeof window.canPreviewHiddenBracket === 'function') && window.canPreviewHiddenBracket()) ||
+    (window.location.search || '').includes('preview=admin')
+  );
 }
 
 function isPublicBracketHomeStatus(status) {
@@ -2952,7 +3046,8 @@ async function fetchHomeBracketMeta(force = false) {
     lockAt: getBracketHomeDefaultLockAt(),
     isPaid: false,
     hasSubmitted: false,
-    entryCount: 0
+    entryCount: 0,
+    canPreviewHidden: canPreviewHiddenBracketHome()
   };
 
   try {
@@ -2978,7 +3073,8 @@ async function fetchHomeBracketMeta(force = false) {
       lockAt: Number.isNaN(parsedLockAt.getTime()) ? getBracketHomeDefaultLockAt() : parsedLockAt,
       isPaid: entry?.payment_status === 'paid',
       hasSubmitted: !!entry?.submitted_at,
-      entryCount: entryCountResult?.count || 0
+      entryCount: entryCountResult?.count || 0,
+      canPreviewHidden: canPreviewHiddenBracketHome()
     };
 
     homeBracketStatusCache = meta;
@@ -2996,6 +3092,21 @@ function getHomeBracketCopy(meta) {
   const countdown = formatBracketHomeCountdown(meta?.lockAt);
 
   if (status === 'hidden') {
+    if (meta?.canPreviewHidden) {
+      return {
+        icon: 'cup',
+        kicker: 'Admin Preview',
+        title: 'Bracket Challenge',
+        subtitle: 'Hidden from players · Test safely',
+        statusLabel: 'Mode',
+        statusValue: 'Hidden',
+        statusClass: 'text-amber-200',
+        button: 'Open Preview',
+        buttonDisabled: false,
+        footer: 'Only admins can see this preview. Normal users still see nothing.'
+      };
+    }
+
     // Bracket is admin-hidden. Card is also hidden via CSS (body.bracket-status-hidden),
     // but return an empty-ish copy so nothing misleading flashes if CSS hasn't loaded.
     return {
@@ -3117,7 +3228,10 @@ function renderHomeBracketCard(card, meta) {
   const isLive = normalizeBracketHomeStatus(meta?.status) === 'live';
   const isCompleted = normalizeBracketHomeStatus(meta?.status) === 'completed';
   const isPublic = isPublicBracketHomeStatus(meta?.status);
+  const isHiddenPreview = normalizeBracketHomeStatus(meta?.status) === 'hidden' && !!meta?.canPreviewHidden;
   const entryCount = Number(meta?.entryCount || 0);
+
+  card.classList.toggle('admin-bracket-preview', isHiddenPreview);
 
   const bg = isLive
     ? 'radial-gradient(circle at top right, rgba(16,185,129,.30), transparent 38%), radial-gradient(circle at 80% 0%, rgba(168,85,247,.28), transparent 36%), linear-gradient(145deg, #06251f 0%, #070612 78%)'
@@ -3181,6 +3295,7 @@ function renderHomeBracketCard(card, meta) {
 
 async function ensureBracketChallengeHomeCard(force = false) {
   try {
+    setupHomeBracketStatusRealtime();
     const homeTab = document.getElementById('tab-home');
     if (!homeTab) return;
 
@@ -3215,7 +3330,28 @@ async function ensureBracketChallengeHomeCard(force = false) {
     }
 
     const meta = await fetchHomeBracketMeta(force);
+
+    if (normalizeBracketHomeStatus(meta?.status) === 'hidden' && !meta?.canPreviewHidden) {
+      document.body.classList.add('bracket-status-hidden');
+      card.style.setProperty('display', 'none', 'important');
+      card.classList.add('hidden');
+      card.setAttribute('data-bracket-hidden-by-status', 'true');
+      return;
+    }
+
+    document.body.classList.remove('bracket-status-hidden');
+    card.style.removeProperty('display');
+    card.classList.remove('hidden');
+    card.removeAttribute('data-bracket-hidden-by-status');
+
     renderHomeBracketCard(card, meta);
+
+    if (normalizeBracketHomeStatus(meta?.status) === 'hidden' && meta?.canPreviewHidden && !card.querySelector(':scope > .admin-preview-badge')) {
+      const badge = document.createElement('div');
+      badge.className = 'admin-preview-badge';
+      badge.textContent = 'Admin Preview';
+      card.prepend(badge);
+    }
 
     // Apply the bracket overlay (blur cover for coming_soon/locked, etc.) SYNCHRONOUSLY
     // right after innerHTML is set. Defers to a no-op when bracket-challenge.js hasn't
@@ -3281,7 +3417,29 @@ function showBracketChallengeInfo() {
   }
 }
 
+window.ensureBracketChallengeHomeCard = ensureBracketChallengeHomeCard;
+window.scheduleHomeBracketRealtimeRefresh = scheduleHomeBracketRealtimeRefresh;
+
+(function bootHomeBracketStatusRealtime(){
+  const boot = () => {
+    try {
+      setupHomeBracketStatusRealtime();
+      ensureBracketChallengeHomeCard(true);
+    } catch (e) {
+      console.warn('[Bracket] Home realtime boot failed:', e);
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    setTimeout(boot, 0);
+  }
+  window.addEventListener('load', () => setTimeout(boot, 250));
+})();
+
 async function loadHome() {
+  setupHomeBracketStatusRealtime()
   ensureBracketChallengeHomeCard()
   const myId = getUser()?.id
   const { data: stats } = await getLeaderboardFromResults()

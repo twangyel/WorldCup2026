@@ -358,11 +358,41 @@ async function submitBracket(entryId, championPick, championFlag) {
   if (error) throw error;
 }
 
+function publishBracketStatusChanged(status, source = 'admin') {
+  const message = {
+    type: 'BRACKET_STATUS_CHANGED',
+    status: String(status || ''),
+    source,
+    at: Date.now()
+  };
+
+  // Same-window listeners. Useful when admin controls and Home card live in the same tab.
+  try {
+    window.dispatchEvent(new CustomEvent('bracket-status-changed', { detail: message }));
+  } catch (_) {}
+
+  // Cross-tab listeners on the same browser/device.
+  try {
+    localStorage.setItem('bracket_status_value', message.status);
+    localStorage.setItem('bracket_status_changed_at', String(message.at));
+  } catch (_) {}
+
+  // BroadcastChannel is instant for other open tabs on the same device.
+  try {
+    if ('BroadcastChannel' in window) {
+      const bc = new BroadcastChannel('bracket-status');
+      bc.postMessage(message);
+      setTimeout(() => { try { bc.close(); } catch (_) {} }, 500);
+    }
+  } catch (_) {}
+}
+
 async function updateBracketStatus(status) {
   const settings = await getBracketSettings();
   const updates = { status };
   if (status === 'open') updates.opened_at = new Date().toISOString();
   if (status === 'locked') updates.locked_at = new Date().toISOString();
+  if (status === 'live') updates.live_at = new Date().toISOString();
   if (status === 'completed') updates.completed_at = new Date().toISOString();
 
   const { error } = await supabaseClient
@@ -370,6 +400,8 @@ async function updateBracketStatus(status) {
     .update(updates)
     .eq('id', settings.id);
   if (error) throw error;
+
+  publishBracketStatusChanged(status, 'admin-update');
 }
 
 // ============================================
@@ -380,10 +412,11 @@ async function initBracketChallenge() {
   try {
     bracketState.settings = await getBracketSettings();
     bracketState.isLocked = isBracketLockedStatus(bracketState.settings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
 
     // Set hidden state now; reveal happens later via applyHomeBracketStatusOverlay
     // (which fires in finally — guarantees overlay is in place before reveal).
-    if (bracketState.settings?.status === 'hidden') {
+    if (bracketState.settings?.status === 'hidden' && !canPreviewHiddenBracket()) {
       document.body.classList.add('bracket-status-hidden');
     } else {
       document.body.classList.remove('bracket-status-hidden');
@@ -414,6 +447,8 @@ async function initBracketChallenge() {
       bracketState.isAdmin = data?.role === 'admin';
     }
 
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
+
     await renderBracketCard();
     if (shouldRunBracketCountdown()) startLiveCountdown(resolveBracketLockAt());
     else stopLiveCountdown();
@@ -441,15 +476,40 @@ function isBracketComingSoonStatus(status) {
   return !status || status === 'coming_soon';
 }
 
+function canPreviewHiddenBracket() {
+  const profile = (typeof getProfile === 'function') ? getProfile() : null;
+
+  return Boolean(
+    bracketState.isAdmin === true ||
+    profile?.role === 'admin' ||
+    profile?.user_role === 'admin' ||
+    profile?.is_admin === true ||
+    ((typeof isAdmin === 'function') && isAdmin())
+  );
+}
+
+function isHiddenAdminPreviewMode() {
+  return bracketState.settings?.status === 'hidden' && canPreviewHiddenBracket();
+}
+
+function isEffectiveBracketLocked() {
+  return isHiddenAdminPreviewMode() ? false : !!bracketState.isLocked;
+}
+
+function isEffectiveBracketPaid() {
+  return isHiddenAdminPreviewMode() ? true : !!bracketState.isPaid;
+}
+
 async function refreshBracketSettingsAndRender(source = 'manual') {
   try {
     const latestSettings = await getBracketSettings();
     bracketState.settings = latestSettings;
     bracketState.isLocked = isBracketLockedStatus(latestSettings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
 
     // Set hidden state now; reveal happens later via applyHomeBracketStatusOverlay
     // (its finally guarantees overlay is in place before reveal — no flash).
-    if (latestSettings?.status === 'hidden') {
+    if (latestSettings?.status === 'hidden' && !canPreviewHiddenBracket()) {
       document.body.classList.add('bracket-status-hidden');
     } else {
       document.body.classList.remove('bracket-status-hidden');
@@ -496,19 +556,27 @@ function scheduleBracketStatusRefresh(source = 'event') {
 
 function setupBracketStatusListeners() {
   if (window.__bracketStatusListenersReady) return;
+
+  // If this script boots before Supabase is ready, retry instead of permanently
+  // marking the listener as ready. This was one reason users had to reopen the app.
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+    setTimeout(setupBracketStatusListeners, 500);
+    return;
+  }
+
   window.__bracketStatusListenersReady = true;
 
   // Supabase realtime: updates every user when admin changes bracket_settings.
   // NOTE: this only works if bracket_settings is in the supabase_realtime publication AND
   // RLS allows the subscribing user to SELECT the row. If realtime is silent, the
-  // polling fallback below catches changes within ~15s.
+  // polling fallback below catches changes within ~5s.
   try {
     if (supabaseClient?.channel) {
       bracketSettingsChannel = supabaseClient
         .channel('bracket-settings-watch')
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'bracket_settings' },
+          { event: '*', schema: 'public', table: 'bracket_settings' },
           (payload) => {
             console.log('[Bracket] Realtime UPDATE received:', payload?.new?.status);
             bracketState.settings = payload.new;
@@ -542,9 +610,13 @@ function setupBracketStatusListeners() {
   }
 
   window.addEventListener('storage', (event) => {
-    if (event.key === 'bracket_status_changed_at') {
+    if (event.key === 'bracket_status_changed_at' || event.key === 'bracket_status_value') {
       scheduleBracketStatusRefresh('local-storage');
     }
+  });
+
+  window.addEventListener('bracket-status-changed', () => {
+    scheduleBracketStatusRefresh('same-window-event');
   });
 
   // Refresh whenever user returns to the app/tab
@@ -553,7 +625,7 @@ function setupBracketStatusListeners() {
     if (!document.hidden) scheduleBracketStatusRefresh('tab-visible');
   });
 
-  // Polling fallback: cheap status-only fetch every 15s while the tab is visible.
+  // Polling fallback: cheap status-only fetch every 5s while the tab is visible.
   // This guarantees every device picks up admin status changes even if realtime
   // is not enabled on the bracket_settings table. It's a single-row select on a
   // tiny table — negligible cost.
@@ -563,18 +635,33 @@ function setupBracketStatusListeners() {
       try {
         const { data, error } = await supabaseClient
           .from('bracket_settings')
-          .select('status, lock_at, opened_at, locked_at, completed_at')
+          .select('status, lock_at, opened_at, locked_at, live_at, completed_at')
           .single();
         if (error) return;
-        const currentStatus = bracketState.settings?.status;
-        if (data && data.status !== currentStatus) {
-          console.log('[Bracket] Polling detected status change:', currentStatus, '->', data.status);
+        const currentKey = JSON.stringify({
+          status: bracketState.settings?.status || '',
+          lock_at: bracketState.settings?.lock_at || '',
+          opened_at: bracketState.settings?.opened_at || '',
+          locked_at: bracketState.settings?.locked_at || '',
+          live_at: bracketState.settings?.live_at || '',
+          completed_at: bracketState.settings?.completed_at || ''
+        });
+        const nextKey = JSON.stringify({
+          status: data?.status || '',
+          lock_at: data?.lock_at || '',
+          opened_at: data?.opened_at || '',
+          locked_at: data?.locked_at || '',
+          live_at: data?.live_at || '',
+          completed_at: data?.completed_at || ''
+        });
+        if (data && nextKey !== currentKey) {
+          console.log('[Bracket] Polling detected settings change:', currentKey, '->', nextKey);
           scheduleBracketStatusRefresh('poll');
         }
       } catch (e) {
         // Silent — polling shouldn't surface errors to the user.
       }
-    }, 15000);
+    }, 5000);
   }
 }
 
@@ -652,9 +739,10 @@ function applyHomeBracketStatusOverlay() {
   const isComingSoon = isBracketComingSoonStatus(status);
   const hasSubmitted = !!bracketState.hasSubmitted;
   const cards = findVisibleHomeBracketCards();
+  const canPreviewHidden = canPreviewHiddenBracket();
 
   // Fully hide only real bracket cards when admin sets status to hidden.
-  if (isHidden) {
+  if (isHidden && !canPreviewHidden) {
     document.body.classList.add('bracket-status-hidden');
 
     cards.forEach((card) => {
@@ -671,6 +759,34 @@ function applyHomeBracketStatusOverlay() {
       officialCard.classList.add('hidden');
       officialCard.setAttribute('data-bracket-hidden-by-status', 'true');
     }
+
+    stopLiveCountdown();
+    return;
+  }
+
+  // Admin-only preview: production status stays hidden, but admin can see and open it.
+  if (isHidden && canPreviewHidden) {
+    document.body.classList.remove('bracket-status-hidden');
+    document.querySelectorAll('[data-bracket-hidden-by-status="true"]').forEach((card) => {
+      card.style.removeProperty('display');
+      card.classList.remove('hidden');
+      card.removeAttribute('data-bracket-hidden-by-status');
+    });
+
+    cards.forEach((card) => {
+      restoreHomeBracketCard(card);
+      card.style.removeProperty('display');
+      card.classList.remove('hidden');
+      card.removeAttribute('data-bracket-hidden-by-status');
+      card.classList.add('admin-bracket-preview');
+
+      if (!card.querySelector(':scope > .admin-preview-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'admin-preview-badge';
+        badge.textContent = 'Admin Preview';
+        card.prepend(badge);
+      }
+    });
 
     stopLiveCountdown();
     return;
@@ -843,13 +959,15 @@ async function renderBracketCard() {
     const freshSettings = await getBracketSettings();
     bracketState.settings = freshSettings;
     bracketState.isLocked = isBracketLockedStatus(freshSettings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
   } catch (e) {
     console.warn('[Bracket] Failed to refresh settings before card render:', e);
   }
 
   const status = bracketState.settings?.status || 'coming_soon';
+  const isHiddenPreview = status === 'hidden' && canPreviewHiddenBracket();
   const isComingSoon = status === 'coming_soon';
-  const isLocked = bracketState.isLocked;
+  const isLocked = isEffectiveBracketLocked();
   const isPaid = bracketState.isPaid;
   const hasSubmitted = bracketState.hasSubmitted;
 
@@ -857,7 +975,7 @@ async function renderBracketCard() {
   // AFTER any overlay has been appended. Don't add bracket-status-ready here.)
 
   // Hidden must stop before any card.style.display = block line.
-  if (status === 'hidden') {
+  if (status === 'hidden' && !isHiddenPreview) {
     document.body.classList.add('bracket-status-hidden');
     if (card) {
       card.style.setProperty('display', 'none', 'important');
@@ -912,7 +1030,15 @@ async function renderBracketCard() {
   let overlayButtonHtml = '';
 
   // IMPORTANT: admin status should override paid/submitted state on the card.
-  if (isComingSoon) {
+  if (isHiddenPreview) {
+    title = 'Admin Preview';
+    subtitle = 'Hidden from players · Test safely';
+    ctaText = 'Open Preview →';
+    badgeText = 'Admin Preview';
+    badgeClass = 'admin-preview';
+    showCountdown = false;
+    showOverlay = false;
+  } else if (isComingSoon) {
     title = 'Mystery Game';
     subtitle = 'Unlocking soon · Stay ready';
     ctaText = 'Opening Soon';
@@ -1262,6 +1388,22 @@ async function openBracketPanel() {
 
     bracketState.settings = await getBracketSettings();
     bracketState.isLocked = isBracketLockedStatus(bracketState.settings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
+
+    if (bracketState.settings?.status === 'hidden' && !canPreviewHiddenBracket()) {
+      content.innerHTML = `
+        <div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:white;">
+          <div style="max-width:340px;">
+            <div style="font-size:42px;margin-bottom:12px;">🔒</div>
+            <h2 style="font-size:22px;font-weight:900;margin-bottom:8px;">Bracket League is hidden</h2>
+            <p style="font-size:13px;line-height:1.5;color:rgba(255,255,255,.72);margin-bottom:18px;">This section is not available yet.</p>
+            <button onclick="window.closeBracketPanel()" style="border:0;padding:12px 18px;border-radius:14px;background:white;color:#111827;font-weight:900;cursor:pointer;">Back to App</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     setupBracketStatusListeners();
     bracketState.slots = await getBracketSlots();
 
@@ -1347,7 +1489,7 @@ function renderBracketFantasyHero() {
   const completed = getCompletedPickCount();
   const total = getExpectedPickCount();
   const pct = getBracketCompletionPct();
-  const lockedCopy = bracketState.isLocked ? 'Picks locked' : 'Predict winners before the deadline';
+  const lockedCopy = isEffectiveBracketLocked() ? 'Picks locked' : (isHiddenAdminPreviewMode() ? 'Admin preview mode' : 'Predict winners before the deadline');
   return `
     <section class="bp-fantasy-hero" aria-label="Knockout Bracket header">
       <div class="bp-hero-topline">
@@ -1440,10 +1582,11 @@ async function renderFullBracketPanel() {
   const container = document.getElementById('bracket-content');
   if (!container) return;
 
-  const isLocked = bracketState.isLocked;
-  const isPaid = bracketState.isPaid;
+  const isHiddenAdminPreview = isHiddenAdminPreviewMode();
+  const isLocked = isHiddenAdminPreview ? false : bracketState.isLocked;
+  const isPaid = isHiddenAdminPreview ? true : bracketState.isPaid;
   const hasSubmitted = bracketState.hasSubmitted;
-  const leaderboardVisible = canShowBracketLeaderboard();
+  const leaderboardVisible = isHiddenAdminPreview ? false : canShowBracketLeaderboard();
 
   if (leaderboardVisible && (!isPaid || !hasSubmitted) && bracketState.currentPhase !== 'leaderboard') {
     bracketState.currentPhase = 'leaderboard';
@@ -1486,6 +1629,11 @@ async function renderFullBracketPanel() {
 
   container.innerHTML = `
     ${renderBracketFantasyHero()}
+    ${isHiddenAdminPreview ? `
+      <div class="bp-admin-preview-strip">
+        <strong>Admin Preview</strong> · Hidden from players. You can view and test the bracket while production status stays hidden.
+      </div>
+    ` : ''}
     <div class="bp-header">
       <div class="bp-phase-tabs">
         ${showPrivateTabs ? `
@@ -1647,7 +1795,7 @@ function renderMatchCard(slot) {
   const myPick = bracketState.myPicks.get(slot.id);
   const hasWinner = slot.winner !== '';
   const isCorrect = myPick && myPick === slot.winner;
-  const isLocked = bracketState.isLocked;
+  const isLocked = isEffectiveBracketLocked();
 
   let teamAClass = '';
   let teamBClass = '';
@@ -1782,7 +1930,7 @@ function isUsableChampionTeamName(name) {
 }
 
 function openChampionPickerModal() {
-  if (isBracketComingSoonStatus(bracketState.settings?.status) || bracketState.isLocked) return;
+  if (isBracketComingSoonStatus(bracketState.settings?.status) || isEffectiveBracketLocked()) return;
 
   closeChampionPickerModal();
 
@@ -2133,7 +2281,7 @@ function renderTooLateMessage() {
 // ============================================
 
 function pickTeam(slotId, team) {
-  if (isBracketComingSoonStatus(bracketState.settings?.status) || bracketState.isLocked) return;
+  if (isBracketComingSoonStatus(bracketState.settings?.status) || isEffectiveBracketLocked()) return;
 
   const current = bracketState.myPicks.get(slotId);
   if (current === team) {
@@ -2146,7 +2294,7 @@ function pickTeam(slotId, team) {
 }
 
 function pickChampion(name, flag) {
-  if (isBracketComingSoonStatus(bracketState.settings?.status) || bracketState.isLocked) return;
+  if (isBracketComingSoonStatus(bracketState.settings?.status) || isEffectiveBracketLocked()) return;
   const cleanName = String(name || '').trim();
   if (!cleanName) return;
 
@@ -2159,7 +2307,7 @@ function pickChampion(name, flag) {
 }
 
 function clearChampion() {
-  if (isBracketComingSoonStatus(bracketState.settings?.status) || bracketState.isLocked) return;
+  if (isBracketComingSoonStatus(bracketState.settings?.status) || isEffectiveBracketLocked()) return;
   bracketState.championPick = null;
   bracketState.championFlag = null;
   closeChampionPickerModal();
@@ -2171,13 +2319,14 @@ async function saveBracketPicks() {
     // Double-check live status before allowing writes.
     bracketState.settings = await getBracketSettings();
     bracketState.isLocked = isBracketLockedStatus(bracketState.settings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
 
     if (isBracketComingSoonStatus(bracketState.settings?.status)) {
       await renderFullBracketPanel();
       throw new Error('Bracket is not open yet');
     }
 
-    if (bracketState.isLocked) {
+    if (isEffectiveBracketLocked()) {
       await renderFullBracketPanel();
       throw new Error('Bracket is already locked');
     }
@@ -2224,7 +2373,7 @@ async function submitFinalBracket() {
     return;
   }
 
-  if (bracketState.isLocked) {
+  if (isEffectiveBracketLocked()) {
     await renderFullBracketPanel();
     bpShowToast('Bracket is already locked.', 'warning');
     return;
@@ -2513,6 +2662,7 @@ async function adminLockBracket() {
     console.log('[Bracket] Status updated to locked');
     bracketState.settings = await getBracketSettings();
     bracketState.isLocked = isBracketLockedStatus(bracketState.settings?.status);
+    if (isHiddenAdminPreviewMode()) bracketState.isLocked = false;
     setupBracketStatusListeners();
     setupHomeBracketMutationObserver();
     console.log('[Bracket] Refreshed state:', bracketState.settings?.status, bracketState.isLocked);
@@ -2562,6 +2712,8 @@ document.head.appendChild(bracketCardStyle);
 
 window.initBracketChallenge = initBracketChallenge;
 window.applyHomeBracketStatusOverlay = applyHomeBracketStatusOverlay;
+window.canPreviewHiddenBracket = canPreviewHiddenBracket;
+window.isHiddenAdminPreviewMode = isHiddenAdminPreviewMode;
 window.showBracketHowItWorks = showBracketHowItWorks;
 window.closeBracketHowItWorks = closeBracketHowItWorks;
 window.openBracketPanel = openBracketPanel;
@@ -2585,11 +2737,13 @@ window.adminLockBracket = adminLockBracket;
 window.adminStartLive = adminStartLive;
 window.adminCompleteBracket = adminCompleteBracket;
 window.refreshBracketSettingsAndRender = refreshBracketSettingsAndRender;
+window.publishBracketStatusChanged = publishBracketStatusChanged;
 
 // Auto-boot the Home-tab suspense cover even if the main app forgets to call initBracketChallenge after reload.
 (function bracketHomeCoverAutoBoot(){
   const boot = () => {
     try {
+      setupBracketStatusListeners();
       setupHomeBracketMutationObserver();
       if (bracketState.settings) {
         applyHomeBracketStatusOverlay();
@@ -2617,4 +2771,26 @@ window.refreshBracketSettingsAndRender = refreshBracketSettingsAndRender;
   }
   window.addEventListener('load', () => setTimeout(boot, 250));
   setTimeout(failSafeReveal, 1500);
+})();
+
+// Admin hidden preview panel styling fallback
+(function injectAdminPreviewPanelStyle() {
+  if (document.getElementById('bp-admin-preview-panel-style')) return;
+  const style = document.createElement('style');
+  style.id = 'bp-admin-preview-panel-style';
+  style.textContent = `
+    .bp-admin-preview-strip {
+      margin: 12px 16px 0;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(251, 191, 36, .14);
+      border: 1px solid rgba(251, 191, 36, .28);
+      color: #fef3c7;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 750;
+    }
+    .bp-admin-preview-strip strong { color: #fde68a; font-weight: 950; }
+  `;
+  document.head.appendChild(style);
 })();
