@@ -4976,9 +4976,15 @@ body.bracket-status-hidden .bracket-home-card {
       bottom: auto !important;
       left: auto !important;
     }
-    .lb-podium-trend:empty,
-    .lb-podium-trend .rank-trend.flat {
+    .lb-podium-trend:empty {
       display: none !important;
+    }
+    .lb-podium-trend .rank-trend.flat {
+      display: inline-flex !important;
+      min-width: 21px !important;
+      background: rgba(248,250,252,.96) !important;
+      color: #64748B !important;
+      border-color: rgba(255,255,255,.95) !important;
     }
     .lb-podium-trend .rank-trend {
       min-width: 21px !important;
@@ -7669,7 +7675,22 @@ body.bracket-status-hidden .bracket-home-card {
  
   </div>
   <script src="/assets/js/bonus-engine.js"></script>
-  <script type="text/javascript" src="/assets/js/index.js?v=crown-3d-1"></script>
+
+  <style>
+    /* Final polish: podium should show a neutral dash when rank did not change. */
+    .lb-podium-trend .rank-trend.flat {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-width: 21px !important;
+      height: 21px !important;
+      line-height: 21px !important;
+      background: rgba(248,250,252,.96) !important;
+      color: #64748B !important;
+      border-color: rgba(255,255,255,.95) !important;
+    }
+  </style>
+  <script type="text/javascript" src="/assets/js/index.js?v=bonus-podium-polish-1"></script>
 
   <!-- Auto-inject FIFA ranking badges into fixture cards -->
   <script>

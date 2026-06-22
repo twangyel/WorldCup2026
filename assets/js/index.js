@@ -1633,15 +1633,18 @@ const submittedStamp = (pred?.submitted_at && !previewMode)
 
     const nextBadge = isNextFixture ? `<div class="fixture-next-badge">Next Match</div>` : isOpen ? `<div class="fixture-next-badge" style="background: linear-gradient(135deg, #10B981, #059669);">Open</div>` : ''
 
-    // Hot Takes: once kickoff has passed, anyone (paid) can see everyone's picks.
-    // Hidden by default; expands inline on tap. Only shown for locked fixtures.
-    const showHotTakes = locked && !previewMode && (hotTakesByFixture[f.id]?.length > 0)
+    // Hot Takes / Pick list: once kickoff has passed, anyone (paid) can see everyone's picks.
+    // Render the action row for EVERY locked/past fixture. The actual list is now
+    // fetched on-demand in toggleHotTakes(), so a stale cache can never hide buttons
+    // or show a partial list.
+    const picksCount = hotTakesByFixture[f.id]?.length || 0
+    const showHotTakes = locked && !previewMode
     const hotTakesBlock = showHotTakes
       ? `<div class="px-5 pb-3">
           <div class="flex items-center gap-2 border-t border-paper-border/60 pt-1">
-            <button id="hot-takes-btn-${f.id}" onclick="toggleHotTakes('${f.id}')"
+            <button id="hot-takes-btn-${f.id}" data-pick-count="${picksCount}" onclick="toggleHotTakes('${f.id}')"
                     class="flex-1 text-xs font-semibold text-ink-600 hover:text-ink-900 tap py-2">
-              See all picks (${hotTakesByFixture[f.id].length})
+              ${picksCount > 0 ? `See all picks (${picksCount})` : 'See all picks'}
             </button>
            ${isAdmin() ? `<button onclick="sharePickList('${f.id}')"
                     class="text-xs font-bold text-brand-700 hover:text-brand-900 tap py-2 px-3 rounded-lg"
@@ -1860,63 +1863,141 @@ return `
     }
 
     async function refreshHotTakes(paidMap) {
+      // Refresh only the lightweight cache used for the button counts / first render.
+      // The full list is also fetched on demand by loadHotTakesForFixture() whenever
+      // the user opens a fixture card. This prevents the fixture card from showing
+      // a partial/stale list while the Match Report shows the correct full list.
       if (!fixtures.length) { hotTakesByFixture = {}; return }
       const now = Date.now()
-      // A fixture is "locked" once its kickoff has passed — at that point its predictions
-      // become public regardless of whether the result is in yet.
-      const lockedIds = fixtures.filter(f => new Date(f.kickoff).getTime() <= now).map(f => f.id)
-      if (!lockedIds.length) { hotTakesByFixture = {}; return }
+      const lockedFixtures = fixtures.filter(f => new Date(f.kickoff).getTime() <= now)
+      if (!lockedFixtures.length) { hotTakesByFixture = {}; return }
 
       try {
-        const [{ data: preds }, { data: results }] = await Promise.all([
+        const next = {}
+        await Promise.all(lockedFixtures.map(async f => {
+          try {
+            const picks = await loadHotTakesForFixture(f.id, { force: true, silent: true })
+            if (picks && picks.length) next[f.id] = picks
+          } catch (e) {
+            console.warn('[hot-takes] fixture refresh failed:', f.id, e)
+          }
+        }))
+        hotTakesByFixture = next
+      } catch (e) {
+        console.warn('[hot-takes] refresh failed:', e)
+      }
+    }
+
+    async function loadHotTakesForFixture(fixtureId, options = {}) {
+      const force = !!options.force
+      const silent = !!options.silent
+      const existing = hotTakesByFixture[fixtureId]
+      if (!force && Array.isArray(existing) && existing.length) return existing
+
+      const fixture = fixtures.find(f => f.id === fixtureId)
+      if (!fixture) return []
+
+      const finished = fixture.home_score !== null && fixture.away_score !== null
+      const locked = new Date(fixture.kickoff).getTime() <= Date.now()
+      if (!locked && !finished) return []
+
+      try {
+        // For finished matches, prediction_results is the source of truth for both
+        // points and the prediction values (same source used by the Match Report).
+        // Raw predictions are fetched as a fallback only, so the list still opens
+        // while admin scoring/recalculation is catching up.
+        const [{ data: scoredRows, error: scoredError }, { data: rawPreds, error: rawError }] = await Promise.all([
+          finished
+            ? supabaseClient.from('prediction_results')
+                .select('user_id, fixture_id, home_prediction, away_prediction, base_points, final_points, streak_bonus, combo_bonus')
+                .eq('fixture_id', fixtureId)
+            : Promise.resolve({ data: [], error: null }),
           supabaseClient.from('predictions')
             .select('user_id, fixture_id, home_prediction, away_prediction, submitted_at')
-            .in('fixture_id', lockedIds)
-            .limit(10000),                       // safeguard against PostgREST 1000-row cap
-          supabaseClient.from('prediction_results')
-            .select('user_id, fixture_id, base_points, final_points, streak_bonus, combo_bonus')
-            .in('fixture_id', lockedIds)
-            .limit(10000)                        // safeguard against PostgREST 1000-row cap
+            .eq('fixture_id', fixtureId)
         ])
 
-        // Index results by "userId|fixtureId" for O(1) merge
-        const resultMap = {}
-        ;(results || []).forEach(r => { resultMap[r.user_id + '|' + r.fixture_id] = r })
+        if (scoredError) console.warn('[hot-takes] result rows fetch failed:', scoredError)
+        if (rawError) console.warn('[hot-takes] raw predictions fetch failed:', rawError)
 
-        const grouped = {}
-        ;(preds || []).forEach(p => {
-          if (!paidMap[p.user_id]) return                                      // unpaid users excluded
-          if (p.home_prediction === null || p.away_prediction === null) return // blank predictions excluded
-          const fid = p.fixture_id
-          if (!grouped[fid]) grouped[fid] = []
-          const r = resultMap[p.user_id + '|' + fid] || {}
-          grouped[fid].push({
-            user_id: p.user_id,
-            name: paidMap[p.user_id].name || 'Anonymous',
-            home: p.home_prediction,
-            away: p.away_prediction,
-            submitted_at: p.submitted_at,
+        const userIds = new Set()
+        ;(scoredRows || []).forEach(r => userIds.add(r.user_id))
+        ;(rawPreds || []).forEach(p => userIds.add(p.user_id))
+
+        const nameMap = {}
+        if (userIds.size) {
+          const { data: profiles, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('id, name, full_name, fee_paid, entered_via_private')
+            .in('id', [...userIds])
+          if (profileError) console.warn('[hot-takes] profile fetch failed:', profileError)
+          ;(profiles || []).forEach(p => {
+            // Match Report parity: paid users only, NULL-safe private-league check.
+            if (p.fee_paid && !p.entered_via_private) {
+              nameMap[p.id] = p.full_name || p.name || 'Anonymous'
+            }
+          })
+        }
+
+        const picks = []
+        const scoredPickKeys = new Set()
+
+        ;(scoredRows || []).forEach(r => {
+          if (!nameMap[r.user_id]) return
+          if (r.home_prediction === null || r.away_prediction === null) return
+          scoredPickKeys.add(`${r.fixture_id}:${r.user_id}`)
+          picks.push({
+            user_id: r.user_id,
+            name: nameMap[r.user_id],
+            home: r.home_prediction,
+            away: r.away_prediction,
+            submitted_at: null,
             base_points: r.base_points ?? null,
             final_points: r.final_points ?? null,
             streak_bonus: r.streak_bonus || 0,
-            combo_bonus: r.combo_bonus || 0
+            combo_bonus: r.combo_bonus || 0,
+            has_result_row: true
           })
         })
 
-        // Sort each fixture's picks: finished -> by final_points desc; locked-not-finished -> by submitted_at asc
-        Object.keys(grouped).forEach(fid => {
-          const fixture = fixtures.find(f => f.id === fid)
-          const finished = fixture && fixture.home_score !== null && fixture.away_score !== null
-          if (finished) {
-            grouped[fid].sort((a, b) => (b.final_points || 0) - (a.final_points || 0))
-          } else {
-            grouped[fid].sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at))
-          }
+        ;(rawPreds || []).forEach(p => {
+          if (!nameMap[p.user_id]) return
+          if (p.home_prediction === null || p.away_prediction === null) return
+          if (scoredPickKeys.has(`${p.fixture_id}:${p.user_id}`)) return
+          picks.push({
+            user_id: p.user_id,
+            name: nameMap[p.user_id],
+            home: p.home_prediction,
+            away: p.away_prediction,
+            submitted_at: p.submitted_at,
+            base_points: null,
+            final_points: null,
+            streak_bonus: 0,
+            combo_bonus: 0,
+            has_result_row: false
+          })
         })
 
-        hotTakesByFixture = grouped
+        picks.sort((a, b) => {
+          // Scored rows first. Fallback-only rows never get fake +0 points.
+          const aScored = a.has_result_row === true
+          const bScored = b.has_result_row === true
+          if (aScored !== bScored) return bScored - aScored
+          if (aScored && bScored) {
+            if ((b.final_points || 0) !== (a.final_points || 0)) return (b.final_points || 0) - (a.final_points || 0)
+            if ((b.base_points || 0) !== (a.base_points || 0)) return (b.base_points || 0) - (a.base_points || 0)
+          }
+          const at = a.submitted_at ? new Date(a.submitted_at).getTime() : 0
+          const bt = b.submitted_at ? new Date(b.submitted_at).getTime() : 0
+          if (at !== bt) return at - bt
+          return String(a.name || '').localeCompare(String(b.name || ''))
+        })
+
+        hotTakesByFixture[fixtureId] = picks
+        return picks
       } catch (e) {
-        console.warn('[hot-takes] refresh failed:', e)
+        if (!silent) console.warn('[hot-takes] on-demand fetch failed:', e)
+        return hotTakesByFixture[fixtureId] || []
       }
     }
 
@@ -1931,8 +2012,9 @@ return `
 
       return picks.map(p => {
         const isMe = p.user_id === myId
-        const ptsBadge = finished
-          ? `<span class="text-xs font-bold ${(p.final_points || 0) > 0 ? 'text-brand-700' : 'text-ink-400'}" style="font-variant-numeric:tabular-nums;">+${p.final_points || 0}</span>`
+        const hasFinalPoints = p.has_result_row === true && p.final_points !== null && p.final_points !== undefined
+        const ptsBadge = finished && hasFinalPoints
+          ? `<span class="text-xs font-bold ${(Number(p.final_points) || 0) > 0 ? 'text-brand-700' : 'text-ink-400'}" style="font-variant-numeric:tabular-nums;">+${Number(p.final_points) || 0}</span>`
           : ''
         const bonusEmoji = (p.streak_bonus > 0 ? '🔥' : '') + (p.combo_bonus > 0 ? '⚡' : '')
         return `
@@ -1949,17 +2031,28 @@ return `
       }).join('')
     }
 
-    function toggleHotTakes(fixtureId) {
+    async function toggleHotTakes(fixtureId) {
       const el = document.getElementById('hot-takes-' + fixtureId)
       const btn = document.getElementById('hot-takes-btn-' + fixtureId)
       if (!el) return
+
       if (el.classList.contains('hidden')) {
-        el.innerHTML = renderHotTakes(fixtureId)
+        el.innerHTML = '<div class="text-center text-xs text-ink-500 py-3">Loading picks…</div>'
         el.classList.remove('hidden')
-        if (btn) btn.textContent = 'Hide picks'
+        if (btn) btn.textContent = 'Loading picks…'
+
+        const picks = await loadHotTakesForFixture(fixtureId, { force: true })
+        el.innerHTML = renderHotTakes(fixtureId)
+        if (btn) {
+          btn.dataset.pickCount = String(picks.length || 0)
+          btn.textContent = 'Hide picks'
+        }
       } else {
         el.classList.add('hidden')
-        if (btn) btn.textContent = 'See all picks'
+        if (btn) {
+          const count = Number(btn.dataset.pickCount || hotTakesByFixture[fixtureId]?.length || 0)
+          btn.textContent = count > 0 ? `See all picks (${count})` : 'See all picks'
+        }
       }
     }
 
@@ -2438,13 +2531,57 @@ return `
     }
 
     // ── Bonus Engine Helpers ──
+async function fetchAllPredictionResults(selectColumns = '*', pageSize = 1000) {
+  // Supabase/PostgREST returns a capped page by default. Once the league grows
+  // beyond that cap, an uncapped select('*') silently misses later scored rows,
+  // which makes the leaderboard look stale even though prediction_results is correct.
+  const allRows = []
+  let from = 0
+
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await supabaseClient
+      .from('prediction_results')
+      .select(selectColumns)
+      .order('kickoff', { ascending: true, nullsFirst: true })
+      .order('created_at', { ascending: true, nullsFirst: true })
+      .range(from, to)
+
+    if (error) throw error
+    const page = data || []
+    allRows.push(...page)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+
+  return allRows
+}
+
 async function getLeaderboardFromResults() {
   // Fetch prediction_results and profiles separately (no FK relationship between them)
   // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
-  const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
-    supabaseClient.from('prediction_results').select('*').limit(10000),  // safeguard against PostgREST 1000-row cap
-   supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true).neq('entered_via_private', true)
-  ])
+  let results = []
+  let resError = null
+  let profiles = []
+  let profError = null
+  try {
+    ;[results, { data: profilesData, error: profilesError }] = await Promise.all([
+      fetchAllPredictionResults('*'),
+      supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true).neq('entered_via_private', true)
+    ])
+    profiles = profilesData || []
+    profError = profilesError || null
+  } catch (e) {
+    resError = e
+    console.warn('[Leaderboard] full prediction_results fetch failed:', e?.message || e)
+    const { data: profilesData, error: profilesError } = await supabaseClient
+      .from('profiles')
+      .select('id, full_name, department, name, fee_paid, avatar_url')
+      .eq('fee_paid', true)
+      .neq('entered_via_private', true)
+    profiles = profilesData || []
+    profError = profilesError || null
+  }
 
   // If prediction_results doesn't exist or is empty, fall back to profiles-based leaderboard
   if (resError || !results || results.length === 0) {
@@ -2512,29 +2649,18 @@ async function getLeaderboardFromResults() {
         if (base > 0) return 'correct'
         return 'miss'
       })
-    let engineStats
-    try {
-      if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
-        engineStats = BonusEngine.aggregateUserStats(uid, userResults)
-      } else {
-        // Fallback: calculate stats manually if BonusEngine is not loaded.
-        // IMPORTANT: tier classification (exact/gd/result) must check base_points,
-        // because final_points includes the stage multiplier. An exact score in the
-        // Semi Final has final_points = 10 (5 × 2), not 5 — we'd miscount it as "wrong" otherwise.
-        let points = 0, exact = 0, gd = 0, result = 0
-        userResults.forEach(r => {
-          points += r.final_points || r.points_awarded || 0
-          const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)
-          if (base === 5) exact++
-          else if (base === 3) gd++
-          else if (base === 2) result++
-        })
-        engineStats = { points, exact, gd, result, total_predictions: userResults.length }
-      }
-    } catch (e) {
-      console.warn('[Leaderboard] BonusEngine failed for user', uid, e)
-      engineStats = { points: 0, exact: 0, gd: 0, result: 0, total_predictions: userResults.length }
-    }
+    // The leaderboard must use prediction_results.final_points as the source of truth.
+    // Do not delegate this aggregation to bonus-engine.js; that file is responsible
+    // for WRITING scored rows, while this UI should only READ the already-final points.
+    let points = 0, exact = 0, gd = 0, result = 0
+    userResults.forEach(r => {
+      points += Number(r.final_points ?? r.points_awarded ?? 0) || 0
+      const base = Number(r.base_points ?? 0) || 0
+      if (base === 5) exact++
+      else if (base === 3) gd++
+      else if (base === 2) result++
+    })
+    const engineStats = { points, exact, gd, result, total_predictions: userResults.length }
 return {
       user_id: uid,
       name: profile.full_name || profile.name || 'Unknown',
@@ -3215,10 +3341,7 @@ recentEl.innerHTML = finished.map(f => {
     // and turned "consecutive wins" into "total wins" (W L W W W incorrectly counted as 4).
     async function computeStreaks() {
       try {
-        const { data } = await supabaseClient
-          .from('prediction_results')
-          .select('user_id, base_points, kickoff, fixture_id')
-          .limit(10000)                        // safeguard against PostgREST 1000-row cap
+        const data = await fetchAllPredictionResults('user_id, base_points, kickoff, fixture_id')
         if (!data) return {}
         const byUser = {}
         data.forEach(p => {
@@ -4035,8 +4158,10 @@ async function generateMatchReportCardBlob(fixtureId) {
   const HEADER_H     = 124
   const SCORE_H      = 220
   const STATS_H      = 124
-  const BONUS_H      = (streakAwards || comboAwards) ? 82 : 0
-  const SEC_LABEL_H  = 58
+  // Taller bonus band so the award title, winner chips and summary never sit on
+  // the border. This is intentionally only a canvas layout change.
+  const BONUS_H      = (streakAwards || comboAwards) ? 142 : 0
+  const SEC_LABEL_H  = 64
   const COL_HDR_H    = 36
   const ROW_H        = 72
   const COL_GUTTER   = 22
@@ -4089,16 +4214,39 @@ async function generateMatchReportCardBlob(fixtureId) {
     return 'Wrong'
   }
 
-  function bonusSummaryText() {
-    const parts = []
+  function bonusAwardParts() {
     const bonusPlayers = picks.filter(p => (p.streak_bonus || 0) > 0 || (p.combo_bonus || 0) > 0)
-    bonusPlayers.slice(0, 4).forEach(p => {
+    return bonusPlayers.map(p => {
       const bits = []
       if ((p.streak_bonus || 0) > 0) bits.push(`🔥 +${p.streak_bonus}`)
       if ((p.combo_bonus || 0) > 0) bits.push(`⚡ +${p.combo_bonus}`)
-      parts.push(`${p.name.split(' ')[0]} ${bits.join(' ')}`)
+      return `${p.name} ${bits.join(' ')}`.trim()
     })
-    return parts.join('   •   ')
+  }
+
+  function bonusSummaryLines(ctx, maxWidth) {
+    const parts = bonusAwardParts()
+    const lines = []
+    let current = ''
+    let used = 0
+
+    for (const part of parts) {
+      const candidate = current ? `${current}  •  ${part}` : part
+      if (!current || ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate
+        used += 1
+        continue
+      }
+      lines.push(current)
+      current = part
+      used += 1
+      if (lines.length === 1) break
+    }
+
+    if (current) lines.push(current)
+    const remaining = Math.max(0, parts.length - used)
+    if (remaining > 0 && lines.length) lines[lines.length - 1] += `  •  +${remaining} more`
+    return lines.slice(0, 2)
   }
 
   // Header
@@ -4204,21 +4352,28 @@ async function generateMatchReportCardBlob(fixtureId) {
     ctx.fillStyle = 'rgba(251,146,60,0.10)'
     ctx.strokeStyle = 'rgba(251,146,60,0.28)'
     ctx.lineWidth = 1.2
-    roundRect(ctx, SIDE_PAD, boxY, INNER_W, BONUS_H - 20, 14)
+    roundRect(ctx, SIDE_PAD, boxY, INNER_W, BONUS_H - 20, 16)
     ctx.fill()
     ctx.stroke()
 
     ctx.fillStyle = '#FB923C'
     ctx.font = '900 22px system-ui, sans-serif'
     ctx.textAlign = 'left'
-    ctx.fillText(`🔥 BONUS AWARDS`, SIDE_PAD + 18, boxY + 32)
-    ctx.fillStyle = 'rgba(255,255,255,0.90)'
-    ctx.font = '800 21px system-ui, sans-serif'
-    ctx.fillText(truncateForCanvas(ctx, bonusSummaryText(), INNER_W - 250), SIDE_PAD + 210, boxY + 32)
+    ctx.fillText('🔥 BONUS AWARDS', SIDE_PAD + 18, boxY + 30)
 
-    ctx.fillStyle = 'rgba(255,255,255,0.58)'
+    // Winner names are allowed to wrap into two readable lines. This keeps the
+    // band clean even when several players receive bonus points.
+    ctx.fillStyle = 'rgba(255,255,255,0.94)'
+    ctx.font = '850 21px system-ui, sans-serif'
+    const awardLines = bonusSummaryLines(ctx, INNER_W - 38)
+    awardLines.forEach((line, i) => {
+      ctx.fillText(truncateForCanvas(ctx, line, INNER_W - 38), SIDE_PAD + 18, boxY + 58 + i * 25)
+    })
+
+    ctx.fillStyle = 'rgba(255,255,255,0.62)'
     ctx.font = '800 17px system-ui, sans-serif'
-    ctx.fillText(`Streak awards: ${streakAwards}   •   Combo awards: ${comboAwards}`, SIDE_PAD + 18, boxY + 58)
+    const detailY = boxY + (awardLines.length > 1 ? 113 : 101)
+    ctx.fillText(`Streak awards: ${streakAwards}   •   Combo awards: ${comboAwards}`, SIDE_PAD + 18, detailY)
     y += BONUS_H
   }
 
@@ -4799,7 +4954,9 @@ async function sharePickList(fixtureId) {
     .find(f => f.id === fixtureId)
   if (!fixture) { showToast('Match not found', 'info'); return }
  
-  const picks = hotTakesByFixture[fixtureId] || []
+  const picks = typeof loadHotTakesForFixture === 'function'
+    ? await loadHotTakesForFixture(fixtureId, { force: true })
+    : (hotTakesByFixture[fixtureId] || [])
   if (!picks.length) { showToast('No picks to share yet', 'info'); return }
  
   let blob = null
@@ -5089,8 +5246,10 @@ function leaderboardTop3Html(stats, myId) {
                 ? `<span class="rank-trend up" title="Up ${tr.delta} since last matchday">▲ ${tr.delta}</span>`
                 : tr.dir === 'down'
                   ? `<span class="rank-trend down" title="Down ${tr.delta} since last matchday">▼ ${tr.delta}</span>`
-                  : `<span class="rank-trend new" title="New this matchday">NEW</span>`)
-            : ''
+                  : tr.dir === 'new'
+                    ? `<span class="rank-trend new" title="New this matchday">NEW</span>`
+                    : `<span class="rank-trend flat" title="No rank change">–</span>`)
+            : `<span class="rank-trend flat" title="No rank change">–</span>`
           return `
             <button type="button" class="lb-podium-player ${cls}" onclick="showPlayerInfo('${escapeHtml(uid)}')" title="View ${escapeHtml(player.name || 'player')}">
               <span class="lb-podium-avatar-wrap">
@@ -5534,6 +5693,30 @@ async function loadLeaderboard() {
     // ============== REALTIME ==============
     let prizePollInterval = null
 
+
+function schedulePostResultRefresh(reason = 'result') {
+  // Publishing a result updates fixtures first, then prediction_results shortly
+  // after. Refresh in waves so the leaderboard reads the final scored rows,
+  // not the pre-engine state. Also clears rank snapshot cache for fresh trends.
+  const waves = [250, 1200, 3000, 6500]
+  waves.forEach(delay => {
+    setTimeout(async () => {
+      try {
+        if (typeof invalidateSnapshotCache === 'function') invalidateSnapshotCache()
+        await Promise.all([
+          (typeof refreshMyResultsCache === 'function' ? refreshMyResultsCache() : Promise.resolve()),
+          (typeof refreshSocialCaches === 'function' ? refreshSocialCaches() : Promise.resolve())
+        ])
+        if (typeof loadLeaderboard === 'function') await loadLeaderboard()
+        if (typeof loadHome === 'function') loadHome()
+        if (delay >= 1200 && typeof loadFixtures === 'function') loadFixtures()
+      } catch (e) {
+        console.warn('[post-result-refresh] failed:', reason, e)
+      }
+    }, delay)
+  })
+}
+
    function setupRealtime() {
   // Track the most recent refresh-trigger so we can collapse bursts (own save
   // fires multiple events: the prediction INSERT/UPSERT then a separate UPDATE
@@ -5594,7 +5777,9 @@ async function loadLeaderboard() {
       // Refresh the local cache so badges, fixture cards, recent-results all update.
       // Also refresh social caches so Hot Takes pick up the new points.
       Promise.all([refreshMyResultsCache(), refreshSocialCaches()]).then(() => {
+        invalidateSnapshotCache()
         loadLeaderboard(); loadHome(); loadFixtures()
+        schedulePostResultRefresh('prediction_results')
       })
     })
     .subscribe((status) => {
@@ -5612,8 +5797,12 @@ async function loadLeaderboard() {
         }
       }
       await loadFixtures()
+      invalidateSnapshotCache()
       loadLeaderboard()
       loadHome()
+      if (payload.eventType === 'UPDATE' && payload.new?.home_score !== null && payload.new?.away_score !== null) {
+        schedulePostResultRefresh('fixtures')
+      }
       // If admin just scored the Final (or the last unscored match),
       // celebrate. Slight delay so leaderboard / prediction_results have
       // a moment to settle before we read them.
@@ -9616,7 +9805,6 @@ async function getLeagueLeaderboard(leagueId) {
         .from('prediction_results')
         .select('*')
         .in('user_id', userIds)
-        .limit(10000)                        // safeguard against PostgREST 1000-row cap
 
     if (resultsError) {
         console.error('getLeagueLeaderboard: results error', resultsError)
