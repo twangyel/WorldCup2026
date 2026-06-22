@@ -2402,3 +2402,120 @@
   background: rgba(251, 191, 36, 0.18) !important;
   color: #facc15 !important;
 }
+
+
+/* ==========================================================
+   BRACKET HOME NO-FLASH SECURITY COVER
+   Prevents the covered Bracket card content from becoming visible
+   during realtime refreshes, reloads, or overlay re-renders.
+   ========================================================== */
+.bracket-home-card,
+#home-bracket-challenge-card,
+#homeBracketLeagueCard,
+#bracketCard[data-bracket-home-card="true"] {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.bracket-home-card[data-bracket-rendering="true"],
+#home-bracket-challenge-card[data-bracket-rendering="true"],
+#homeBracketLeagueCard[data-bracket-rendering="true"] {
+  min-height: 238px !important;
+  background: #f8fafc !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.bracket-home-card[data-bracket-rendering="true"] > *,
+#home-bracket-challenge-card[data-bracket-rendering="true"] > *,
+#homeBracketLeagueCard[data-bracket-rendering="true"] > * {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.bracket-home-card[data-bracket-rendering="true"]::before,
+#home-bracket-challenge-card[data-bracket-rendering="true"]::before,
+#homeBracketLeagueCard[data-bracket-rendering="true"]::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -8px !important;
+  z-index: 2147483600 !important;
+  background: #f8fafc !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.bracket-home-card[data-bracket-rendering="true"]::after,
+#home-bracket-challenge-card[data-bracket-rendering="true"]::after,
+#homeBracketLeagueCard[data-bracket-rendering="true"]::after {
+  content: 'Loading…' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2147483601 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* When a status cover is active, never show/blur the real bracket content behind it. */
+.bracket-home-card.has-status-overlay > :not(.bracket-home-status-overlay):not(.admin-preview-badge),
+#home-bracket-challenge-card.has-status-overlay > :not(.bracket-home-status-overlay):not(.admin-preview-badge),
+#homeBracketLeagueCard.has-status-overlay > :not(.bracket-home-status-overlay):not(.admin-preview-badge),
+.bracket-home-card[data-bracket-secure-covered] > :not(.bracket-home-status-overlay):not(.admin-preview-badge),
+#home-bracket-challenge-card[data-bracket-secure-covered] > :not(.bracket-home-status-overlay):not(.admin-preview-badge),
+#homeBracketLeagueCard[data-bracket-secure-covered] > :not(.bracket-home-status-overlay):not(.admin-preview-badge) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  filter: none !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.bracket-home-card .bracket-home-status-overlay,
+#home-bracket-challenge-card .bracket-home-status-overlay,
+#homeBracketLeagueCard .bracket-home-status-overlay {
+  position: absolute !important;
+  inset: -8px !important;
+  z-index: 2147483000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 22px !important;
+  box-sizing: border-box !important;
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.bracket-home-card .bracket-home-status-overlay[data-status="locked"],
+#home-bracket-challenge-card .bracket-home-status-overlay[data-status="locked"],
+#homeBracketLeagueCard .bracket-home-status-overlay[data-status="locked"] {
+  background: #f1f5f9 !important;
+}
+
+.bracket-home-card .bracket-overlay-foreground,
+.bracket-home-card .bracket-overlay-foreground *,
+#home-bracket-challenge-card .bracket-overlay-foreground,
+#home-bracket-challenge-card .bracket-overlay-foreground *,
+#homeBracketLeagueCard .bracket-overlay-foreground,
+#homeBracketLeagueCard .bracket-overlay-foreground * {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+}

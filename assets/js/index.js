@@ -3225,19 +3225,46 @@ function bracketHomeIconHtml(type = 'cup') {
 
 function renderHomeBracketCard(card, meta) {
   const copy = getHomeBracketCopy(meta);
-  const isLive = normalizeBracketHomeStatus(meta?.status) === 'live';
-  const isCompleted = normalizeBracketHomeStatus(meta?.status) === 'completed';
+  const normalizedStatus = normalizeBracketHomeStatus(meta?.status);
+  const isLive = normalizedStatus === 'live';
+  const isCompleted = normalizedStatus === 'completed';
   const isPublic = isPublicBracketHomeStatus(meta?.status);
-  const isHiddenPreview = normalizeBracketHomeStatus(meta?.status) === 'hidden' && !!meta?.canPreviewHidden;
+  const isHiddenPreview = normalizedStatus === 'hidden' && !!meta?.canPreviewHidden;
+  const isSecureCovered = normalizedStatus === 'coming_soon' || normalizedStatus === 'locked';
   const entryCount = Number(meta?.entryCount || 0);
 
   card.classList.toggle('admin-bracket-preview', isHiddenPreview);
+  card.toggleAttribute('data-bracket-secure-covered', isSecureCovered);
 
   const bg = isLive
     ? 'radial-gradient(circle at top right, rgba(16,185,129,.30), transparent 38%), radial-gradient(circle at 80% 0%, rgba(168,85,247,.28), transparent 36%), linear-gradient(145deg, #06251f 0%, #070612 78%)'
     : isCompleted
       ? 'radial-gradient(circle at top right, rgba(251,191,36,.25), transparent 38%), linear-gradient(145deg, #140a2e 0%, #070612 76%)'
       : 'radial-gradient(circle at top right, rgba(168,85,247,.42), transparent 38%), radial-gradient(circle at 8% 0%, rgba(56,189,248,.10), transparent 26%), linear-gradient(145deg, #140a2e 0%, #070612 76%)';
+
+  // No-flash safety: render the suspense/locked cover in the same DOM write as the card.
+  // This prevents users from briefly seeing the hidden bracket content before the
+  // bracket-challenge.js overlay function re-runs.
+  const secureCoverOverlay = isSecureCovered ? `
+    <div class="bracket-home-status-overlay bracket-status-cover-overlay" data-status="${normalizedStatus}" data-overlay-key="${normalizedStatus}:${hasSubmitted ? 'submitted' : 'not-submitted'}:${meta?.lockAt ? new Date(meta.lockAt).toISOString() : ''}">
+      <div class="bracket-overlay-foreground">
+        <div class="bracket-overlay-icon">${normalizedStatus === 'coming_soon' ? '⏳' : '🔒'}</div>
+        <div class="bracket-overlay-title">${normalizedStatus === 'coming_soon' ? 'Coming Soon' : 'Entries Locked'}</div>
+        <div class="bracket-overlay-subtitle">${normalizedStatus === 'coming_soon' ? 'A new game mode will be revealed soon. Stay ready.' : 'Entries are closed. Leaderboard opens when scoring goes live.'}</div>
+        ${normalizedStatus === 'coming_soon' ? `
+          <div class="bracket-status-countdown" data-countdown-prefix="home-status" style="margin-top:16px;width:min(260px,100%);">
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.4px;color:#64748b;margin-bottom:8px;">Reveals in</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;">
+              <div class="status-count-box"><span class="status-count-num" id="home-status-days">--</span><span class="status-count-label">Days</span></div>
+              <div class="status-count-box"><span class="status-count-num" id="home-status-hours">--</span><span class="status-count-label">Hrs</span></div>
+              <div class="status-count-box"><span class="status-count-num" id="home-status-minutes">--</span><span class="status-count-label">Min</span></div>
+              <div class="status-count-box"><span class="status-count-num" id="home-status-seconds">--</span><span class="status-count-label">Sec</span></div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  ` : '';
 
   card.innerHTML = `
     <div class="absolute inset-0 pointer-events-none" style="background:${bg};"></div>
@@ -3290,6 +3317,7 @@ function renderHomeBracketCard(card, meta) {
         ${copy.footer}
       </p>
     </div>
+    ${secureCoverOverlay}
   `;
 }
 
@@ -3318,24 +3346,25 @@ async function ensureBracketChallengeHomeCard(force = false) {
       }
     }
 
-    // Fast placeholder, replaced with live Supabase state below.
-    if (!homeBracketStatusCache) {
-      renderHomeBracketCard(card, {
-        status: 'coming_soon',
-        lockAt: getBracketHomeDefaultLockAt(),
-        isPaid: false,
-        hasSubmitted: false,
-        entryCount: 0
-      });
+    // No-flash safety: cover the card before any async status fetch/re-render.
+    // We intentionally do NOT render the real bracket content as a placeholder.
+    card.setAttribute('data-bracket-rendering', 'true');
+    if (!homeBracketStatusCache && !card.innerHTML.trim()) {
+      card.innerHTML = '<div class="bracket-home-safe-placeholder" aria-hidden="true"></div>';
     }
 
     const meta = await fetchHomeBracketMeta(force);
 
-    if (normalizeBracketHomeStatus(meta?.status) === 'hidden' && !meta?.canPreviewHidden) {
+    const normalizedStatus = normalizeBracketHomeStatus(meta?.status);
+    const shouldSecureCover = normalizedStatus === 'coming_soon' || normalizedStatus === 'locked';
+
+    if (normalizedStatus === 'hidden' && !meta?.canPreviewHidden) {
       document.body.classList.add('bracket-status-hidden');
       card.style.setProperty('display', 'none', 'important');
       card.classList.add('hidden');
       card.setAttribute('data-bracket-hidden-by-status', 'true');
+      card.removeAttribute('data-bracket-rendering');
+      card.removeAttribute('data-bracket-secure-covered');
       return;
     }
 
@@ -3343,6 +3372,7 @@ async function ensureBracketChallengeHomeCard(force = false) {
     card.style.removeProperty('display');
     card.classList.remove('hidden');
     card.removeAttribute('data-bracket-hidden-by-status');
+    card.toggleAttribute('data-bracket-secure-covered', shouldSecureCover);
 
     renderHomeBracketCard(card, meta);
 
@@ -3362,9 +3392,14 @@ async function ensureBracketChallengeHomeCard(force = false) {
       }
     } catch (e) {
       // Silent — overlay is a best-effort visual.
+    } finally {
+      // Remove the temporary render cover only after the real card/overlay exists.
+      card.removeAttribute('data-bracket-rendering');
     }
   } catch (e) {
     console.warn('[Bracket] home card render failed:', e);
+    const card = document.getElementById('home-bracket-challenge-card');
+    if (card) card.removeAttribute('data-bracket-rendering');
   }
 }
 

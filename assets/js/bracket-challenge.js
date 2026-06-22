@@ -713,6 +713,7 @@ function restoreHomeBracketCard(card) {
   if (!card) return;
   card.querySelectorAll(':scope > .bracket-home-status-overlay').forEach(el => el.remove());
   card.classList?.remove('has-status-overlay');
+  card.removeAttribute('data-bracket-secure-covered');
   // Remove the blur class we may have added to children when the overlay was active.
   Array.from(card.children).forEach((child) => {
     child.classList?.remove('bracket-content-blurred');
@@ -838,6 +839,7 @@ function applyHomeBracketStatusOverlay() {
     if (computed.position === 'static') card.style.position = 'relative';
     card.style.overflow = 'hidden';
     card.classList?.add('has-status-overlay');
+    card.setAttribute('data-bracket-secure-covered', 'true');
 
     // Blur the existing card content (anything already inside the card) so the overlay
     // sits on top of a softly-blurred backdrop. The CSS .bracket-content-blurred rule
@@ -872,13 +874,13 @@ function applyHomeBracketStatusOverlay() {
       justify-content:center !important;
       padding:22px !important;
       box-sizing:border-box !important;
-      background:${isComingSoon ? 'rgba(248,250,252,0.55)' : 'rgba(241,245,249,0.55)'} !important;
+      background:${isComingSoon ? '#f8fafc' : '#f1f5f9'} !important;
       color:#1e293b !important;
       border:0 !important;
       outline:0 !important;
       box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 16px 32px rgba(15,23,42,.08) !important;
-      backdrop-filter:blur(16px) saturate(0.95) !important;
-      -webkit-backdrop-filter:blur(16px) saturate(0.95) !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
       pointer-events:auto !important;
     `;
     overlay.innerHTML = `
