@@ -734,6 +734,20 @@
   </div>
 </div>
 
+          <!-- Knockout Scoring Toggle -->
+          <div class="flex items-center justify-between bg-paper rounded-2xl p-4 border border-paper-border mt-4">
+            <div class="min-w-0 mr-3">
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-sm">Knockout Scoring</span>
+                <span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-wider">R32+</span>
+                <span id="settings-ko-status" class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">DISABLED</span>
+              </div>
+              <div class="text-xs text-ink-500 mt-0.5">Pen winner = match winner in knockouts</div>
+              <div class="text-[11px] text-ink-400 mt-1">When ON, knockout matches that go to penalties award the winner tier to whoever wins the shootout. Players who predict a draw also pick the shootout winner. Group stage is unaffected.</div>
+            </div>
+            <div id="knockout-scoring-switch" class="switch" onclick="toggleKnockoutScoring()"></div>
+          </div>
+
 <div class="mt-4 p-4 bg-purple-50 rounded-2xl border border-purple-100">
   <div class="flex items-start gap-2">
     <span class="text-purple-600 text-lg">ℹ️</span>
@@ -3478,19 +3492,77 @@ document.getElementById('csv-input').value = '';
           : ''
 
         // Score inputs: editable only for the next match, read-only for everything else
+        // -- Knockout penalty UI -------------------------------------------------
+        // Show a pen-winner picker when this is a knockout fixture AND the entered
+        // scoreline is (or could become) a draw. Hidden by default; toggled by JS
+        // whenever the score inputs change (see _refreshPenaltyUI below).
+        const isKnockoutFixture = (typeof window !== 'undefined' && window.KnockoutScoring)
+          ? window.KnockoutScoring.isKnockoutStage(f.stage)
+          : false
+        const currentlyDraw = f.home_score !== null && f.away_score !== null && f.home_score === f.away_score
+        const showPenInitially = isKnockoutFixture && currentlyDraw
+        const penWinner = f.penalty_winner || null  // 'home', 'away', or null
+        const penHomeScore = f.penalty_home_score
+        const penAwayScore = f.penalty_away_score
+
+        // Pre-seed pendingScores so existing pen state survives a re-render.
+        if (isKnockoutFixture && (penWinner || penHomeScore !== null || penAwayScore !== null)) {
+          if (!pendingScores[f.id]) pendingScores[f.id] = {}
+          if (pendingScores[f.id].penaltyWinner === undefined) pendingScores[f.id].penaltyWinner = penWinner
+          if (pendingScores[f.id].penaltyHome === undefined)   pendingScores[f.id].penaltyHome   = penHomeScore
+          if (pendingScores[f.id].penaltyAway === undefined)   pendingScores[f.id].penaltyAway   = penAwayScore
+        }
+
+        // Read-only summary for locked knockout fixtures that already went to pens.
+        const penLockedSummary = (locked && isKnockoutFixture && penWinner)
+          ? `<div class="mt-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5">
+               <span>🥅</span>
+               <span>${penWinner === 'home' ? f.home_team : f.away_team} won${(penHomeScore !== null && penAwayScore !== null) ? ' ' + Math.max(penHomeScore, penAwayScore) + '-' + Math.min(penHomeScore, penAwayScore) : ''} on pens</span>
+             </div>`
+          : ''
+
+        // Editable pen picker — only included when fixture is editable AND a knockout.
+        // Always rendered (so JS toggles work cleanly), but hidden until needed.
+        const penEditableHtml = (!locked && isKnockoutFixture)
+          ? `<div id="pen-row-${f.id}" class="${showPenInitially ? '' : 'hidden'} mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+               <div class="text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                 <span>🥅</span><span>Penalty shootout — who won?</span>
+               </div>
+               <div class="flex items-center gap-2 mb-2">
+                 <button id="pen-btn-home-${f.id}" onclick="_setPenaltyWinner('${f.id}','home')"
+                         class="flex-1 text-xs font-semibold px-3 h-10 rounded-lg tap border transition-colors ${penWinner === 'home' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-amber-900 border-amber-300'}">
+                   ${f.home_team}
+                 </button>
+                 <button id="pen-btn-away-${f.id}" onclick="_setPenaltyWinner('${f.id}','away')"
+                         class="flex-1 text-xs font-semibold px-3 h-10 rounded-lg tap border transition-colors ${penWinner === 'away' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-amber-900 border-amber-300'}">
+                   ${f.away_team}
+                 </button>
+               </div>
+               <div class="flex items-center gap-2 text-[11px]">
+                 <span class="text-amber-800 font-semibold">Pen score (optional):</span>
+                 <input type="number" min="0" max="20" placeholder="H" class="mini-score" style="width:48px;height:32px;font-size:12px;"
+                        value="${penHomeScore ?? ''}" onchange="_updatePenaltyScore('${f.id}','home',this.value)">
+                 <span class="text-amber-700 font-bold">–</span>
+                 <input type="number" min="0" max="20" placeholder="A" class="mini-score" style="width:48px;height:32px;font-size:12px;"
+                        value="${penAwayScore ?? ''}" onchange="_updatePenaltyScore('${f.id}','away',this.value)">
+                 <span class="text-[10px] text-amber-700 ml-auto">Scoring uses winner only</span>
+               </div>
+             </div>`
+          : ''
+
         const scoreInputs = locked
           ? `<div class="flex items-center gap-2">
                <div class="mini-score flex items-center justify-center bg-gray-100 text-gray-500 font-bold" style="border-color:#E5E7EB;">${f.home_score !== null ? f.home_score : '–'}</div>
                <span class="text-ink-300 font-bold">–</span>
                <div class="mini-score flex items-center justify-center bg-gray-100 text-gray-500 font-bold" style="border-color:#E5E7EB;">${f.away_score !== null ? f.away_score : '–'}</div>
                <span class="ml-auto text-xs font-semibold text-gray-400 px-3 py-1.5 rounded-xl bg-gray-100">Locked</span>
-             </div>`
+             </div>${penLockedSummary}`
           : `<div class="flex items-center gap-2">
                <input type="number" min="0" placeholder="H" class="mini-score" value="${f.home_score ?? ''}" onchange="updateScore('${f.id}','home',this.value)">
                <span class="text-ink-300 font-bold">–</span>
                <input type="number" min="0" placeholder="A" class="mini-score" value="${f.away_score ?? ''}" onchange="updateScore('${f.id}','away',this.value)">
                <button onclick="confirmSaveScore('${f.id}')" class="ml-auto bg-brand-900 text-white text-xs font-semibold px-4 h-11 rounded-xl tap flex items-center">Save</button>
-             </div>`
+             </div>${penEditableHtml}`
 
         return `
         <div class="px-5 py-4 ${isNext && !timeLocked ? 'bg-brand-50/30' : ''}">
@@ -3516,7 +3588,71 @@ document.getElementById('csv-input').value = '';
     function updateScore(id, side, val) {
       if (!pendingScores[id]) pendingScores[id] = {}
       pendingScores[id][side] = val === '' ? null : parseInt(val)
+      // Knockout: show/hide pen-winner panel based on whether the current state is a draw.
+      _refreshPenaltyUI(id)
     }
+
+    // -- Knockout penalty UI helpers ------------------------------------------------
+    // The pen panel below the score inputs is shown when the fixture is a knockout
+    // AND the (current OR pending) scores form a draw. It disappears the moment the
+    // admin changes one of the scores so it's no longer a draw. The pen winner
+    // is persisted to pendingScores[id].penaltyWinner and committed on Save.
+
+    function _resolveScoreFor(id, side) {
+      // Pending takes precedence over the saved fixture value.
+      const pending = (pendingScores[id] || {})[side]
+      if (pending !== undefined) return pending
+      const f = allFixtures.find(x => x.id === id)
+      return f ? f[side === 'home' ? 'home_score' : 'away_score'] : null
+    }
+
+    function _refreshPenaltyUI(id) {
+      const f = allFixtures.find(x => x.id === id)
+      if (!f) return
+      const row = document.getElementById('pen-row-' + id)
+      if (!row) return  // group-stage or locked fixture — no pen UI rendered
+      const isKnockout = window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(f.stage)
+      const h = _resolveScoreFor(id, 'home')
+      const a = _resolveScoreFor(id, 'away')
+      const bothFilled = h !== null && h !== undefined && a !== null && a !== undefined
+      const isDraw = bothFilled && h === a
+      if (isKnockout && isDraw) {
+        row.classList.remove('hidden')
+      } else {
+        row.classList.add('hidden')
+        // When the score is no longer a draw, drop any pending pen winner so we don't
+        // accidentally save an inconsistent state. The DB CHECK constraint would also
+        // catch this, but clearing client-side gives a cleaner Save flow.
+        if (pendingScores[id]) {
+          pendingScores[id].penaltyWinner = null
+        }
+      }
+    }
+
+    function _setPenaltyWinner(id, side) {
+      if (!pendingScores[id]) pendingScores[id] = {}
+      pendingScores[id].penaltyWinner = side  // 'home' or 'away'
+      // Update visual active state on the two buttons.
+      const homeBtn = document.getElementById('pen-btn-home-' + id)
+      const awayBtn = document.getElementById('pen-btn-away-' + id)
+      const activeCls = ['bg-amber-600', 'text-white', 'border-amber-600']
+      const idleCls   = ['bg-white', 'text-amber-900', 'border-amber-300']
+      if (homeBtn && awayBtn) {
+        const winnerBtn = side === 'home' ? homeBtn : awayBtn
+        const otherBtn  = side === 'home' ? awayBtn : homeBtn
+        activeCls.forEach(c => winnerBtn.classList.add(c))
+        idleCls.forEach(c => winnerBtn.classList.remove(c))
+        idleCls.forEach(c => otherBtn.classList.add(c))
+        activeCls.forEach(c => otherBtn.classList.remove(c))
+      }
+    }
+
+    function _updatePenaltyScore(id, side, val) {
+      if (!pendingScores[id]) pendingScores[id] = {}
+      const key = side === 'home' ? 'penaltyHome' : 'penaltyAway'
+      pendingScores[id][key] = val === '' ? null : parseInt(val)
+    }
+
     function confirmSaveScore(id) {
       const s = pendingScores[id] || {}
       if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
@@ -3535,6 +3671,20 @@ document.getElementById('csv-input').value = '';
       const f = allFixtures.find(x => x.id === id)
       const alreadyScored = f && f.home_score !== null && f.home_score !== undefined &&
                                  f.away_score !== null && f.away_score !== undefined
+
+      // -- Knockout validation: draw on a knockout fixture requires a pen winner.
+      // Resolves entered + existing values the same way the UI does, then blocks
+      // if it's a draw on a knockout stage with no penaltyWinner chosen.
+      const isKnockout = f && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(f.stage)
+      const newHomeForCheck = s.home !== undefined ? s.home : f?.home_score
+      const newAwayForCheck = s.away !== undefined ? s.away : f?.away_score
+      const bothFilled = newHomeForCheck !== null && newHomeForCheck !== undefined
+                      && newAwayForCheck !== null && newAwayForCheck !== undefined
+      const isDraw = bothFilled && newHomeForCheck === newAwayForCheck
+      if (isKnockout && isDraw && !s.penaltyWinner) {
+        showToast('Knockout draw — pick the penalty shootout winner before saving.', 'error')
+        return
+      }
 
       // If this fixture already has a final score, this is an EDIT — points will be
       // recomputed for every prediction. Make the admin acknowledge that explicitly.
@@ -3654,6 +3804,51 @@ async function executeSaveScore(id) {
     if (s.home !== undefined) f.home_score = s.home
     if (s.away !== undefined) f.away_score = s.away
   }
+
+  // -- Knockout: persist pen fields (or clear them) AFTER the score update succeeds.
+  // The DB has CHECK constraints (fixtures_penalty_requires_draw and
+  // fixtures_penalty_winner_matches_score) that enforce consistency, so we only
+  // send a coherent payload here:
+  //   - Knockout draw with a pen winner → write all pen fields.
+  //   - Anything else                   → clear all pen fields.
+  // For group-stage fixtures, this branch is a no-op (no write).
+  const isKnockout = f && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(f.stage)
+  if (isKnockout) {
+    const newHome = (s.home !== undefined) ? s.home : f.home_score
+    const newAway = (s.away !== undefined) ? s.away : f.away_score
+    const bothFilled = newHome !== null && newHome !== undefined
+                    && newAway !== null && newAway !== undefined
+    const isDraw = bothFilled && newHome === newAway
+
+    let penUpdate
+    if (isDraw && s.penaltyWinner) {
+      // Only include pen scores if BOTH are provided (CHECK constraint requires
+      // all-three-set or only-winner-set). Mixing one number with null fails.
+      const ph = (s.penaltyHome !== null && s.penaltyHome !== undefined) ? s.penaltyHome : null
+      const pa = (s.penaltyAway !== null && s.penaltyAway !== undefined) ? s.penaltyAway : null
+      const bothPenSet = ph !== null && pa !== null && ph !== pa
+      penUpdate = {
+        penalty_winner: s.penaltyWinner,
+        penalty_home_score: bothPenSet ? ph : null,
+        penalty_away_score: bothPenSet ? pa : null
+      }
+    } else {
+      penUpdate = { penalty_winner: null, penalty_home_score: null, penalty_away_score: null }
+    }
+
+    const { error: penErr } = await supabaseClient
+      .from('fixtures')
+      .update(penUpdate)
+      .eq('id', id)
+    if (penErr) {
+      console.error('[executeSaveScore] pen update failed:', penErr)
+      showToast('Score saved but pen winner failed: ' + penErr.message, 'warning')
+    } else if (f) {
+      // Mirror to in-memory fixture so re-render reflects DB truth.
+      Object.assign(f, penUpdate)
+    }
+  }
+
   pendingScores[id] = {}
   renderResults(); renderFixturesManage()
 
@@ -5163,7 +5358,7 @@ window.setSystemSettings = async function(payload) {
   }
 }
 
-    let systemSettings = { private_leagues_enabled: false, private_leagues_v2_enabled: false, v3_invite_link_enabled: false }
+    let systemSettings = { private_leagues_enabled: false, private_leagues_v2_enabled: false, v3_invite_link_enabled: false, knockout_scoring_enabled: false }
 
     async function loadSystemSettings() {
       try {
@@ -5206,6 +5401,22 @@ window.setSystemSettings = async function(payload) {
       const swV3 = document.getElementById('v3-invite-link-switch')
       if (swV3) {
         swV3.classList.toggle('on', !!systemSettings.v3_invite_link_enabled)
+      }
+
+      // Knockout scoring switch visual state + status badge
+      const swKO = document.getElementById('knockout-scoring-switch')
+      if (swKO) {
+        swKO.classList.toggle('on', !!systemSettings.knockout_scoring_enabled)
+      }
+      const koStatus = document.getElementById('settings-ko-status')
+      if (koStatus) {
+        if (systemSettings.knockout_scoring_enabled) {
+          koStatus.textContent = 'ENABLED'
+          koStatus.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700'
+        } else {
+          koStatus.textContent = 'DISABLED'
+          koStatus.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500'
+        }
       }
 
       loadLeagueStats()
@@ -5291,6 +5502,76 @@ window.setSystemSettings = async function(payload) {
       systemSettings.v3_invite_link_enabled = newValue
       renderSettings()
       showToast(newValue ? 'Invite-link Signup ENABLED' : 'Invite-link Signup disabled', 'success')
+    }
+
+    async function toggleKnockoutScoring() {
+      const newValue = !systemSettings.knockout_scoring_enabled
+
+      if (newValue) {
+        // -- Turning ON --
+        const ok = confirm(
+          'Enable Knockout Scoring?\n\n' +
+          '• Knockout matches that go to penalties will award the winner tier ' +
+          'to the team that wins the shootout.\n' +
+          '• Players who predict a draw on a knockout fixture will be asked to ' +
+          'pick which team wins on pens.\n' +
+          '• Group stage scoring is UNAFFECTED.\n\n' +
+          'Recommended: only enable AFTER the group stage is fully scored and ' +
+          'published. You can turn this off again at any time.'
+        )
+        if (!ok) return
+      } else {
+        // -- Turning OFF -- check whether any pen data is already recorded.
+        // If so, warn loudly: turning off would orphan that data and silently
+        // demote some predictions on the next recalc.
+        const { data: penRows, error: penErr } = await supabaseClient
+          .from('fixtures')
+          .select('id, home_team, away_team, penalty_winner')
+          .not('penalty_winner', 'is', null)
+          .limit(20)
+        if (penErr) {
+          console.warn('[toggleKnockoutScoring] pen-check query failed:', penErr)
+        }
+        if (penRows && penRows.length > 0) {
+          const list = penRows.slice(0, 5)
+            .map(r => `  • ${r.home_team} vs ${r.away_team} (${r.penalty_winner === 'home' ? r.home_team : r.away_team} won pens)`)
+            .join('\n')
+          const extra = penRows.length > 5 ? `\n  • …and ${penRows.length - 5} more` : ''
+          const ok = confirm(
+            '⚠️  DISABLE Knockout Scoring?\n\n' +
+            `${penRows.length} knockout fixture(s) already have penalty winners recorded:\n${list}${extra}\n\n` +
+            'Turning OFF means the pen winner will NOT count when those fixtures ' +
+            'are recalculated — predictions on those matches will be re-scored ' +
+            'using standard 5/3/2/0 logic only, which can change player point totals.\n\n' +
+            'Are you absolutely sure?'
+          )
+          if (!ok) return
+        } else {
+          // No pen data recorded yet — safe to disable.
+          const ok = confirm(
+            'Disable Knockout Scoring?\n\n' +
+            'Knockout fixtures will score using standard 5/3/2/0 logic only ' +
+            '(no pen-winner consideration). Safe to do now since no penalty ' +
+            'winners are recorded yet.'
+          )
+          if (!ok) return
+        }
+      }
+
+      const { error } = await setSystemSettings({ knockout_scoring_enabled: newValue })
+      if (error) {
+        const msg = error.message || ''
+        if (msg.includes('Admin access required') || msg.includes('admin')) {
+          showToast('Admin access required. Check your profile has is_admin=true or role=admin.', 'error')
+        } else {
+          showToast(msg || 'Failed to update setting', 'error')
+        }
+        return
+      }
+
+      systemSettings.knockout_scoring_enabled = newValue
+      renderSettings()
+      showToast(newValue ? '🥅 Knockout Scoring ENABLED — pen winners now count!' : 'Knockout Scoring disabled', 'success')
     }
 
     async function loadLeagueStats() {

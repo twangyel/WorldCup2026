@@ -4,6 +4,91 @@
 // Integrates with existing calculatePoints(predHome, predAway, actualHome, actualAway)
 // ============================================================
 
+// ============== KNOCKOUT-AWARE BASE-POINTS HELPERS ==============
+// Loaded once per scoring run from system_settings.knockout_scoring_enabled.
+// When true AND the fixture is a knockout stage, base points are computed by
+// KnockoutScoring.computeBasePoints (which understands penalty_winner and
+// advance_pick). Otherwise, standard 5/3/2/0 logic runs inline below.
+//
+// Self-sufficient: does NOT depend on the calculatePoints() function in
+// admin.html. Works on any page (admin or player-facing).
+//
+// Requires window.KnockoutScoring to be loaded BEFORE this file (only for
+// the knockout-flag-on path):
+//   <script src="assets/js/knockout-scoring.js"></script>
+//   <script src="assets/js/bonus-engine.js"></script>
+// If KnockoutScoring is missing, _computeBase still works — it falls back
+// to standard 5/3/2/0 scoring regardless of stage.
+
+/**
+ * Load the knockout-scoring feature flag from system_settings.
+ * Returns false on any error or missing row (fail-safe to legacy scoring).
+ */
+async function _loadKnockoutFlag() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('system_settings')
+      .select('knockout_scoring_enabled')
+      .eq('id', 1)
+      .single();
+    if (error) {
+      console.warn('[bonus-engine] knockout flag load failed, defaulting OFF:', error);
+      return false;
+    }
+    return Boolean(data && data.knockout_scoring_enabled);
+  } catch (err) {
+    console.warn('[bonus-engine] knockout flag load threw, defaulting OFF:', err);
+    return false;
+  }
+}
+
+/**
+ * Compute base points for a prediction against a fixture.
+ *
+ * Self-sufficient: does NOT depend on calculatePoints (which lives only on
+ * admin.html). The standard 5/3/2/0 logic is inlined below, mirroring
+ * calculatePoints in admin.html exactly. If you ever change calculatePoints,
+ * update the inline logic here too (or vice versa).
+ *
+ * Branches:
+ *   - Flag ON AND fixture is a knockout stage AND KnockoutScoring available:
+ *       → delegates to KnockoutScoring.computeBasePoints, which handles
+ *         penalty_winner and advance_pick.
+ *   - Otherwise:
+ *       → standard 5/3/2/0 logic inlined below (exact / GD / winner / miss).
+ *
+ * @param {Object} prediction - { home_prediction, away_prediction, advance_pick? }
+ *                              Can be a synthetic object (e.g. for Double Pick alt).
+ * @param {Object} fixture    - The full fixture row (must include stage,
+ *                              home_score, away_score, penalty_winner).
+ * @param {Boolean} knockoutEnabled - The cached flag value for this scoring run.
+ * @returns {Number} base points: 5, 3, 2, or 0
+ */
+function _computeBase(prediction, fixture, knockoutEnabled) {
+  // Knockout-aware path: only when flag is ON, fixture is a knockout stage,
+  // and KnockoutScoring is loaded. Handles pen winner and advance_pick.
+  if (knockoutEnabled &&
+      typeof window !== 'undefined' &&
+      window.KnockoutScoring &&
+      window.KnockoutScoring.isKnockoutStage(fixture.stage)) {
+    return window.KnockoutScoring.computeBasePoints(prediction, fixture);
+  }
+
+  // Standard path: 5/3/2/0 logic — mirrors calculatePoints() in admin.html.
+  // Inlined here so bonus-engine.js works on any page (admin or player-facing).
+  const ph = Number(prediction.home_prediction);
+  const pa = Number(prediction.away_prediction);
+  const ah = Number(fixture.home_score);
+  const aa = Number(fixture.away_score);
+
+  if (ph === ah && pa === aa) return 5;                       // Exact score
+  const predDiff = ph - pa;
+  const actualDiff = ah - aa;
+  if (predDiff === actualDiff) return 3;                       // Correct GD
+  if (Math.sign(predDiff) === Math.sign(actualDiff)) return 2; // Correct winner
+  return 0;                                                    // Miss
+}
+
 // ============== CONFIGURATION ==============
 const BONUS_CONFIG = {
   // --- Layer 1: Streak Bonus ---
@@ -678,6 +763,10 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
     cardsByUser[cp.user_id][cp.card_type] = cp;
   });
 
+  // Knockout flag: cached once per scoring run, passed into _computeBase below.
+  // When false, base-points logic is byte-for-byte identical to the pre-patch behavior.
+  const knockoutEnabled = await _loadKnockoutFlag();
+
   const matchdayKey = getMatchdayKey(fixture.kickoff);
   let written = 0, errors = 0;
   const cardUpdates = []; // batch resolution updates
@@ -694,12 +783,9 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
       const hasDoublePoints = !!userCards.double_points;
 
       // --- Step 1: base points for primary prediction
-      const primaryBase = calculatePoints(
-        pred.home_prediction,
-        pred.away_prediction,
-        actualHome,
-        actualAway
-      );
+      // Routes through KnockoutScoring when flag is ON and fixture is a knockout;
+      // otherwise identical to calculatePoints(predHome, predAway, actualHome, actualAway).
+      const primaryBase = _computeBase(pred, fixture, knockoutEnabled);
 
       let basePoints = primaryBase;
       let winningHome = pred.home_prediction;
@@ -708,13 +794,16 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
       let altBaseCached = null;
 
       // --- Step 2: Double Pick — score alt, take higher
+      // For knockouts, the same advance_pick applies to whichever of primary/alt
+      // ends up being a draw. The synthetic prediction object below carries it
+      // through; _computeBase ignores advance_pick for non-draw scores anyway.
       if (hasDoublePick) {
-        const altBase = calculatePoints(
-          pred.alt_home_prediction,
-          pred.alt_away_prediction,
-          actualHome,
-          actualAway
-        );
+        const altPrediction = {
+          home_prediction: pred.alt_home_prediction,
+          away_prediction: pred.alt_away_prediction,
+          advance_pick: pred.advance_pick
+        };
+        const altBase = _computeBase(altPrediction, fixture, knockoutEnabled);
         altBaseCached = altBase;
         if (altBase > primaryBase) {
           basePoints = altBase;
@@ -968,6 +1057,10 @@ async function recalculateAllBonuses() {
   const uniqueUserIds = [...new Set(users.map(u => u.user_id))];
   console.log(`[recalc-all] Processing ${uniqueUserIds.length} users`);
 
+  // Cache the knockout flag once for the whole recalc run.
+  const knockoutEnabled = await _loadKnockoutFlag();
+  console.log(`[recalc-all] knockout_scoring_enabled = ${knockoutEnabled}`);
+
   let totalCreated = 0, totalUpdated = 0, totalErrors = 0;
 
   for (const uid of uniqueUserIds) {
@@ -981,7 +1074,8 @@ async function recalculateAllBonuses() {
           fixture_id,
           home_prediction,
           away_prediction,
-          fixtures!inner(home_score, away_score, stage, kickoff)
+          advance_pick,
+          fixtures!inner(home_score, away_score, stage, kickoff, penalty_winner, penalty_home_score, penalty_away_score)
         `)
         .eq('user_id', uid)
         .not('fixtures.home_score', 'is', null)
@@ -1019,10 +1113,13 @@ async function recalculateAllBonuses() {
       for (const m of missingRows) {
         try {
           const f = m.fixtures;
-          const basePoints = calculatePoints(
-            m.home_prediction, m.away_prediction,
-            f.home_score, f.away_score
-          );
+          // Build a prediction-shaped object so _computeBase can read advance_pick.
+          const predForCalc = {
+            home_prediction: m.home_prediction,
+            away_prediction: m.away_prediction,
+            advance_pick: m.advance_pick
+          };
+          const basePoints = _computeBase(predForCalc, f, knockoutEnabled);
           const matchdayKey = getMatchdayKey(f.kickoff);
 
           const fullResult = calculateFullPoints({

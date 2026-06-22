@@ -6940,6 +6940,7 @@ html.dark-mode .profile-premium-card {
 }
 
 </style>
+<base target="_blank">
 </head>
 <body class="text-ink-900">
 
@@ -7417,10 +7418,87 @@ html.dark-mode .profile-premium-card {
         </div>
       </div>
 
-      <!-- Badges & Achievements -->
+            <!-- Penalty Shootouts (Knockout Stage) -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-pink-50 text-pink-700 flex items-center justify-center text-sm font-bold">4</div>
+          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">4</div>
+          <h4 class="font-bold text-sm">Penalty Shootouts (Knockout Stage)</h4>
+        </div>
+        <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-3">
+          In knockout matches, the winner is whoever advances to the next round — including when the match is decided by a penalty shootout.
+        </p>
+        <div class="pl-10 space-y-2">
+          <div class="flex items-start gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">Recorded scoreline is after extra time</div>
+              <div class="text-xs text-ink-500">The score at the end of extra time (or 90 minutes if no extra time was needed). Penalties do not change the recorded scoreline.</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">Only the shootout winner matters</div>
+              <div class="text-xs text-ink-500">Not the shootout score. Whether a team wins on pens 4–2, 5–4, or 7–6 makes no difference to your points. You don't predict the penalty score.</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">3</div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">Draw predictions require a penalty winner pick</div>
+              <div class="text-xs text-ink-500">If you predict a draw, you must also pick who wins on penalties. The app will ask you when you enter equal scores. This becomes your "winner pick" if the match goes to pens.</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">4</div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">Non-draw predictions have automatic winner pick</div>
+              <div class="text-xs text-ink-500">If you predict a winner (non-draw), your winner pick is automatic. No extra question — the team you picked to win is your winner pick.</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 bg-paper rounded-xl p-3 border border-paper-border">
+            <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">5</div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">Picking the advancing team always earns at least 2 points</div>
+              <div class="text-xs text-ink-500">Even if your score and goal difference were wrong, getting the advancing team right guarantees the Winner tier (2 points).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Example -->
+        <div class="ml-10 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div class="flex items-start gap-2 mb-2">
+            <span class="text-amber-700 text-lg leading-none mt-0.5">💡</span>
+            <div class="text-xs font-bold text-amber-800 uppercase tracking-wider">Quick Example</div>
+          </div>
+          <p class="text-xs text-amber-800 leading-relaxed mb-2">
+            <b>Argentina vs France</b> ends 1–1, Argentina wins 4–2 on penalties:
+          </p>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 text-xs">
+              <div class="w-6 h-6 rounded-lg bg-white border border-amber-200 flex items-center justify-center font-bold text-amber-700 shrink-0">5</div>
+              <span class="text-amber-900">Predicted <b>1–1 + Argentina on pens</b> → <b>5 pts</b> (exact score)</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <div class="w-6 h-6 rounded-lg bg-white border border-amber-200 flex items-center justify-center font-bold text-amber-700 shrink-0">3</div>
+              <span class="text-amber-900">Predicted <b>2–2 + Argentina on pens</b> → <b>3 pts</b> (right goal difference)</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <div class="w-6 h-6 rounded-lg bg-white border border-amber-200 flex items-center justify-center font-bold text-amber-700 shrink-0">2</div>
+              <span class="text-amber-900">Predicted <b>Argentina 2–1</b> → <b>2 pts</b> (right winner)</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <div class="w-6 h-6 rounded-lg bg-white border border-amber-200 flex items-center justify-center font-bold text-red-600 shrink-0">0</div>
+              <span class="text-amber-900">Predicted <b>France 2–1</b> → <b>0 pts</b> (wrong winner)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- Badges & Achievements -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-pink-50 text-pink-700 flex items-center justify-center text-sm font-bold">5</div>
           <h4 class="font-bold text-sm">Badges & Achievements</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-3">
@@ -7497,7 +7575,7 @@ html.dark-mode .profile-premium-card {
       <!-- Prize Pool -->
       <div id="rules-prize-section">
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">5</div>
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold">6</div>
           <h4 class="font-bold text-sm">Prize Distribution</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-2" id="rules-prize-intro">
@@ -7532,7 +7610,7 @@ html.dark-mode .profile-premium-card {
       <!-- Tiebreakers -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center text-sm font-bold">6</div>
+          <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center text-sm font-bold">7</div>
           <h4 class="font-bold text-sm">Tiebreakers</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10 mb-3">
@@ -7575,7 +7653,7 @@ html.dark-mode .profile-premium-card {
       <!-- Private Leagues -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold">7</div>
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold">8</div>
           <h4 class="font-bold text-sm">Private Leagues</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -7586,7 +7664,7 @@ html.dark-mode .profile-premium-card {
       <!-- Deadlines -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">8</div>
+          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center text-sm font-bold">9</div>
           <h4 class="font-bold text-sm">Prediction Deadlines</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -7597,7 +7675,7 @@ html.dark-mode .profile-premium-card {
       <!-- Fair Play -->
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">9</div>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold">10</div>
           <h4 class="font-bold text-sm">Fair Play</h4>
         </div>
         <p class="text-sm text-ink-500 leading-relaxed pl-10">
@@ -8577,6 +8655,7 @@ html.dark-mode .profile-premium-card {
 
  
   </div>
+  <script src="assets/js/knockout-scoring.js"></script>
   <script src="/assets/js/bonus-engine.js"></script>
 
   <style>
@@ -8910,6 +8989,7 @@ html.dark-mode .profile-premium-card {
 }
 
 </style>
+
   <script type="text/javascript" src="/assets/js/index.js?v=bonus-podium-polish-1"></script>
 
   <!-- Auto-inject FIFA ranking badges into fixture cards -->

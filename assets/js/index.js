@@ -1615,9 +1615,59 @@ function msToCountdown(ms) {
              </div>`)
       : ''
 
+    // -- Knockout advance pick (player side) ----------------------------------
+    // For knockout fixtures, if the player's prediction (primary OR alt) is a draw,
+    // they also need to pick which team wins on penalties. Hidden by default;
+    // toggled by JS whenever the score inputs change. Pre-seeds pendingPredictions
+    // from any saved advance_pick so existing state survives a re-render.
+    const _isKnockoutFix = (typeof window !== 'undefined' && window.KnockoutScoring)
+      ? window.KnockoutScoring.isKnockoutStage(f.stage)
+      : false
+    const _primaryDrawNow = hP !== '' && aP !== '' && Number(hP) === Number(aP)
+    const _altDrawNow = hasDoublePick && altH !== '' && altA !== '' && altH !== null && altA !== null && Number(altH) === Number(altA)
+    const _showAdvNow = _isKnockoutFix && (_primaryDrawNow || _altDrawNow)
+    const _savedAdvPick = pred?.advance_pick || null
+
+    // Pre-seed pending so visual state mirrors saved state on re-render.
+    if (_isKnockoutFix && _savedAdvPick) {
+      if (!pendingPredictions[f.id]) pendingPredictions[f.id] = {}
+      if (pendingPredictions[f.id].advance_pick === undefined) {
+        pendingPredictions[f.id].advance_pick = _savedAdvPick
+      }
+    }
+
+    // Locked summary: when the fixture is locked and player has an advance pick,
+    // show it inline so they remember what they picked.
+    const advLockedSummary = (locked && _isKnockoutFix && _savedAdvPick && !previewMode)
+      ? `<div class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1">
+           <span>🥅</span>
+           <span>Pen pick: ${_savedAdvPick === 'home' ? f.home_team : f.away_team}</span>
+         </div>`
+      : ''
+
+    // Editable advance-pick panel — only for unlocked knockout fixtures.
+    const advEditableHtml = (!locked && _isKnockoutFix)
+      ? `<div id="adv-row-${f.id}" class="${_showAdvNow ? '' : 'hidden'}" style="margin-top:12px;padding:12px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;">
+           <div style="font-size:11px;font-weight:800;color:#78350F;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+             <span>🥅</span><span>Who wins on penalties?</span>
+           </div>
+           <div style="display:flex;gap:8px;">
+             <button id="adv-btn-home-${f.id}" onclick="setAdvancePick('${f.id}','home')"
+                     class="tap" style="flex:1;padding:10px 8px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid ${_savedAdvPick === 'home' ? '#D97706' : '#FCD34D'};background:${_savedAdvPick === 'home' ? '#D97706' : '#FFFFFF'};color:${_savedAdvPick === 'home' ? '#FFFFFF' : '#78350F'};transition:all 0.15s;">
+               ${f.home_team}
+             </button>
+             <button id="adv-btn-away-${f.id}" onclick="setAdvancePick('${f.id}','away')"
+                     class="tap" style="flex:1;padding:10px 8px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid ${_savedAdvPick === 'away' ? '#D97706' : '#FCD34D'};background:${_savedAdvPick === 'away' ? '#D97706' : '#FFFFFF'};color:${_savedAdvPick === 'away' ? '#FFFFFF' : '#78350F'};transition:all 0.15s;">
+               ${f.away_team}
+             </button>
+           </div>
+           <div style="margin-top:6px;font-size:10px;color:#92400E;">If the match goes to pens, the team you pick is your winner.</div>
+         </div>`
+      : ''
+
     const scoreSection = cardBadge + (hasDoublePick
       ? `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;font-weight:700;">Primary pick</div>${primaryRow}${altRow}`
-      : primaryRow)
+      : primaryRow) + advEditableHtml + advLockedSummary
 
     // Save button
     const saveBtn = !locked
@@ -1698,6 +1748,76 @@ return `
     function updatePrediction(id, side, val) {
       if (!pendingPredictions[id]) pendingPredictions[id] = {}
       pendingPredictions[id][side] = val
+      // Knockout: show/hide pen-winner panel based on whether current state is a draw.
+      _refreshAdvancePickUI(id)
+    }
+
+    // -- Knockout advance-pick helpers ------------------------------------------
+    // The pen-winner panel below the score inputs shows when (a) the fixture is a
+    // knockout and (b) the player's primary OR alt prediction is currently a draw.
+    // It hides the moment scores are no longer a draw and clears the pending pick.
+
+    function _scoreFor(id, key) {
+      // pending value wins; falls back to the saved prediction value.
+      const p = pendingPredictions[id] || {}
+      if (p[key] !== undefined && p[key] !== '') return p[key]
+      const pred = (typeof getPrediction === 'function') ? getPrediction(id) : null
+      if (!pred) return ''
+      const map = {
+        home: 'home_prediction',
+        away: 'away_prediction',
+        alt_home: 'alt_home_prediction',
+        alt_away: 'alt_away_prediction'
+      }
+      const v = pred[map[key]]
+      return (v === null || v === undefined) ? '' : String(v)
+    }
+
+    function _refreshAdvancePickUI(id) {
+      const f = (typeof fixtures !== 'undefined') ? fixtures.find(x => x.id === id) : null
+      if (!f) return
+      const row = document.getElementById('adv-row-' + id)
+      if (!row) return  // not a knockout fixture or locked — no panel rendered
+      const isKnockout = window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(f.stage)
+      if (!isKnockout) { row.classList.add('hidden'); return }
+
+      const ph = _scoreFor(id, 'home'),  pa = _scoreFor(id, 'away')
+      const ah = _scoreFor(id, 'alt_home'), aa = _scoreFor(id, 'alt_away')
+      const primaryDraw = ph !== '' && pa !== '' && Number(ph) === Number(pa)
+
+      // Only consider alt-draw if Double Pick is armed on this match.
+      const cp = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
+      const hasDoublePick = cp?.card_type === 'double_pick'
+      const altDraw = hasDoublePick && ah !== '' && aa !== '' && Number(ah) === Number(aa)
+
+      if (primaryDraw || altDraw) {
+        row.classList.remove('hidden')
+      } else {
+        row.classList.add('hidden')
+        // Drop the pending pen pick when scores are no longer a draw — keeps the
+        // save payload coherent. The DB CHECK constraint would also reject an
+        // inconsistent state.
+        if (pendingPredictions[id]) pendingPredictions[id].advance_pick = null
+      }
+    }
+
+    function setAdvancePick(id, side) {
+      if (!pendingPredictions[id]) pendingPredictions[id] = {}
+      pendingPredictions[id].advance_pick = side  // 'home' or 'away'
+      // Visual update on the two buttons (active gets amber-600 bg, idle gets white).
+      const homeBtn = document.getElementById('adv-btn-home-' + id)
+      const awayBtn = document.getElementById('adv-btn-away-' + id)
+      if (!homeBtn || !awayBtn) return
+      const activeBg = '#D97706', activeFg = '#FFFFFF', activeBorder = '#D97706'
+      const idleBg   = '#FFFFFF', idleFg   = '#78350F', idleBorder   = '#FCD34D'
+      const winnerBtn = side === 'home' ? homeBtn : awayBtn
+      const otherBtn  = side === 'home' ? awayBtn : homeBtn
+      winnerBtn.style.background = activeBg
+      winnerBtn.style.color = activeFg
+      winnerBtn.style.borderColor = activeBorder
+      otherBtn.style.background = idleBg
+      otherBtn.style.color = idleFg
+      otherBtn.style.borderColor = idleBorder
     }
 
     async function handleSavePrediction(id) {
@@ -1709,6 +1829,26 @@ return `
       const a = pending.away !== undefined ? pending.away : inputs[1]?.value
       if (h === '' || h === undefined || a === '' || a === undefined) { showToast('Enter both scores', 'warning'); return }
       const home = parseInt(h), away = parseInt(a)
+
+      // -- Knockout validation: a draw prediction on a knockout fixture requires
+      // an advance_pick (pen winner). Same rule applies to the alt prediction if
+      // Double Pick is armed and the alt is also a draw. One advance_pick covers
+      // both scenarios — the player picks the team that wins pens.
+      const fxForCheck = (typeof fixtures !== 'undefined') ? fixtures.find(x => x.id === id) : null
+      const isKnockout = fxForCheck && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(fxForCheck.stage)
+      if (isKnockout) {
+        const primaryDraw = home === away
+        const cpCheck = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
+        const altDraw = (cpCheck?.card_type === 'double_pick')
+          && pending.alt_home !== undefined && pending.alt_home !== ''
+          && pending.alt_away !== undefined && pending.alt_away !== ''
+          && Number(pending.alt_home) === Number(pending.alt_away)
+        if ((primaryDraw || altDraw) && !pending.advance_pick) {
+          showToast('Knockout draw — pick which team wins on penalties', 'warning')
+          return
+        }
+      }
+
       const { error } = await savePrediction(id, home, away)
       if (error) { showToast(error.message, 'error'); return }
 
@@ -1737,6 +1877,28 @@ return `
         }
       }
 
+      // -- Knockout: persist advance_pick (or clear it).
+      // - Knockout draw AND player chose a pen winner → write the pick.
+      // - Anything else (group stage, knockout non-draw, knockout draw + no pick after
+      //   alt logic also cleared) → clear the pick. Keeps state coherent with the
+      //   DB CHECK constraints and ensures stale picks don't survive an overwrite.
+      let advancePickSaved = null
+      if (isKnockout) {
+        const primaryDrawFinal = home === away
+        const altDrawFinal = (cpForSave?.card_type === 'double_pick')
+          && altHomeSaved !== null && altAwaySaved !== null
+          && altHomeSaved === altAwaySaved
+        const shouldWritePick = (primaryDrawFinal || altDrawFinal) && pending.advance_pick
+        advancePickSaved = shouldWritePick ? pending.advance_pick : null
+        try {
+          await supabaseClient
+            .from('predictions')
+            .update({ advance_pick: advancePickSaved })
+            .eq('user_id', getUser().id)
+            .eq('fixture_id', id)
+        } catch (e) { console.error('[knockout] advance_pick save failed:', e) }
+      }
+
       // Feature 1: write submitted_at timestamp. Silent-fail if column doesn't exist.
       const submittedAt = new Date().toISOString()
       try {
@@ -1763,6 +1925,8 @@ return `
           existing.alt_home_prediction = altHomeSaved
           existing.alt_away_prediction = altAwaySaved
         }
+        // Knockout: mirror the advance_pick we just wrote (or cleared).
+        existing.advance_pick = advancePickSaved
         existing.submitted_at = submittedAt
       } else {
         predictions.push({
@@ -1772,13 +1936,49 @@ return `
           away_prediction: away,
           alt_home_prediction: altHomeSaved,
           alt_away_prediction: altAwaySaved,
+          advance_pick: advancePickSaved,
           points_awarded: 0,
           submitted_at: submittedAt
         })
       }
       updatePredictionCount()
-      renderFixtures()  // re-render so "Locked in just now" appears immediately
+      patchFixtureCardAfterPredictionSave(id, submittedAt)
     }
+
+  function patchFixtureCardAfterPredictionSave(id, submittedAt) {
+    // Do NOT re-render the whole fixture list after a save.
+    // renderFixtures() rebuilds #fixtures-list via innerHTML, which destroys every
+    // card and makes the Predict tab visibly flicker. This tiny DOM patch updates
+    // only the card that was just saved.
+    const safeId = String(id).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    const card = document.querySelector(`[data-fixture="${safeId}"]`)
+    if (!card) return
+
+    const saveButton = card.querySelector('.fixture-save-btn')
+    if (saveButton && !saveButton.textContent.toLowerCase().includes('sign in')) {
+      saveButton.textContent = 'Update Prediction'
+    }
+
+    const stampText = 'Locked in just now'
+    const existingStamp = card.querySelector('.submitted-stamp')
+    if (existingStamp) {
+      existingStamp.textContent = stampText
+      return
+    }
+
+    const stampWrap = document.createElement('div')
+    stampWrap.className = 'px-5 pb-3'
+    const stamp = document.createElement('span')
+    stamp.className = 'submitted-stamp'
+    stamp.textContent = stampText
+    stampWrap.appendChild(stamp)
+
+    if (saveButton) {
+      saveButton.insertAdjacentElement('afterend', stampWrap)
+    } else {
+      card.appendChild(stampWrap)
+    }
+  }
 
   function updatePredictionCount() {
   const now = new Date()
@@ -6391,6 +6591,7 @@ function schedulePostResultRefresh(reason = 'result') {
     }
  function tickCountdowns() {
   const now = Date.now()
+  let shouldRefreshFixtureLockState = false
 
   // 1. Home page next-match countdown
   const homeCd = document.getElementById('home-next-countdown')
@@ -6403,9 +6604,8 @@ function schedulePostResultRefresh(reason = 'result') {
       setTimeout(() => { if (typeof loadHome === 'function') loadHome() }, 2000)
     } else {
       const mins = ms / 60000
-      const hrs = mins / 60
       homeCd.textContent = `in ${msToCountdown(ms)}`
-      
+
       // Color transition: green (>2h) → amber (30m-2h) → red (<30m)
       homeCd.classList.remove('countdown-green', 'countdown-amber', 'countdown-red')
       if (mins > 120) {
@@ -6425,7 +6625,10 @@ function schedulePostResultRefresh(reason = 'result') {
     if (!f) return
     const ms = new Date(f.kickoff).getTime() - now
     if (ms <= 0) {
-      if (typeof renderFixtures === 'function') renderFixtures()
+      // Mark for one batched render after all countdown DOM updates finish.
+      el.textContent = 'Locked'
+      delete el.dataset.cdCard
+      shouldRefreshFixtureLockState = true
     } else {
       el.textContent = msToCountdown(ms)
       const mins = ms / 60000
@@ -6453,7 +6656,9 @@ function schedulePostResultRefresh(reason = 'result') {
     if (!f) return
     const ms = new Date(f.kickoff).getTime() - now
     if (ms <= 0) {
-      if (typeof renderFixtures === 'function') renderFixtures()
+      el.textContent = 'locked'
+      delete el.dataset.lockwarn
+      shouldRefreshFixtureLockState = true
     } else {
       el.textContent = msToCountdown(ms)
       const banner = el.closest('.lock-warn')
@@ -6468,40 +6673,14 @@ function schedulePostResultRefresh(reason = 'result') {
     }
   })
 
+  // If one or more countdowns crossed zero, refresh the fixture cards once,
+  // not once per countdown element. This removes the occasional lock-time blink.
+  if (shouldRefreshFixtureLockState && typeof renderFixtures === 'function') {
+    requestAnimationFrame(() => renderFixtures())
+  }
+}
 
-      // 2. Per-card mini countdowns on predictions tab
-      document.querySelectorAll('[data-cd-card]').forEach(el => {
-        const fId = el.dataset.cdCard
-        const f = fixtures.find(x => x.id == fId)
-        if (!f) return
-        const ms = new Date(f.kickoff).getTime() - now
-        if (ms <= 0) {
-          // lock just elapsed — re-render
-          if (typeof renderFixtures === 'function') renderFixtures()
-        } else {
-          el.textContent = msToCountdown(ms)
-          if (ms <= 10 * 6e4 && !el.classList.contains('urgent')) el.classList.add('urgent')
-        }
-      })
 
-      // 3. Lock-warning banner timer
-      document.querySelectorAll('[data-lockwarn]').forEach(el => {
-        const fId = el.dataset.lockwarn
-        const f = fixtures.find(x => x.id == fId)
-        if (!f) return
-        const ms = new Date(f.kickoff).getTime() - now
-        if (ms <= 0) {
-          if (typeof renderFixtures === 'function') renderFixtures()
-        } else {
-          el.textContent = msToCountdown(ms)
-          // escalate styling on the parent banner
-          const banner = el.closest('.lock-warn')
-          if (banner && ms <= 10 * 6e4) banner.classList.add('urgent')
-        }
-      })
-    }
-
-    
 // ============== PROFILE HEADER & COLLAPSIBLE EDIT ==============
 
 function toggleEditProfile() {
