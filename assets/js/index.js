@@ -5090,9 +5090,10 @@ function computeRowHint(s, rank, prevPlayer) {
   // Close-rival overtake (only meaningful when someone's actually ahead by a little)
   if (rank > 1 && prevPlayer) {
     const gap = (prevPlayer.points || 0) - points
-    if (gap > 0 && gap <= 5) {
+    const needed = gap + 1 // +1 because matching points only ties — overtaking requires one more
+    if (gap >= 0 && needed <= 5) {
       const name = (prevPlayer.full_name || prevPlayer.name || 'them').split(' ')[0]
-      return `${gap} pt${gap > 1 ? 's' : ''} to overtake ${name}`
+      return `${needed} pt${needed > 1 ? 's' : ''} to overtake ${name}`
     }
   }
 
@@ -6547,7 +6548,15 @@ async function updateProfileHeader() {
   }
 
   const deptEl = document.getElementById('profile-header-dept')
-  if (deptEl) deptEl.textContent = profile.department || 'No department'
+  if (deptEl) {
+    const realDepartment = String(profile.department || '').trim()
+    const fallbackTitle = (typeof isAdmin === 'function' && isAdmin())
+      ? 'Prediction League Host'
+      : 'Prediction League Player'
+
+    deptEl.textContent = realDepartment || fallbackTitle
+    deptEl.classList.toggle('profile-title-fallback', !realDepartment)
+  }
 
   const phoneEl = document.getElementById('profile-header-phone')
   const phone = profile.phone || ''
@@ -6555,7 +6564,9 @@ async function updateProfileHeader() {
     // Display the full number with a leading + if it looks international.
     let display = phone
     if (display && !display.startsWith('+')) display = '+' + display.replace(/\D/g, '')
-    phoneEl.textContent = display || '—'
+    phoneEl.textContent = display || ''
+    const phoneRow = phoneEl.parentElement
+    if (phoneRow) phoneRow.classList.toggle('hidden', !display)
   }
 
   try {
