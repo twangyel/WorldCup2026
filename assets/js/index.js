@@ -1871,10 +1871,12 @@ return `
         const [{ data: preds }, { data: results }] = await Promise.all([
           supabaseClient.from('predictions')
             .select('user_id, fixture_id, home_prediction, away_prediction, submitted_at')
-            .in('fixture_id', lockedIds),
+            .in('fixture_id', lockedIds)
+            .limit(10000),                       // safeguard against PostgREST 1000-row cap
           supabaseClient.from('prediction_results')
             .select('user_id, fixture_id, base_points, final_points, streak_bonus, combo_bonus')
             .in('fixture_id', lockedIds)
+            .limit(10000)                        // safeguard against PostgREST 1000-row cap
         ])
 
         // Index results by "userId|fixtureId" for O(1) merge
@@ -2440,7 +2442,7 @@ async function getLeaderboardFromResults() {
   // Fetch prediction_results and profiles separately (no FK relationship between them)
   // Profiles are filtered to fee_paid=true so unpaid users (including unpaid admin) never appear on the global leaderboard.
   const [{ data: results, error: resError }, { data: profiles, error: profError }] = await Promise.all([
-    supabaseClient.from('prediction_results').select('*'),
+    supabaseClient.from('prediction_results').select('*').limit(10000),  // safeguard against PostgREST 1000-row cap
    supabaseClient.from('profiles').select('id, full_name, department, name, fee_paid, avatar_url').eq('fee_paid', true).neq('entered_via_private', true)
   ])
 
@@ -3216,6 +3218,7 @@ recentEl.innerHTML = finished.map(f => {
         const { data } = await supabaseClient
           .from('prediction_results')
           .select('user_id, base_points, kickoff, fixture_id')
+          .limit(10000)                        // safeguard against PostgREST 1000-row cap
         if (!data) return {}
         const byUser = {}
         data.forEach(p => {
@@ -9613,6 +9616,7 @@ async function getLeagueLeaderboard(leagueId) {
         .from('prediction_results')
         .select('*')
         .in('user_id', userIds)
+        .limit(10000)                        // safeguard against PostgREST 1000-row cap
 
     if (resultsError) {
         console.error('getLeagueLeaderboard: results error', resultsError)
