@@ -3663,3 +3663,58 @@ html.dark-mode .profile-premium-card {
   .ga-fab svg { width: 18px !important; height: 18px !important; }
 }
 
+
+
+/* ============================================================
+   LEAGUE PULSE COMMENTARY POLISH v4
+   - Adds a small Pulse commentary line to every activity
+   - Gives rows more breathing room without overflowing
+   - Keeps the feed lively even when a tab has only a few backend events
+   ============================================================ */
+.ga-feed-item {
+  align-items: start !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+.ga-feed-icon,
+.ga-feed-avatar,
+.ga-score-pill {
+  margin-top: 2px !important;
+}
+.ga-feed-commentary {
+  margin-top: 7px;
+  padding: 7px 9px;
+  border-radius: 11px;
+  color: #E8EEF8;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(212, 162, 76, .10);
+  font-size: 11.4px;
+  line-height: 1.34;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ga-feed-commentary span {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  margin-right: 6px;
+  border-radius: 999px;
+  color: #0B1221;
+  background: linear-gradient(135deg, #FDE7A8, #D4A24C);
+  font-size: 8.6px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  vertical-align: 1px;
+}
+.ga-tone-rose .ga-feed-commentary,
+.ga-tone-red .ga-feed-commentary { border-color: rgba(251,113,133,.16); }
+.ga-tone-green .ga-feed-commentary { border-color: rgba(34,197,94,.16); }
+.ga-tone-violet .ga-feed-commentary,
+.ga-tone-purple .ga-feed-commentary { border-color: rgba(168,85,247,.16); }
+.ga-tone-blue .ga-feed-commentary { border-color: rgba(56,189,248,.14); }
+@media (max-width: 370px) {
+  .ga-feed-commentary { font-size: 10.8px; padding: 6px 8px; }
+}

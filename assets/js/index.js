@@ -10609,6 +10609,80 @@ async function loadLeagueLeaderboardView(leagueId) {
     return m ? `${m[1]} - ${m[2]}` : '';
   }
 
+
+  function compactActivityKey(item) {
+    return String(`${item.type || ''}|${item.title || ''}|${item.body || ''}`)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .slice(0, 160);
+  }
+
+  function uniqueActivityEvents(events) {
+    const seen = new Set();
+    return (events || []).filter(item => {
+      const key = compactActivityKey(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function buildActivityCommentary(item) {
+    const type = String(item?.type || '');
+    const text = String(`${item?.title || ''} ${item?.body || ''}`).toLowerCase();
+    const meta = item?.metadata || {};
+    const actor = item?.actorName || metadataValue(meta, ['actor_name', 'player_name', 'name', 'user_name', 'display_name']);
+
+    if (type === 'podium_pressure') {
+      return 'The podium zone is tight — one exact score can completely change this chase.';
+    }
+    if (type === 'rank_movement') {
+      if (text.includes('#1') || text.includes('rank 1') || text.includes('rank #1')) {
+        return 'New leader pressure: everyone now has a clear target to chase.';
+      }
+      if (text.includes('climbed') || text.includes('moved up') || text.includes('jumped')) {
+        return 'Momentum is building. A strong round like this can pull the player into the danger zone.';
+      }
+      if (text.includes('dropped') || text.includes('fell')) {
+        return 'Still recoverable — but the next prediction now carries extra pressure.';
+      }
+      return 'Rank movement is starting to matter more as every point becomes harder to recover.';
+    }
+    if (type === 'result_published') {
+      return 'Fresh points are live. Watch for leaderboard movement once bonuses and exact scores settle.';
+    }
+    if (type === 'centurion_unlocked') {
+      return 'Crossing 100 points is elite territory — this player is now a serious title contender.';
+    }
+    if (type === 'exact_hunter') {
+      return 'Exact-score accuracy is becoming the biggest separator between close players.';
+    }
+    if (type === 'badge_unlocked') {
+      return 'Milestone unlocked. Consistency is starting to show on the leaderboard.';
+    }
+    if (type === 'inventory_card_used' || type === 'inventory_card_impact') {
+      return 'Card timing can create sudden swings, especially when the leaderboard is this close.';
+    }
+    if (type === 'bracket_status_changed') {
+      return 'Bracket momentum is starting — once knockouts begin, this side league can move fast.';
+    }
+    if (type === 'bracket_submitted') {
+      return 'Bracket submitted. Now every knockout result can make or break the path to champion.';
+    }
+    if (type === 'bracket_payment_verified' || type === 'bracket_payment_pending') {
+      return 'Entry status updated. More verified players means a stronger bracket race.';
+    }
+    if (type === 'prediction_locked') {
+      return 'No more edits now — every pick is locked and under pressure.';
+    }
+    if (type === 'admin_announcement' || type === 'system_update' || type === 'deadline_warning') {
+      return 'System update for everyone — check this before making your next move.';
+    }
+    if (actor) return `${actor} is part of the current league story — keep an eye on the next move.`;
+    return 'League pulse update — small moments like this can shape the overall race.';
+  }
+
   function rowToEvent(row) {
     const meta = row.metadata || {};
     const actorName = metadataValue(meta, ['actor_name', 'player_name', 'name', 'user_name', 'display_name']);
@@ -10726,27 +10800,80 @@ async function loadLeagueLeaderboardView(leagueId) {
     const events = [];
     if (!Array.isArray(stats) || !stats.length || subtab === 'matchday') return events;
     const myId = getPlayerIdSafe();
-    const leader = stats[0];
+    const rows = stats.slice().filter(Boolean);
+    const leader = rows[0];
     const leaderPoints = Number(leader?.points || 0);
+
     if (leader && leaderPoints > 0) {
       events.push(feedEvent({
         type: 'rank_movement', filterId: 'rank', icon: 'crown', tone: 'gold',
         title: 'Leader watch',
-        body: `${leader.name || 'The leader'} is setting the pace with ${pointsText(leaderPoints)}.`,
+        body: `${leader.name || 'The leader'} is setting the pace with ${pointsText(leaderPoints)}. The chasing pack needs precision, not luck.`,
         meta: 'Live leaderboard',
         actorName: leader.name || '',
         avatarUrl: leader.avatar_url || ''
       }));
     }
-    const myIdx = myId ? stats.findIndex(s => (s.user_id || s.id) === myId) : -1;
+
+    if (rows[1] && leader) {
+      const gap = Math.max(0, Number(leader.points || 0) - Number(rows[1].points || 0));
+      events.push(feedEvent({
+        type: 'podium_pressure', filterId: 'rank', icon: 'shield', tone: gap <= 5 ? 'rose' : 'orange',
+        title: gap <= 5 ? 'Title race is tight' : 'Leader has breathing room',
+        body: `${rows[1].name || 'Second place'} is ${pointsText(gap)} behind ${leader.name || 'the leader'}. ${gap <= 5 ? 'One exact score can flip the story.' : 'The chase needs a perfect round soon.'}`,
+        meta: 'Top 2 gap',
+        actorName: rows[1].name || '',
+        avatarUrl: rows[1].avatar_url || ''
+      }));
+    }
+
+    const podium = rows.slice(0, 3).filter(s => Number(s.points || 0) > 0);
+    if (podium.length >= 3) {
+      const spread = Math.max(0, Number(podium[0].points || 0) - Number(podium[2].points || 0));
+      events.push(feedEvent({
+        type: 'podium_pressure', filterId: 'rank', icon: 'trophy', tone: 'violet',
+        title: 'Podium watch',
+        body: `Only ${pointsText(spread)} separate 1st and 3rd. The podium is still very much alive.`,
+        meta: 'Top 3 battle'
+      }));
+    }
+
+    const closest = rows.slice(1).map((s, idx) => {
+      const above = rows[idx];
+      return { player: s, above, gap: Math.max(0, Number(above?.points || 0) - Number(s?.points || 0)), rank: idx + 2 };
+    }).filter(x => x.player && x.above && x.gap <= 5).sort((a, b) => a.gap - b.gap)[0];
+    if (closest) {
+      events.push(feedEvent({
+        type: 'podium_pressure', filterId: 'rank', icon: 'target', tone: 'green',
+        title: 'Overtake chance',
+        body: `${closest.player.name || 'A player'} is only ${pointsText(closest.gap)} behind ${closest.above.name || 'the player above'}. The next match could change that rank.`,
+        meta: `Rank ${closest.rank} chase`,
+        actorName: closest.player.name || '',
+        avatarUrl: closest.player.avatar_url || ''
+      }));
+    }
+
+    const strongest = rows.slice().sort((a, b) => Number(b.exact || 0) - Number(a.exact || 0))[0];
+    if (strongest && Number(strongest.exact || 0) > 0) {
+      events.push(feedEvent({
+        type: 'rank_movement', filterId: 'rank', icon: 'target', tone: 'blue',
+        title: 'Precision threat',
+        body: `${strongest.name || 'A player'} has ${strongest.exact} exact score${Number(strongest.exact) === 1 ? '' : 's'}. Exact picks are becoming the cleanest path up the table.`,
+        meta: 'Exact-score pressure',
+        actorName: strongest.name || '',
+        avatarUrl: strongest.avatar_url || ''
+      }));
+    }
+
+    const myIdx = myId ? rows.findIndex(s => (s.user_id || s.id) === myId) : -1;
     if (myIdx > 0) {
-      const me = stats[myIdx];
-      const target = stats[myIdx - 1];
+      const me = rows[myIdx];
+      const target = rows[myIdx - 1];
       const need = Math.max(1, Number(target.points || 0) - Number(me.points || 0) + 1);
       events.push(feedEvent({
         type: 'podium_pressure', filterId: 'rank', icon: 'target', tone: 'rose',
-        title: 'Podium pressure',
-        body: `You need ${pointsText(need)} to overtake ${target.name || 'the player above you'}.`,
+        title: 'Your chase',
+        body: `You need ${pointsText(need)} to overtake ${target.name || 'the player above you'}. One smart pick can close it quickly.`,
         meta: `Rank ${myIdx + 1} pressure`,
         actorName: me.name || '',
         avatarUrl: me.avatar_url || ''
@@ -10815,8 +10942,10 @@ async function loadLeagueLeaderboardView(leagueId) {
 
   function buildGlobalActivityEvents(context = lastFeedContext) {
     const backend = backendEvents.map(rowToEvent);
-    if (backend.length > 0) return backend.slice(0, FEED_PAGE_SIZE);
-    return buildFallbackEvents(context).slice(0, 18);
+    const fallback = buildFallbackEvents(context);
+    // Keep real activity as the main source, but add live leaderboard commentary
+    // underneath it so tabs do not feel empty when only a few backend rows exist.
+    return uniqueActivityEvents([...backend, ...fallback]).slice(0, FEED_PAGE_SIZE);
   }
 
   function avatarHtml(item) {
@@ -10834,6 +10963,7 @@ async function loadLeagueLeaderboardView(leagueId) {
     const av = avatarHtml(item);
     const score = item.filterId === 'results' ? extractScoreBadge(item) : '';
     const hasAvatarClass = av ? ' has-avatar' : '';
+    const commentary = buildActivityCommentary(item);
     return `
       <article class="ga-feed-item ga-tone-${activityEsc(item.tone)}${hasAvatarClass}" data-feed-type="${activityEsc(item.filterId || item.type)}">
         <div class="ga-feed-icon">${activityIcon(item.icon)}</div>
@@ -10841,6 +10971,7 @@ async function loadLeagueLeaderboardView(leagueId) {
         <div class="ga-feed-copy">
           <div class="ga-feed-title">${activityTextHtml(item.title, item)}</div>
           ${item.body ? `<div class="ga-feed-body">${activityTextHtml(item.body, item)}</div>` : ''}
+          ${commentary ? `<div class="ga-feed-commentary"><span>Pulse</span>${activityTextHtml(commentary, item)}</div>` : ''}
           <div class="ga-feed-meta">${activityEsc(item.meta || 'Live')}</div>
         </div>
         ${score ? `<div class="ga-score-pill">${activityEsc(score)}</div>` : ''}
