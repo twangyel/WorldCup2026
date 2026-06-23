@@ -5685,6 +5685,9 @@ function leaderboardTop3Html(stats, myId) {
                     ? `<span class="rank-trend new" title="New this matchday">NEW</span>`
                     : `<span class="rank-trend flat" title="No rank change">–</span>`)
             : `<span class="rank-trend flat" title="No rank change">–</span>`
+         const pCorrect = (player.exact || 0) + (player.gd || 0) + (player.result || 0)
+          const pExact = player.exact || 0
+          const pPoints = player.points || 0
           return `
             <button type="button" class="lb-podium-player ${cls}" onclick="showPlayerInfo('${escapeHtml(uid)}')" title="View ${escapeHtml(player.name || 'player')}">
               <span class="lb-podium-avatar-wrap">
@@ -5694,8 +5697,9 @@ function leaderboardTop3Html(stats, myId) {
                 <span class="lb-podium-trend">${podiumTrendHtml}</span>
               </span>
               <span class="lb-podium-name">${escapeHtml(podiumName(player.name || 'Anonymous'))}${isMe ? ' · YOU' : ''}</span>
+              <span class="lb-podium-stats"><b>${pCorrect}</b>C · <b>${pExact}</b>E</span>
               <span class="lb-podium-scoreline">
-                <span class="lb-podium-points">${player.points || 0}<span>PTS</span></span>
+                <span class="lb-podium-points">${pPoints}<span>PTS</span></span>
               </span>
             </button>`
         }).join('')}
@@ -5931,11 +5935,11 @@ async function loadLeaderboard() {
           ? `<span class="lb-v2-chip bonus is-compact" title="${comboN} exact combo${comboN > 1 ? 's' : ''}" data-badge-id="combo-chip">${badgeIconHtml('combo', 'lb-v2-chip-icon')} +${comboN}</span>`
           : ''
 
-        const topChip = (rank === 1 && hasPoints)
+       const topChip = (rank === 1 && hasPoints)
           ? `<span class="lb-v2-chip top is-compact" title="Current league leader" data-badge-id="champion">${badgeIconHtml('champion', 'lb-v2-chip-icon')} +1</span>`
           : ''
 
-        // V2.3: use the new custom achievement badge icons on the leaderboard,
+       // V2.3: use the new custom achievement badge icons on the leaderboard,
         // but cap progress chips so top players do not slide under the trend/points column.
         const progressChips = [streakChip, nostradamusChip, comboChip, topChip].filter(Boolean)
         // V2.4: show only the two most useful progress chips on the row.
@@ -10679,8 +10683,6 @@ loadRememberedEmail()
         padding: 10px 12px 10px 7px !important;
         column-gap: 0 !important;
         contain: layout paint style !important;
-        content-visibility: auto !important;
-        contain-intrinsic-size: 88px !important;
         transform: translateZ(0) !important;
         backface-visibility: hidden !important;
         transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease !important;
@@ -10775,12 +10777,12 @@ loadRememberedEmail()
         text-align: right !important;
       }
 
-      .lb-v2-points .points-num,
-      .points-num[data-points-el] {
+     .lb-row.lb-v2-row[data-rank="1"] .lb-v2-points .points-num,
+      .lb-podium-player.rank-1 .lb-podium-points {
         animation: lbPointsBreath 2.65s ease-in-out infinite !important;
         transform-origin: center !important;
         will-change: transform, text-shadow !important;
-      }
+      }s
 
       @keyframes lbPointsBreath {
         0%, 100% { transform: translateZ(0) scale(1); text-shadow: 0 0 0 rgba(18,52,90,0); }
