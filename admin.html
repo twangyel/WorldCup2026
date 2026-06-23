@@ -5681,5 +5681,272 @@ Copy this and send to the user via WhatsApp. They should change it after logging
 }
 
 </script>
+<!--
+  ADMIN.HTML — ADDITIVE PATCH for Activity Feed wiring.
+
+  Two changes only. Both are additive — they don't replace any existing logic.
+
+  ─────────────────────────────────────────────────────────────────────────────
+  CHANGE A (REQUIRED): emit admin_announcement after a successful publish run.
+  Location: inside executeRecalcAll() (admin.html line ~2043), AFTER the
+  forward-stamp block completes and BEFORE the try/catch closes. Specifically,
+  add the emit_activity call immediately after the
+      "Refresh the admin's own league view"
+  comment block at line ~2148. The result_published events themselves are
+  emitted automatically by the fixtures-table trigger, so the only thing the
+  admin path needs to add here is an aggregate "publish complete" beacon for
+  the feed.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+
+<script>
+/* ============== ACTIVITY FEED EMIT HELPERS (admin) ============== */
+
+// Safe wrapper. Never throws — admin actions shouldn't fail because the feed
+// emit failed. Returns the inserted row id (or null on error).
+window.emitActivity = async function emitActivity(payload) {
+  if (typeof supabaseClient === 'undefined') return null;
+  try {
+    const { data, error } = await supabaseClient.rpc('emit_activity', {
+      p_type:             payload.type,
+      p_title:            payload.title,
+      p_message:          payload.message ?? null,
+      p_icon:             payload.icon ?? null,
+      p_tone:             payload.tone ?? 'slate',
+      p_scope:            payload.scope ?? 'public',
+      p_user_id:          payload.user_id ?? null,
+      p_actor_id:         payload.actor_id ?? null,
+      p_fixture_id:       payload.fixture_id ?? null,
+      p_bracket_entry_id: payload.bracket_entry_id ?? null,
+      p_metadata:         payload.metadata ?? {},
+      p_visible_after:    payload.visible_after ?? null,
+      p_is_admin_only:    !!payload.is_admin_only
+    });
+    if (error) {
+      console.warn('[emitActivity] failed:', error.message || error);
+      return null;
+    }
+    return data || null;
+  } catch (e) {
+    console.warn('[emitActivity] exception:', e);
+    return null;
+  }
+};
+
+/* ───────── HOOK INTO executeRecalcAll ───────── */
+// Wraps the existing function so we don't have to edit it inline.
+// After a successful publish, emit one aggregate announcement so the public
+// feed has a clear "results just went live" marker. Individual
+// result_published rows come from the fixtures trigger.
+(function wrapExecuteRecalcAll() {
+  if (typeof executeRecalcAll !== 'function') return;
+  const _orig = executeRecalcAll;
+  window.executeRecalcAll = async function patchedExecuteRecalcAll(...args) {
+    // Snapshot which fixtures had no score before publish so we can announce
+    // accurately. (The trigger handles per-fixture announcements; this is the
+    // aggregate one.)
+    let prePublishUnscoredCount = 0;
+    try {
+      prePublishUnscoredCount = (typeof allFixtures !== 'undefined' && Array.isArray(allFixtures))
+        ? allFixtures.filter(f => f.home_score === null && f.away_score === null).length
+        : 0;
+    } catch (_) {}
+
+    const result = await _orig.apply(this, args);
+
+    try {
+      const postUnscored = (typeof allFixtures !== 'undefined' && Array.isArray(allFixtures))
+        ? allFixtures.filter(f => f.home_score === null && f.away_score === null).length
+        : 0;
+      const justPublished = Math.max(0, prePublishUnscoredCount - postUnscored);
+      if (justPublished > 0) {
+        await window.emitActivity({
+          type: 'admin_announcement',
+          title: 'Leaderboard updated',
+          message: `Points awarded for ${justPublished} new result${justPublished === 1 ? '' : 's'}.`,
+          icon: 'megaphone',
+          tone: 'green',
+          scope: 'public',
+          metadata: { kind: 'publish_complete', count: justPublished }
+        });
+      }
+    } catch (e) {
+      console.warn('[publish] activity_feed emit (post-publish) failed:', e);
+    }
+    return result;
+  };
+})();
+
+/* ───────── HOOK INTO refundCardPlay ───────── */
+// When admin refunds a card, emit a private "your card was refunded" event so
+// the affected player gets a feed entry.
+(function wrapRefundCardPlay() {
+  if (typeof refundCardPlay !== 'function') return;
+  const _orig = refundCardPlay;
+  window.refundCardPlay = async function patchedRefundCardPlay(playId, userId, cardType) {
+    const before = await _orig.apply(this, [playId, userId, cardType]);
+    try {
+      const label = cardType === 'double_points' ? 'Booster' : cardType === 'double_pick' ? 'Insurance' : 'Card';
+      await window.emitActivity({
+        type: 'inventory_card_used', // re-use the user's "cards" filter chip
+        scope: 'private',
+        user_id: userId,
+        title: `${label} refunded`,
+        message: 'Your card has been returned to your inventory.',
+        icon: 'cards',
+        tone: 'slate',
+        metadata: { kind: 'refund', card_type: cardType, play_id: playId }
+      });
+    } catch (e) { console.warn('[refund] feed emit failed:', e); }
+    return before;
+  };
+})();
+
+/* ───────── OPTIONAL: One-shot backfill button wiring ───────── */
+// Add this button somewhere in the admin Tools panel if you want a UI:
+//   <button onclick="runBackfillResultPublished()" class="...">Backfill feed: results</button>
+window.runBackfillResultPublished = async function runBackfillResultPublished() {
+  if (typeof supabaseClient === 'undefined') return;
+  if (!confirm('Backfill activity_feed with a result_published row for every already-scored fixture? Safe to re-run.')) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('backfill_result_published');
+    if (error) { alert('Backfill failed: ' + error.message); return; }
+    alert(`Backfill complete: ${data} rows inserted.`);
+  } catch (e) {
+    alert('Backfill threw: ' + (e.message || e));
+  }
+};
+</script>
+<!--
+  ADMIN.HTML — TIER 2 ADDITIVE PATCH
+  Append after the Tier 1 <script> block (03_admin_html_patch.html).
+
+  Two hooks:
+   1) After executeRecalcAll() succeeds → run detect_and_emit_milestones() so
+      newly-crossed Centurion / Exact-Hunter thresholds emit activity_feed rows.
+   2) After stampMatchdaySnapshot() (and the forward-stamp inside executeRecalcAll)
+      → run emit_rank_movements() so the latest snapshot diff produces
+      rank_movement + podium_pressure events.
+-->
+
+<script>
+/* ============== TIER 2 EMITTERS — milestones + rank movements ============== */
+
+window.runDetectMilestones = async function runDetectMilestones() {
+  if (typeof supabaseClient === 'undefined') return 0;
+  try {
+    const { data, error } = await supabaseClient.rpc('detect_and_emit_milestones');
+    if (error) { console.warn('[milestones] failed:', error.message || error); return 0; }
+    if (data && data > 0) console.log('[milestones] emitted', data, 'rows');
+    return data || 0;
+  } catch (e) { console.warn('[milestones] threw:', e); return 0; }
+};
+
+window.runEmitRankMovements = async function runEmitRankMovements() {
+  if (typeof supabaseClient === 'undefined') return 0;
+  try {
+    const { data, error } = await supabaseClient.rpc('emit_rank_movements');
+    if (error) { console.warn('[rank-movements] failed:', error.message || error); return 0; }
+    if (data && data > 0) console.log('[rank-movements] emitted', data, 'rows');
+    return data || 0;
+  } catch (e) { console.warn('[rank-movements] threw:', e); return 0; }
+};
+
+/* ───────── Re-wrap executeRecalcAll (chains on top of Tier 1 wrapper) ───────── */
+// Order is important here: this MUST be evaluated AFTER the Tier 1 wrapper in
+// 03_admin_html_patch.html. If both <script> blocks are at end-of-body in
+// that order, this is automatic.
+(function chainExecuteRecalcAllForMilestones() {
+  if (typeof executeRecalcAll !== 'function') return;
+  const _prevWrapped = executeRecalcAll;
+  window.executeRecalcAll = async function chainedExecuteRecalcAll(...args) {
+    const result = await _prevWrapped.apply(this, args);
+    // After everything has settled (publish complete, forward-stamp done):
+    // 1) detect milestone crossings
+    // 2) diff the new snapshot vs the previous one and emit rank movements
+    // Both are idempotent + cheap.
+    setTimeout(() => {
+      window.runDetectMilestones().catch(() => {});
+      window.runEmitRankMovements().catch(() => {});
+    }, 750);   // small delay: lets prediction_results writes settle
+    return result;
+  };
+})();
+
+/* ───────── Hook stampMatchdaySnapshot (manual snapshot stamping path) ───────── */
+(function chainStampSnapshot() {
+  if (typeof stampMatchdaySnapshot !== 'function') return;
+  const _orig = stampMatchdaySnapshot;
+  window.stampMatchdaySnapshot = async function patchedStampSnapshot(opts = {}) {
+    const r = await _orig.apply(this, [opts]);
+    try {
+      // Manual stamp = a new "latest" snapshot exists, so re-run diff.
+      await window.runEmitRankMovements();
+    } catch (e) { console.warn('[stamp] rank-movement emit failed:', e); }
+    return r;
+  };
+})();
+
+/* ───────── Optional admin UI hooks ─────────
+   Drop these buttons into your Tools panel if you want manual control:
+
+   <button onclick="runBackfillMilestones()"        class="...">Backfill milestones</button>
+   <button onclick="runDetectMilestones()"          class="...">Detect milestones now</button>
+   <button onclick="runEmitRankMovements()"         class="...">Emit rank movements now</button>
+   <button onclick="emitAdminAnnouncementPrompt()"  class="...">Post announcement</button>
+*/
+
+window.runBackfillMilestones = async function runBackfillMilestones() {
+  if (typeof supabaseClient === 'undefined') return;
+  if (!confirm('Backfill activity_feed with centurion / exact-hunter events for current state? Safe to re-run.')) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('backfill_milestones');
+    if (error) { alert('Backfill failed: ' + error.message); return; }
+    alert(`Backfill complete: ${data} milestone rows emitted.`);
+  } catch (e) { alert('Backfill threw: ' + (e.message || e)); }
+};
+
+window.emitAdminAnnouncementPrompt = async function emitAdminAnnouncementPrompt() {
+  const title = prompt('Announcement title:');
+  if (!title) return;
+  const message = prompt('Announcement body (optional):') || null;
+  const ok = await window.emitActivity({
+    type: 'admin_announcement',
+    title,
+    message,
+    icon: 'megaphone',
+    tone: 'violet',
+    scope: 'public'
+  });
+  if (ok) alert('Announcement posted.');
+  else alert('Failed to post announcement (see console).');
+};
+
+/* ───────── BRACKET RECALC — emit one summary event after batch winner update ─────────
+   The bracket_slots winner trigger already emits per-slot bracket_points_updated
+   rows. If your admin flow batches multiple winner updates in quick succession
+   (e.g. "score round" actions), wrap recalculateScores so a single summary
+   admin_announcement is posted at the end.
+*/
+(function wrapRecalculateScores() {
+  if (typeof recalculateScores !== 'function') return;
+  const _orig = recalculateScores;
+  window.recalculateScores = async function patchedRecalculateScores(...args) {
+    const r = await _orig.apply(this, args);
+    try {
+      await window.emitActivity({
+        type: 'admin_announcement',
+        title: 'Bracket scores recalculated',
+        message: 'The bracket leaderboard has been refreshed.',
+        icon: 'megaphone',
+        tone: 'green',
+        scope: 'public',
+        metadata: { kind: 'bracket_recalc' }
+      });
+    } catch (e) { console.warn('[bracket recalc] feed emit failed:', e); }
+    return r;
+  };
+})();
+</script>
 </body>
 </html>
