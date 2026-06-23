@@ -5865,7 +5865,7 @@ async function loadLeaderboard() {
           <span>Rank</span>
           <span>Predictions</span>
           <span>Trend</span>
-          <span>Points</span>
+          <span>Pts</span>
         </div>`
       const leaderboardLegend = `
         <div class="lb-v2-legend" aria-label="Leaderboard legend">
@@ -5883,6 +5883,13 @@ async function loadLeaderboard() {
       const visibleRows = stats
         .map((s, i) => ({ s, i }))
         .filter(({ i }) => !(hideTop3Rows && i < 3))
+
+      // Gap column: points behind the row directly above.
+      // Rank 1 shows an em dash. Ties below Rank 1 show 0 because they are
+      // separated by tie-breakers, not points.
+      // (Note: the Global Activity feed uses a different "X points from the
+      // podium" semantic via computeRowHint — that's the +1 overtake framing
+      // and intentionally differs from this raw row-to-row gap.)
 
       // Only show Your Competition Zone when the current user is outside the podium.
       // If the player is already top 3, the podium itself is the spotlight.
@@ -6007,6 +6014,14 @@ async function loadLeaderboard() {
       // Update tournament progress strip — derived from current fixtures state.
       // Called on every leaderboard render so it stays in sync after realtime updates.
       renderTournamentProgress()
+
+      // Keep the floating Global Activity Feed in sync with the freshest
+      // leaderboard render without adding extra blocking queries.
+      window.__wcplLatestLeaderboardStats = stats
+      window.__wcplLatestLeaderboardSubtab = lbSubtab
+      if (typeof updateGlobalActivityFeed === 'function') {
+        updateGlobalActivityFeed({ stats, subtab: lbSubtab })
+      }
 
       // ===== Row tap routing =====
       // Clicks are now context-aware:
@@ -10434,6 +10449,713 @@ async function loadLeagueLeaderboardView(leagueId) {
     }).join('')
 }
 
+
+// ============================================================
+// GLOBAL ACTIVITY FEED — League Pulse UI + draggable circle FAB
+// ============================================================
+// Source of truth: public.activity_feed.
+// The client only renders what RLS allows it to see. Fallback events remain
+// safe and intentionally omit sensitive card/bracket inference.
+// ============================================================
+(function () {
+  const FEED_ROOT_ID = 'global-activity-feed-root';
+  const FAB_POS_KEY = 'wcpl-ga-fab-position-v2';
+  const FILTERS = [
+    { id: 'all',     label: 'All',          types: null },
+    { id: 'results', label: 'Result',       types: ['result_published'] },
+    { id: 'rank',    label: 'Ranks',        types: ['rank_movement', 'podium_pressure'] },
+    { id: 'bracket', label: 'Bracket',      types: ['bracket_status_changed', 'bracket_submitted', 'bracket_payment_pending', 'bracket_payment_verified', 'bracket_points_updated'] },
+    { id: 'badges',  label: 'Achievement',  types: ['badge_unlocked', 'centurion_unlocked', 'exact_hunter'] },
+    { id: 'system',  label: 'System',       types: ['admin_announcement', 'prediction_locked', 'system_update', 'deadline_warning'] },
+    { id: 'cards',   label: 'Cards',        types: ['inventory_card_used', 'inventory_card_impact'] }
+  ];
+  const TYPE_TO_FILTER_ID = (() => {
+    const m = {};
+    FILTERS.forEach(f => { (f.types || []).forEach(t => { m[t] = f.id; }); });
+    return m;
+  })();
+
+  const FEED_PAGE_SIZE = 50;
+  let activeFeedFilter = 'all';
+  let feedOpen = false;
+  let lastFeedContext = { stats: [], subtab: 'overall' };
+  let backendEvents = [];
+  let backendLoaded = false;
+  let backendChannel = null;
+  let pendingFetchTimer = null;
+
+  function activityEsc(value) {
+    if (typeof escapeHtml === 'function') return escapeHtml(value == null ? '' : String(value));
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function activityRegexEsc(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\\\\]]/g, '\\$&');
+  }
+
+  function collectActivityNames(text, item) {
+    const names = [];
+    const meta = (item && item.metadata) || {};
+    const directKeys = ['actor_name', 'player_name', 'user_name', 'display_name', 'name', 'profile_name'];
+    directKeys.forEach(key => {
+      const v = meta[key] || (key === 'actor_name' ? item?.actorName : '');
+      if (v && String(v).trim().length >= 3) names.push(String(v).trim());
+    });
+
+    const raw = String(text || '').trim();
+    const actionMatch = raw.match(/^([A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){0,3})(?=\s+(got|is|moved|dropped|activated|used|climbed|joined|earned|submitted|entered|unlocked)\b)/i);
+    if (actionMatch && actionMatch[1]) names.push(actionMatch[1].trim());
+
+    return [...new Set(names)]
+      .filter(name => name && name.length >= 3)
+      .sort((a, b) => b.length - a.length);
+  }
+
+  function activityTextHtml(text, item) {
+    const raw = String(text == null ? '' : text);
+    if (!raw) return '';
+    let html = activityEsc(raw);
+    const names = collectActivityNames(raw, item);
+    names.forEach(name => {
+      const safeName = activityEsc(name);
+      if (!safeName || !html.includes(safeName)) return;
+      const re = new RegExp(`(^|[^A-Za-zÀ-ÖØ-öø-ÿ])(${activityRegexEsc(safeName)})(?=$|[^A-Za-zÀ-ÖØ-öø-ÿ])`, 'i');
+      html = html.replace(re, `$1<span class="ga-player-name">$2</span>`);
+    });
+    return html;
+  }
+
+  function activityIcon(name) {
+    const attrs = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+    const icons = {
+      zap: `<svg ${attrs}><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>`,
+      bolt: `<svg ${attrs}><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>`,
+      trendingUp: `<svg ${attrs}><path d="M3 17 9 11l4 4 7-7"/><path d="M14 8h6v6"/></svg>`,
+      trendingDown: `<svg ${attrs}><path d="M3 7l6 6 4-4 7 7"/><path d="M14 16h6v-6"/></svg>`,
+      crown: `<svg ${attrs}><path d="m2 7 5 5 5-9 5 9 5-5-2 13H4L2 7Z"/><path d="M4 20h16"/></svg>`,
+      target: `<svg ${attrs}><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
+      award: `<svg ${attrs}><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5 7 22l5-3 5 3-1.5-9.5"/></svg>`,
+      medal: `<svg ${attrs}><path d="M7 2h10l-2 6H9L7 2Z"/><circle cx="12" cy="15" r="5"/><path d="M12 13v4"/><path d="M10 15h4"/></svg>`,
+      shield: `<svg ${attrs}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M12 8v5"/><path d="M12 17h.01"/></svg>`,
+      flame: `<svg ${attrs}><path d="M8.5 14.5A4.5 4.5 0 0 0 13 22a7 7 0 0 0 7-7c0-4-3-6-4-9-1 3-3 4-5 6-1.5-2-1-4 0-6-4 3-6 6-2.5 8.5Z"/></svg>`,
+      cards: `<svg ${attrs}><rect x="7" y="3" width="10" height="14" rx="2"/><path d="M5 7 3.5 17.5A2 2 0 0 0 5.2 20L14 21.2"/><path d="M10 7h4M10 11h4"/></svg>`,
+      bracket: `<svg ${attrs}><path d="M6 4h6v5H6zM6 15h6v5H6zM16 9h4v6h-4z"/><path d="M12 6.5h2a2 2 0 0 1 2 2V12M12 17.5h2a2 2 0 0 0 2-2V12"/></svg>`,
+      trophy: `<svg ${attrs}><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 7H4a3 3 0 0 0 3 3"/><path d="M17 7h3a3 3 0 0 1-3 3"/></svg>`,
+      lock: `<svg ${attrs}><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 15v2"/></svg>`,
+      chart: `<svg ${attrs}><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="12" width="3" height="4" rx="1"/><rect x="12" y="9" width="3" height="7" rx="1"/><rect x="17" y="6" width="3" height="10" rx="1"/></svg>`,
+      check: `<svg ${attrs}><path d="M20 6 9 17l-5-5"/></svg>`,
+      x: `<svg ${attrs}><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>`,
+      megaphone: `<svg ${attrs}><path d="M3 11v2a3 3 0 0 0 3 3l9 4V4L6 8H6a3 3 0 0 0-3 3Z"/><path d="M18 8a4 4 0 0 1 0 8"/></svg>`
+    };
+    return icons[name] || icons.zap;
+  }
+
+  function timeAgo(iso) {
+    try {
+      const d = new Date(iso);
+      const diff = Date.now() - d.getTime();
+      if (!Number.isFinite(diff)) return 'Just now';
+      const s = Math.floor(diff / 1000);
+      if (s < 30) return 'Just now';
+      if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      const days = Math.floor(h / 24);
+      if (days < 7) return days + 'd ago';
+      return d.toLocaleDateString();
+    } catch (_) { return 'Just now'; }
+  }
+
+  function getPlayerIdSafe() {
+    try {
+      const u = (typeof getUser === 'function') ? getUser() : (typeof currentUser !== 'undefined' ? currentUser : null);
+      return u?.id || null;
+    } catch (_) { return null; }
+  }
+
+  function pointsText(n) {
+    const x = Number(n || 0);
+    return `${x} pt${x === 1 ? '' : 's'}`;
+  }
+
+  function initialsFromName(name) {
+    try {
+      if (typeof getInitials === 'function') return getInitials(name || '');
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return '•';
+      return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
+    } catch (_) { return '•'; }
+  }
+
+  function metadataValue(meta, keys) {
+    if (!meta || typeof meta !== 'object') return '';
+    for (const key of keys) {
+      const value = meta[key];
+      if (value !== undefined && value !== null && String(value).trim()) return String(value);
+    }
+    return '';
+  }
+
+  function extractScoreBadge(item) {
+    const meta = item.metadata || {};
+    const direct = metadataValue(meta, ['score', 'scoreline', 'result_score']);
+    if (direct) return direct.replace(/[–—]/g, '-');
+    const text = `${item.title || ''} ${item.body || ''}`;
+    const m = text.match(/\b(\d{1,2})\s*[–-]\s*(\d{1,2})\b/);
+    return m ? `${m[1]} - ${m[2]}` : '';
+  }
+
+  function rowToEvent(row) {
+    const meta = row.metadata || {};
+    const actorName = metadataValue(meta, ['actor_name', 'player_name', 'name', 'user_name', 'display_name']);
+    const avatarUrl = metadataValue(meta, ['actor_avatar_url', 'avatar_url', 'profile_image_url', 'profile_url', 'photo_url']);
+    return {
+      id: row.id,
+      type: row.type,
+      filterId: TYPE_TO_FILTER_ID[row.type] || 'all',
+      icon: row.icon || defaultIconFor(row.type, row.tone, row.title),
+      tone: row.tone || defaultToneFor(row.type),
+      title: row.title || '',
+      body: row.message || '',
+      meta: meta.meta_label || timeAgo(row.created_at),
+      metadata: meta,
+      actorName,
+      avatarUrl,
+      source: 'backend'
+    };
+  }
+
+  function defaultToneFor(type) {
+    switch (type) {
+      case 'rank_movement': return 'gold';
+      case 'podium_pressure': return 'rose';
+      case 'badge_unlocked':
+      case 'centurion_unlocked':
+      case 'exact_hunter': return 'green';
+      case 'result_published': return 'red';
+      case 'inventory_card_used':
+      case 'inventory_card_impact': return 'blue';
+      case 'bracket_status_changed':
+      case 'bracket_submitted':
+      case 'bracket_payment_pending':
+      case 'bracket_payment_verified':
+      case 'bracket_points_updated': return 'violet';
+      case 'admin_announcement': return 'orange';
+      default: return 'blue';
+    }
+  }
+
+  function defaultIconFor(type, tone, title) {
+    const t = String(title || '').toLowerCase();
+    switch (type) {
+      case 'rank_movement': return t.includes('#1') || t.includes('rank #1') ? 'crown' : 'chart';
+      case 'podium_pressure': return 'shield';
+      case 'badge_unlocked': return 'award';
+      case 'centurion_unlocked': return 'medal';
+      case 'exact_hunter': return 'target';
+      case 'result_published': return 'trophy';
+      case 'inventory_card_used': return t.includes('insurance') ? 'shield' : 'zap';
+      case 'inventory_card_impact': return 'bolt';
+      case 'bracket_status_changed':
+      case 'bracket_submitted':
+      case 'bracket_payment_pending':
+      case 'bracket_payment_verified':
+      case 'bracket_points_updated': return 'bracket';
+      case 'admin_announcement': return 'megaphone';
+      case 'prediction_locked': return 'lock';
+      default: return tone === 'gold' ? 'crown' : 'zap';
+    }
+  }
+
+  function feedEvent({ type='zap', filterId='all', icon='zap', tone='blue', title, body, meta='Just now', actorName='', avatarUrl='', metadata={} }) {
+    return { type, filterId, icon, tone, title, body, meta, actorName, avatarUrl, metadata, source: 'fallback' };
+  }
+
+  async function fetchBackendEvents() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient?.from) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('activity_feed')
+        .select('id, type, title, message, icon, tone, scope, user_id, actor_id, fixture_id, metadata, created_at, visible_after, is_admin_only')
+        .order('created_at', { ascending: false })
+        .limit(FEED_PAGE_SIZE);
+      if (error) {
+        if (String(error.code || '') !== '42P01') console.warn('[activity_feed] fetch failed:', error.message || error);
+        backendLoaded = true;
+        backendEvents = [];
+        return;
+      }
+      const nowMs = Date.now();
+      backendEvents = (data || []).filter(r => !r.visible_after || new Date(r.visible_after).getTime() <= nowMs);
+      backendLoaded = true;
+    } catch (e) {
+      console.warn('[activity_feed] fetch exception:', e);
+      backendLoaded = true;
+      backendEvents = [];
+    }
+  }
+
+  function scheduleBackendFetch(delayMs = 200) {
+    clearTimeout(pendingFetchTimer);
+    pendingFetchTimer = setTimeout(() => fetchBackendEvents().then(renderIfVisible), delayMs);
+  }
+
+  function renderIfVisible() {
+    if (document.getElementById(FEED_ROOT_ID)) updateGlobalActivityFeed(lastFeedContext);
+  }
+
+  function ensureBackendChannel() {
+    if (backendChannel || typeof supabaseClient === 'undefined' || !supabaseClient?.channel) return;
+    try {
+      backendChannel = supabaseClient
+        .channel('activity_feed')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_feed' }, () => scheduleBackendFetch(150))
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED') console.log('[activity_feed] channel status:', status);
+        });
+    } catch (e) {
+      console.warn('[activity_feed] realtime setup failed:', e);
+    }
+  }
+
+  function fallbackRankEvents(stats, subtab) {
+    const events = [];
+    if (!Array.isArray(stats) || !stats.length || subtab === 'matchday') return events;
+    const myId = getPlayerIdSafe();
+    const leader = stats[0];
+    const leaderPoints = Number(leader?.points || 0);
+    if (leader && leaderPoints > 0) {
+      events.push(feedEvent({
+        type: 'rank_movement', filterId: 'rank', icon: 'crown', tone: 'gold',
+        title: 'Leader watch',
+        body: `${leader.name || 'The leader'} is setting the pace with ${pointsText(leaderPoints)}.`,
+        meta: 'Live leaderboard',
+        actorName: leader.name || '',
+        avatarUrl: leader.avatar_url || ''
+      }));
+    }
+    const myIdx = myId ? stats.findIndex(s => (s.user_id || s.id) === myId) : -1;
+    if (myIdx > 0) {
+      const me = stats[myIdx];
+      const target = stats[myIdx - 1];
+      const need = Math.max(1, Number(target.points || 0) - Number(me.points || 0) + 1);
+      events.push(feedEvent({
+        type: 'podium_pressure', filterId: 'rank', icon: 'target', tone: 'rose',
+        title: 'Podium pressure',
+        body: `You need ${pointsText(need)} to overtake ${target.name || 'the player above you'}.`,
+        meta: `Rank ${myIdx + 1} pressure`,
+        actorName: me.name || '',
+        avatarUrl: me.avatar_url || ''
+      }));
+    }
+    return events;
+  }
+
+  function fallbackBadgeEvents(stats, subtab) {
+    const events = [];
+    if (!Array.isArray(stats) || !stats.length || subtab === 'matchday') return events;
+    const exactHunter = stats.slice().sort((a, b) => Number(b.exact || 0) - Number(a.exact || 0))[0];
+    if (exactHunter && Number(exactHunter.exact || 0) >= 3) {
+      events.push(feedEvent({
+        type: 'exact_hunter', filterId: 'badges', icon: 'target', tone: 'green',
+        title: 'Exact hunter alert',
+        body: `${exactHunter.name || 'A player'} leads precision with ${exactHunter.exact} exact score${Number(exactHunter.exact) === 1 ? '' : 's'}.`,
+        meta: 'Precision matters',
+        actorName: exactHunter.name || '',
+        avatarUrl: exactHunter.avatar_url || ''
+      }));
+    }
+    const centurion = stats.find(s => Number(s.points || 0) >= 100);
+    if (centurion) {
+      events.push(feedEvent({
+        type: 'centurion_unlocked', filterId: 'badges', icon: 'medal', tone: 'gold',
+        title: '100 Club unlocked',
+        body: `${centurion.name || 'A player'} has crossed ${pointsText(100)}.`,
+        meta: 'Milestone badge',
+        actorName: centurion.name || '',
+        avatarUrl: centurion.avatar_url || ''
+      }));
+    }
+    return events;
+  }
+
+  function fallbackResultEvents() {
+    const events = [];
+    try {
+      const scored = (typeof fixtures !== 'undefined' && Array.isArray(fixtures) ? fixtures : [])
+        .filter(f => f && f.home_score !== null && f.away_score !== null)
+        .sort((a, b) => new Date(b.kickoff || 0) - new Date(a.kickoff || 0));
+      if (scored[0]) {
+        const f = scored[0];
+        events.push(feedEvent({
+          type: 'result_published', filterId: 'results', icon: 'trophy', tone: 'red',
+          title: `Admin published results for ${f.home_team || 'Home'} vs ${f.away_team || 'Away'}`,
+          body: `${f.stage || 'Match'} result.`,
+          meta: timeAgo(f.kickoff),
+          metadata: { score: `${f.home_score} - ${f.away_score}` }
+        }));
+      }
+    } catch (_) {}
+    return events;
+  }
+
+  function buildFallbackEvents(context) {
+    const stats = Array.isArray(context.stats) ? context.stats : (window.__wcplLatestLeaderboardStats || []);
+    const subtab = context.subtab || window.__wcplLatestLeaderboardSubtab || 'overall';
+    return [
+      ...fallbackRankEvents(stats, subtab),
+      ...fallbackBadgeEvents(stats, subtab),
+      ...fallbackResultEvents()
+    ];
+  }
+
+  function buildGlobalActivityEvents(context = lastFeedContext) {
+    const backend = backendEvents.map(rowToEvent);
+    if (backend.length > 0) return backend.slice(0, FEED_PAGE_SIZE);
+    return buildFallbackEvents(context).slice(0, 18);
+  }
+
+  function avatarHtml(item) {
+    const name = item.actorName || metadataValue(item.metadata, ['player_name', 'actor_name', 'name']);
+    if (!name && !item.avatarUrl) return '';
+    const safeName = activityEsc(name || 'Player');
+    const initials = activityEsc(initialsFromName(name));
+    if (item.avatarUrl) {
+      return `<div class="ga-feed-avatar" title="${safeName}"><img src="${activityEsc(item.avatarUrl)}" alt="${safeName}" loading="lazy" onerror="this.remove();this.parentElement.textContent='${initials}'"></div>`;
+    }
+    return `<div class="ga-feed-avatar ga-feed-avatar-initials" title="${safeName}">${initials}</div>`;
+  }
+
+  function feedItemHtml(item) {
+    const av = avatarHtml(item);
+    const score = item.filterId === 'results' ? extractScoreBadge(item) : '';
+    const hasAvatarClass = av ? ' has-avatar' : '';
+    return `
+      <article class="ga-feed-item ga-tone-${activityEsc(item.tone)}${hasAvatarClass}" data-feed-type="${activityEsc(item.filterId || item.type)}">
+        <div class="ga-feed-icon">${activityIcon(item.icon)}</div>
+        ${av}
+        <div class="ga-feed-copy">
+          <div class="ga-feed-title">${activityTextHtml(item.title, item)}</div>
+          ${item.body ? `<div class="ga-feed-body">${activityTextHtml(item.body, item)}</div>` : ''}
+          <div class="ga-feed-meta">${activityEsc(item.meta || 'Live')}</div>
+        </div>
+        ${score ? `<div class="ga-score-pill">${activityEsc(score)}</div>` : ''}
+      </article>`;
+  }
+
+  function emptyFeedHtml() {
+    return `
+      <div class="ga-empty-state">
+        <div class="ga-empty-icon">${activityIcon('zap')}</div>
+        <div class="ga-empty-title">No activity yet</div>
+        <p>Rank moves, achievements, cards, bracket updates and results will appear here.</p>
+      </div>`;
+  }
+
+  function readSavedFabPosition() {
+    try {
+      const raw = localStorage.getItem(FAB_POS_KEY);
+      if (!raw) return null;
+      const pos = JSON.parse(raw);
+      if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) return null;
+      return pos;
+    } catch (_) { return null; }
+  }
+
+  function fabEdgeMargin() {
+    return Math.max(14, Number(getComputedStyle(document.documentElement).getPropertyValue('--safe-fab-margin').replace('px', '')) || 14);
+  }
+
+  function clampFabPosition(pos, fab) {
+    const rect = fab.getBoundingClientRect();
+    const w = rect.width || 46;
+    const h = rect.height || 46;
+    const margin = fabEdgeMargin();
+    const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+    const maxTop = Math.max(margin, window.innerHeight - h - margin);
+    return {
+      left: Math.min(Math.max(Number(pos.left) || margin, margin), maxLeft),
+      top: Math.min(Math.max(Number(pos.top) || margin, margin), maxTop)
+    };
+  }
+
+  function applyFabPosition(fab, pos, persist) {
+    const safe = clampFabPosition(pos, fab);
+    fab.style.left = safe.left + 'px';
+    fab.style.top = safe.top + 'px';
+    fab.style.right = 'auto';
+    fab.style.bottom = 'auto';
+    fab.dataset.positioned = 'true';
+    if (persist) {
+      try { localStorage.setItem(FAB_POS_KEY, JSON.stringify(safe)); } catch (_) {}
+    }
+  }
+
+  function snapFabPosition(fab, pos, persist, animate) {
+    const safe = clampFabPosition(pos, fab);
+    const rect = fab.getBoundingClientRect();
+    const w = rect.width || 46;
+    const margin = fabEdgeMargin();
+    const snapLeft = (safe.left + w / 2) < (window.innerWidth / 2)
+      ? margin
+      : Math.max(margin, window.innerWidth - w - margin);
+    const target = { left: snapLeft, top: safe.top };
+    if (animate) {
+      fab.classList.add('snapping');
+      window.setTimeout(() => fab.classList.remove('snapping'), 260);
+    }
+    applyFabPosition(fab, target, persist);
+  }
+
+  function restoreFabPosition(fab) {
+    const saved = readSavedFabPosition();
+    if (saved) snapFabPosition(fab, saved, true, false);
+  }
+
+  function isGlobalActivityAppOpen() {
+    const shell = document.getElementById('app-shell');
+    const auth = document.getElementById('auth-screen');
+    const shellVisible = !!shell && !shell.classList.contains('hidden') && getComputedStyle(shell).display !== 'none';
+    const authVisible = !!auth && !auth.classList.contains('hidden') && getComputedStyle(auth).display !== 'none';
+    return shellVisible && !authVisible;
+  }
+
+  function closeGlobalActivityPanelSilently() {
+    feedOpen = false;
+    const panel = document.getElementById('global-activity-panel');
+    const backdrop = document.getElementById('global-activity-backdrop');
+    const fab = document.getElementById('global-activity-fab');
+    panel?.classList.remove('open');
+    panel?.setAttribute('aria-hidden', 'true');
+    if (backdrop) { backdrop.classList.remove('open'); backdrop.hidden = true; }
+    fab?.classList.remove('is-open');
+    document.body.classList.remove('ga-feed-open');
+  }
+
+  function syncGlobalActivityFeedVisibility() {
+    const root = document.getElementById(FEED_ROOT_ID);
+    if (!root) return false;
+    const allowed = isGlobalActivityAppOpen();
+    root.classList.toggle('ga-feed-auth-hidden', !allowed);
+    if (!allowed) closeGlobalActivityPanelSilently();
+    return allowed;
+  }
+
+  function setupGlobalActivityFabDrag(fab) {
+    if (!fab || fab.__gaDragBound) return;
+    fab.__gaDragBound = true;
+    restoreFabPosition(fab);
+
+    let pointerId = null;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+    let moved = false;
+    let rafId = null;
+    let queuedPos = null;
+
+    function flushDragFrame() {
+      rafId = null;
+      if (!queuedPos) return;
+      applyFabPosition(fab, queuedPos, false);
+      queuedPos = null;
+    }
+
+    function queueFabPosition(pos) {
+      queuedPos = pos;
+      if (rafId) return;
+      rafId = requestAnimationFrame(flushDragFrame);
+    }
+
+    fab.addEventListener('click', (e) => {
+      if (fab.__gaDragJustEnded) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      setGlobalActivityFeedOpen(true);
+    });
+
+    fab.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      pointerId = e.pointerId;
+      moved = false;
+      queuedPos = null;
+      const rect = fab.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      fab.classList.add('dragging');
+      try { fab.setPointerCapture(pointerId); } catch (_) {}
+    });
+
+    fab.addEventListener('pointermove', (e) => {
+      if (pointerId !== e.pointerId) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+      if (!moved) return;
+      e.preventDefault();
+      queueFabPosition({ left: startLeft + dx, top: startTop + dy });
+    }, { passive: false });
+
+    function finishDrag(e) {
+      if (pointerId !== null && e.pointerId !== pointerId) return;
+      try { fab.releasePointerCapture(pointerId); } catch (_) {}
+      pointerId = null;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        flushDragFrame();
+      }
+      fab.classList.remove('dragging');
+      if (moved) {
+        const rect = fab.getBoundingClientRect();
+        snapFabPosition(fab, { left: rect.left, top: rect.top }, true, true);
+        fab.__gaDragJustEnded = true;
+        setTimeout(() => { fab.__gaDragJustEnded = false; }, 240);
+      }
+      queuedPos = null;
+    }
+
+    fab.addEventListener('pointerup', finishDrag);
+    fab.addEventListener('pointercancel', finishDrag);
+
+    window.addEventListener('resize', () => {
+      if (!fab.dataset.positioned) return;
+      const rect = fab.getBoundingClientRect();
+      snapFabPosition(fab, { left: rect.left, top: rect.top }, true, false);
+    });
+  }
+
+  function ensureGlobalActivityFeedUI() {
+    if (document.getElementById(FEED_ROOT_ID)) {
+      syncGlobalActivityFeedVisibility();
+      return;
+    }
+    const root = document.createElement('div');
+    root.id = FEED_ROOT_ID;
+    root.innerHTML = `
+      <button type="button" id="global-activity-fab" class="ga-fab tap" aria-label="Open League Pulse">
+        ${activityIcon('zap')}
+        <span class="ga-fab-dot" aria-hidden="true"></span>
+      </button>
+      <div id="global-activity-backdrop" class="ga-backdrop" hidden></div>
+      <aside id="global-activity-panel" class="ga-panel" aria-hidden="true" aria-label="League Pulse">
+        <header class="ga-panel-header">
+          <div>
+            <h3><span aria-hidden="true">🔥</span> League Pulse</h3>
+            <p>Live updates from the league</p>
+          </div>
+          <button type="button" id="global-activity-close" class="ga-close tap" aria-label="Close League Pulse">${activityIcon('x')}</button>
+        </header>
+        <nav class="ga-filters" aria-label="Activity filters">
+          ${FILTERS.map(f => `<button type="button" class="ga-filter ${f.id === activeFeedFilter ? 'active' : ''}" data-ga-filter="${f.id}">${f.label}</button>`).join('')}
+        </nav>
+        <div id="global-activity-list" class="ga-list"></div>
+      </aside>`;
+    document.body.appendChild(root);
+    syncGlobalActivityFeedVisibility();
+
+    ['app-shell', 'auth-screen'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      try {
+        new MutationObserver(syncGlobalActivityFeedVisibility).observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+      } catch (_) {}
+    });
+
+    setupGlobalActivityFabDrag(root.querySelector('#global-activity-fab'));
+    root.querySelector('#global-activity-close')?.addEventListener('click', () => setGlobalActivityFeedOpen(false));
+    root.querySelector('#global-activity-backdrop')?.addEventListener('click', () => setGlobalActivityFeedOpen(false));
+    root.querySelectorAll('[data-ga-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeFeedFilter = btn.dataset.gaFilter || 'all';
+        root.querySelectorAll('[data-ga-filter]').forEach(x => x.classList.toggle('active', x === btn));
+        updateGlobalActivityFeed(lastFeedContext);
+      });
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && feedOpen) setGlobalActivityFeedOpen(false);
+    });
+    updateGlobalActivityFeed(lastFeedContext);
+  }
+
+  function setGlobalActivityFeedOpen(open) {
+    ensureGlobalActivityFeedUI();
+    if (open && !syncGlobalActivityFeedVisibility()) return;
+    feedOpen = !!open;
+    const panel = document.getElementById('global-activity-panel');
+    const backdrop = document.getElementById('global-activity-backdrop');
+    const fab = document.getElementById('global-activity-fab');
+    if (panel) {
+      panel.classList.toggle('open', feedOpen);
+      panel.setAttribute('aria-hidden', feedOpen ? 'false' : 'true');
+    }
+    if (backdrop) {
+      backdrop.hidden = !feedOpen;
+      requestAnimationFrame(() => backdrop.classList.toggle('open', feedOpen));
+    }
+    if (fab) fab.classList.toggle('is-open', feedOpen);
+    document.body.classList.toggle('ga-feed-open', feedOpen);
+    if (feedOpen) scheduleBackendFetch(0);
+  }
+
+  function updateGlobalActivityFeed(context = {}) {
+    lastFeedContext = {
+      stats: Array.isArray(context.stats) ? context.stats : (lastFeedContext.stats || []),
+      subtab: context.subtab || lastFeedContext.subtab || 'overall'
+    };
+    ensureGlobalActivityFeedUI();
+    syncGlobalActivityFeedVisibility();
+    const list = document.getElementById('global-activity-list');
+    const fab = document.getElementById('global-activity-fab');
+    if (!list) return;
+    const allEvents = buildGlobalActivityEvents(lastFeedContext);
+    const filtered = activeFeedFilter === 'all'
+      ? allEvents
+      : allEvents.filter(e => (e.filterId || TYPE_TO_FILTER_ID[e.type] || e.type) === activeFeedFilter);
+    list.innerHTML = filtered.length ? filtered.map(feedItemHtml).join('') : emptyFeedHtml();
+    if (fab) fab.classList.toggle('has-activity', allEvents.length > 0);
+  }
+
+  window.ensureGlobalActivityFeedUI = ensureGlobalActivityFeedUI;
+  window.updateGlobalActivityFeed = updateGlobalActivityFeed;
+  window.setGlobalActivityFeedOpen = setGlobalActivityFeedOpen;
+  window.refreshActivityFeed = () => scheduleBackendFetch(0);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureGlobalActivityFeedUI, { once: true });
+  } else {
+    ensureGlobalActivityFeedUI();
+  }
+
+  (function bootBackend(attempt = 0) {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient?.from) {
+      fetchBackendEvents().then(renderIfVisible);
+      ensureBackendChannel();
+    } else if (attempt < 20) {
+      setTimeout(() => bootBackend(attempt + 1), 250);
+    }
+  })();
+
+  setInterval(() => {
+    syncGlobalActivityFeedVisibility();
+    if (document.getElementById(FEED_ROOT_ID) && feedOpen) updateGlobalActivityFeed(lastFeedContext);
+  }, 30000);
+
+  setInterval(() => {
+    syncGlobalActivityFeedVisibility();
+    if (document.getElementById(FEED_ROOT_ID)) scheduleBackendFetch(0);
+  }, 60000);
+})();
+
 // ============== PROFILE TAB: LOAD LEAGUES ==============
 
 const _originalSwitchTab = switchTab
@@ -10678,10 +11400,15 @@ loadRememberedEmail()
       }
 
       .lb-row.lb-v2-row {
-        grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
+        /* 5 grid tracks: Rank/Avatar | Name/Badges | SPACER (1fr) | Trend | Points
+           Name column sizes to content; spacer eats all slack so trend+pts
+           hug the right edge instead of drifting next to the name. */
+        display: grid !important;
+        grid-template-columns: 66px minmax(0, auto) 1fr 42px 48px !important;
         min-height: 88px !important;
-        padding: 10px 12px 10px 7px !important;
-        column-gap: 0 !important;
+        padding: 10px 10px 10px 7px !important;
+        column-gap: 5px !important;
+        align-items: center !important;
         contain: layout paint style !important;
         transform: translateZ(0) !important;
         backface-visibility: hidden !important;
@@ -10689,10 +11416,38 @@ loadRememberedEmail()
       }
 
       .lb-v2-table-head {
-        grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
-        padding-left: 7px !important;
-        padding-right: 12px !important;
-        column-gap: 0 !important;
+        display: grid !important;
+        grid-template-columns: 66px minmax(0, auto) 1fr 42px 48px !important;
+        padding-left: 8px !important;
+        padding-right: 10px !important;
+        column-gap: 5px !important;
+        align-items: center !important;
+      }
+
+      .lb-v2-table-head span {
+        display: block !important;
+        min-width: 0 !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        font-size: 7.8px !important;
+        letter-spacing: 0.055em !important;
+        line-height: 1.05 !important;
+      }
+
+      /* Header label positions must mirror the row cell positions so labels
+         sit directly above their values — never stacked over each other.
+         Trend sits in col 4, Pts in col 5 (col 3 is the spacer). */
+      .lb-v2-table-head span:nth-child(3) {  /* Trend */
+        grid-column: 4 !important;
+        justify-self: center !important;
+        text-align: center !important;
+      }
+      .lb-v2-table-head span:nth-child(4) {  /* Pts */
+        grid-column: 5 !important;
+        justify-self: end !important;
+        text-align: right !important;
+        padding-right: 2px !important;
       }
 
       .lb-v2-rank-avatar {
@@ -10713,8 +11468,9 @@ loadRememberedEmail()
 
       .lb-v2-main {
         min-width: 0 !important;
-        padding-left: 6px !important;
-        overflow: visible !important;
+        padding-left: 5px !important;
+        padding-right: 4px !important;
+        overflow: hidden !important;
       }
 
       .lb-v2-name-line {
@@ -10750,30 +11506,40 @@ loadRememberedEmail()
       .lb-v2-chips {
         margin-top: 5px !important;
         max-height: 20px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
       }
 
       .lb-v2-trend {
-        width: 26px !important;
-        min-width: 26px !important;
-        justify-self: end !important;
-        justify-content: flex-end !important;
-        transform: translateX(12px) !important;
+        grid-column: 4 !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        justify-self: center !important;
+        display: flex !important;
+        justify-content: center !important;
+        transform: none !important;
         z-index: 4 !important;
       }
 
       .lb-v2-trend .rank-trend {
-        min-width: 26px !important;
-        height: 20px !important;
-        line-height: 18px !important;
+        min-width: 34px !important;
+        width: 34px !important;
+        justify-content: center !important;
+        height: 22px !important;
+        line-height: 20px !important;
         padding: 0 5px !important;
-        font-size: 8.5px !important;
+        font-size: 9px !important;
+        font-variant-numeric: tabular-nums !important;
         box-shadow: 0 3px 8px rgba(15,23,42,.08) !important;
       }
 
       .lb-v2-points {
-        width: 62px !important;
-        min-width: 62px !important;
-        padding-right: 3px !important;
+        grid-column: 5 !important;
+        width: 48px !important;
+        min-width: 48px !important;
+        justify-self: end !important;
+        padding-right: 0 !important;
+        padding-left: 2px !important;
         text-align: right !important;
       }
 
@@ -10856,33 +11622,36 @@ loadRememberedEmail()
       @media (min-width: 390px) and (max-width: 460px) {
         .lb-row.lb-v2-row,
         .lb-v2-table-head {
-          grid-template-columns: 86px minmax(0, 1fr) 26px 62px !important;
+          grid-template-columns: 66px minmax(0, auto) 1fr 42px 48px !important;
+          column-gap: 5px !important;
         }
-        .lb-v2-name { font-size: 13.8px !important; }
-        .lb-v2-trend { transform: translateX(12px) !important; }
+        .lb-v2-name { font-size: 13.6px !important; }
+        .lb-v2-trend { transform: none !important; }
       }
 
       @media (max-width: 380px) {
         .lb-row.lb-v2-row,
         .lb-v2-table-head {
-          grid-template-columns: 78px minmax(0, 1fr) 24px 58px !important;
-          padding-right: 10px !important;
+          grid-template-columns: 60px minmax(0, auto) 1fr 38px 44px !important;
+          column-gap: 4px !important;
+          padding-right: 9px !important;
         }
+        .lb-v2-table-head span { font-size: 7.2px !important; letter-spacing: 0.045em !important; }
         .lb-row.lb-v2-row { min-height: 84px !important; }
-        .lb-v2-rank-avatar { grid-template-columns: 26px 43px !important; gap: 6px !important; }
+        .lb-v2-rank-avatar { grid-template-columns: 24px 41px !important; gap: 5px !important; }
         .lb-v2-row .lb-avatar {
-          width: 43px !important;
-          height: 43px !important;
-          min-width: 43px !important;
-          min-height: 43px !important;
+          width: 41px !important;
+          height: 41px !important;
+          min-width: 41px !important;
+          min-height: 41px !important;
           font-size: 13px !important;
         }
-        .lb-v2-main { padding-left: 5px !important; }
-        .lb-v2-name { font-size: 12.6px !important; line-height: 1.12 !important; }
-        .lb-v2-stats { font-size: 8.8px !important; gap: 6px !important; }
-        .lb-v2-trend { width: 24px !important; min-width: 24px !important; transform: translateX(9px) !important; }
-        .lb-v2-trend .rank-trend { min-width: 24px !important; height: 19px !important; line-height: 17px !important; font-size: 8px !important; padding: 0 4px !important; }
-        .lb-v2-points { width: 58px !important; min-width: 58px !important; padding-right: 2px !important; }
+        .lb-v2-main { padding-left: 4px !important; padding-right: 2px !important; }
+        .lb-v2-name { font-size: 12.2px !important; line-height: 1.12 !important; }
+        .lb-v2-stats { font-size: 8.5px !important; gap: 5px !important; }
+        .lb-v2-trend { width: 38px !important; min-width: 38px !important; transform: none !important; }
+        .lb-v2-trend .rank-trend { width: 32px !important; min-width: 32px !important; height: 20px !important; line-height: 18px !important; font-size: 8.2px !important; padding: 0 4px !important; }
+        .lb-v2-points { width: 44px !important; min-width: 44px !important; padding-right: 0 !important; padding-left: 1px !important; }
         .lb-v2-points .points-num { font-size: 22px !important; }
         .badge-flip-front .badge-icon-art,
         .badge-flip-front .badge-img-asset { width: 50px !important; height: 50px !important; }
@@ -10930,5 +11699,275 @@ loadRememberedEmail()
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
     init();
+  }
+})();
+
+/* ============================================================
+   FINAL FIX — Leaderboard Trend + Points column alignment
+   Injected after the readability polish so it wins the cascade.
+   ============================================================ */
+(function installLeaderboardColumnFinalFix() {
+  const STYLE_ID = 'wcpl-leaderboard-columns-final-fix';
+  const CSS = `
+
+/* ============================================================
+   FINAL FIX — Leaderboard Trend + Points column alignment
+   2026-06-23
+   Locks Trend and Pts into fixed right-side columns, with a real
+   flexible spacer between prediction chips and the trend pill.
+   ============================================================ */
+#leaderboard-list {
+  --lb-rank-col: 66px;
+  --lb-main-col: clamp(132px, 38vw, 152px);
+  --lb-spacer-col: minmax(14px, 1fr);
+  --lb-trend-col: 40px;
+  --lb-pts-col: 56px;
+  --lb-grid-gap: 5px;
+}
+
+#leaderboard-list .lb-v2-table-head,
+#leaderboard-list .lb-row.lb-v2-row,
+.lb-v2-table-head,
+.lb-row.lb-v2-row {
+  display: grid !important;
+  grid-template-columns:
+    var(--lb-rank-col)
+    var(--lb-main-col)
+    var(--lb-spacer-col)
+    var(--lb-trend-col)
+    var(--lb-pts-col) !important;
+  column-gap: var(--lb-grid-gap) !important;
+  align-items: center !important;
+}
+
+#leaderboard-list .lb-v2-table-head,
+.lb-v2-table-head {
+  padding-left: 8px !important;
+  padding-right: 10px !important;
+}
+
+#leaderboard-list .lb-row.lb-v2-row,
+.lb-row.lb-v2-row {
+  padding-left: 7px !important;
+  padding-right: 10px !important;
+  overflow: hidden !important;
+}
+
+#leaderboard-list .lb-v2-table-head span,
+.lb-v2-table-head span {
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(1),
+.lb-v2-table-head span:nth-child(1) {
+  grid-column: 1 !important;
+  justify-self: start !important;
+  text-align: left !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(2),
+.lb-v2-table-head span:nth-child(2) {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  text-align: left !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(3),
+.lb-v2-table-head span:nth-child(3) {
+  grid-column: 4 !important;
+  justify-self: center !important;
+  text-align: center !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(4),
+.lb-v2-table-head span:nth-child(4) {
+  grid-column: 5 !important;
+  justify-self: end !important;
+  text-align: right !important;
+  padding-right: 2px !important;
+}
+
+#leaderboard-list .lb-v2-rank-avatar,
+.lb-v2-rank-avatar {
+  grid-column: 1 !important;
+  min-width: 0 !important;
+}
+
+#leaderboard-list .lb-v2-main,
+.lb-v2-main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+#leaderboard-list .lb-v2-name-line,
+.lb-v2-name-line,
+#leaderboard-list .lb-v2-stats,
+.lb-v2-stats,
+#leaderboard-list .lb-v2-chips,
+.lb-v2-chips {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+#leaderboard-list .lb-v2-chips,
+.lb-v2-chips {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+#leaderboard-list .lb-v2-chip,
+.lb-v2-chip {
+  flex: 0 0 auto !important;
+}
+
+#leaderboard-list .lb-v2-trend,
+.lb-v2-trend {
+  grid-column: 4 !important;
+  width: var(--lb-trend-col) !important;
+  min-width: var(--lb-trend-col) !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 !important;
+  transform: none !important;
+  position: static !important;
+  z-index: 4 !important;
+  pointer-events: none !important;
+}
+
+#leaderboard-list .lb-v2-trend .rank-trend,
+.lb-v2-trend .rank-trend {
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 5px !important;
+  line-height: 1 !important;
+  font-size: 8.8px !important;
+  font-weight: 900 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+#leaderboard-list .lb-v2-points,
+.lb-v2-points {
+  grid-column: 5 !important;
+  width: var(--lb-pts-col) !important;
+  min-width: var(--lb-pts-col) !important;
+  justify-self: end !important;
+  align-self: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: right !important;
+  position: static !important;
+  transform: none !important;
+  z-index: 4 !important;
+}
+
+#leaderboard-list .lb-v2-points .points-num,
+.lb-v2-points .points-num {
+  display: block !important;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+  line-height: .95 !important;
+}
+
+#leaderboard-list .lb-v2-points .points-label,
+.lb-v2-points .points-label {
+  display: block !important;
+  text-align: right !important;
+  padding-right: 1px !important;
+}
+
+@media (min-width: 390px) and (max-width: 460px) {
+  #leaderboard-list {
+    --lb-rank-col: 66px;
+    --lb-main-col: clamp(142px, 37vw, 154px);
+    --lb-spacer-col: minmax(16px, 1fr);
+    --lb-trend-col: 40px;
+    --lb-pts-col: 56px;
+    --lb-grid-gap: 5px;
+  }
+}
+
+@media (max-width: 380px) {
+  #leaderboard-list {
+    --lb-rank-col: 60px;
+    --lb-main-col: clamp(122px, 38vw, 140px);
+    --lb-spacer-col: minmax(12px, 1fr);
+    --lb-trend-col: 38px;
+    --lb-pts-col: 50px;
+    --lb-grid-gap: 4px;
+  }
+  #leaderboard-list .lb-v2-table-head,
+  .lb-v2-table-head {
+    padding-left: 7px !important;
+    padding-right: 9px !important;
+  }
+  #leaderboard-list .lb-row.lb-v2-row,
+  .lb-row.lb-v2-row {
+    padding-left: 6px !important;
+    padding-right: 9px !important;
+  }
+  #leaderboard-list .lb-v2-trend .rank-trend,
+  .lb-v2-trend .rank-trend {
+    width: 32px !important;
+    min-width: 32px !important;
+    font-size: 8.2px !important;
+    padding: 0 4px !important;
+  }
+}
+`;
+
+  function inject() {
+    const old = document.getElementById(STYLE_ID);
+    if (old) old.remove();
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
+  } else {
+    inject();
+  }
+})();
+
+
+
+/* ============================================================
+   MOBILE SAFE FIX — Leaderboard Trend + Points columns
+   Injected last so runtime CSS cannot push points off-screen.
+   ============================================================ */
+(function installLeaderboardMobileSafeColumnsFix() {
+  const STYLE_ID = 'wcpl-leaderboard-mobile-safe-columns-fix';
+  const CSS = '\n/* ============================================================\n   MOBILE SAFE FIX — Leaderboard Trend + Points columns\n   2026-06-23\n   Fixes right-edge clipping by removing the oversized spacer grid.\n   Final layout: Rank | Predictions | Trend | Pts\n   ============================================================ */\n#leaderboard-list {\n  --lb-safe-rank-col: 68px;\n  --lb-safe-trend-col: 40px;\n  --lb-safe-pts-col: 50px;\n  --lb-safe-gap: 5px;\n}\n\n#leaderboard-list .lb-v2-table-head,\n#leaderboard-list .lb-row.lb-v2-row,\n.lb-v2-table-head,\n.lb-row.lb-v2-row {\n  box-sizing: border-box !important;\n  width: 100% !important;\n  max-width: 100% !important;\n  min-width: 0 !important;\n  display: grid !important;\n  grid-template-columns:\n    var(--lb-safe-rank-col)\n    minmax(0, 1fr)\n    var(--lb-safe-trend-col)\n    var(--lb-safe-pts-col) !important;\n  column-gap: var(--lb-safe-gap) !important;\n  align-items: center !important;\n  overflow: hidden !important;\n}\n\n#leaderboard-list .lb-v2-table-head,\n.lb-v2-table-head {\n  padding-left: 8px !important;\n  padding-right: 8px !important;\n}\n\n#leaderboard-list .lb-row.lb-v2-row,\n.lb-row.lb-v2-row {\n  padding-left: 8px !important;\n  padding-right: 8px !important;\n}\n\n#leaderboard-list .lb-v2-table-head span:nth-child(1),\n.lb-v2-table-head span:nth-child(1) {\n  grid-column: 1 !important;\n  justify-self: start !important;\n  text-align: left !important;\n}\n\n#leaderboard-list .lb-v2-table-head span:nth-child(2),\n.lb-v2-table-head span:nth-child(2) {\n  grid-column: 2 !important;\n  justify-self: start !important;\n  text-align: left !important;\n}\n\n#leaderboard-list .lb-v2-table-head span:nth-child(3),\n.lb-v2-table-head span:nth-child(3) {\n  grid-column: 3 !important;\n  justify-self: center !important;\n  text-align: center !important;\n}\n\n#leaderboard-list .lb-v2-table-head span:nth-child(4),\n.lb-v2-table-head span:nth-child(4) {\n  grid-column: 4 !important;\n  justify-self: end !important;\n  text-align: right !important;\n  padding-right: 0 !important;\n}\n\n#leaderboard-list .lb-v2-rank-avatar,\n.lb-v2-rank-avatar {\n  grid-column: 1 !important;\n  width: var(--lb-safe-rank-col) !important;\n  min-width: 0 !important;\n  max-width: var(--lb-safe-rank-col) !important;\n  display: grid !important;\n  grid-template-columns: 26px 37px !important;\n  gap: 5px !important;\n  align-items: center !important;\n  overflow: visible !important;\n}\n\n#leaderboard-list .lb-v2-rank-tile,\n#leaderboard-list .lb-v2-medal-simple,\n.lb-v2-rank-tile,\n.lb-v2-medal-simple {\n  width: 26px !important;\n  height: 26px !important;\n  min-width: 26px !important;\n  font-size: 12px !important;\n}\n\n#leaderboard-list .lb-v2-medal-shiny,\n.lb-v2-medal-shiny {\n  width: 28px !important;\n  min-width: 28px !important;\n  max-width: 28px !important;\n}\n\n#leaderboard-list .lb-v2-row .lb-avatar,\n.lb-v2-row .lb-avatar {\n  width: 37px !important;\n  height: 37px !important;\n  min-width: 37px !important;\n  min-height: 37px !important;\n}\n\n#leaderboard-list .lb-v2-main,\n.lb-v2-main {\n  grid-column: 2 !important;\n  min-width: 0 !important;\n  max-width: 100% !important;\n  overflow: hidden !important;\n  padding-left: 2px !important;\n  padding-right: 0 !important;\n}\n\n#leaderboard-list .lb-v2-name-line,\n.lb-v2-name-line,\n#leaderboard-list .lb-v2-stats,\n.lb-v2-stats,\n#leaderboard-list .lb-v2-chips,\n.lb-v2-chips {\n  min-width: 0 !important;\n  max-width: 100% !important;\n}\n\n#leaderboard-list .lb-v2-name,\n.lb-v2-name {\n  min-width: 0 !important;\n  max-width: 100% !important;\n}\n\n#leaderboard-list .lb-v2-chips,\n.lb-v2-chips {\n  overflow: hidden !important;\n  flex-wrap: nowrap !important;\n}\n\n#leaderboard-list .lb-v2-trend,\n.lb-v2-trend {\n  grid-column: 3 !important;\n  width: var(--lb-safe-trend-col) !important;\n  min-width: var(--lb-safe-trend-col) !important;\n  max-width: var(--lb-safe-trend-col) !important;\n  justify-self: center !important;\n  align-self: center !important;\n  display: flex !important;\n  justify-content: center !important;\n  align-items: center !important;\n  margin: 0 !important;\n  padding: 0 !important;\n  transform: none !important;\n  position: static !important;\n  z-index: 6 !important;\n}\n\n#leaderboard-list .lb-v2-trend .rank-trend,\n.lb-v2-trend .rank-trend {\n  width: 34px !important;\n  min-width: 34px !important;\n  max-width: 34px !important;\n  height: 20px !important;\n  padding: 0 4px !important;\n  display: inline-flex !important;\n  align-items: center !important;\n  justify-content: center !important;\n  font-size: 8.4px !important;\n  line-height: 1 !important;\n  white-space: nowrap !important;\n  font-variant-numeric: tabular-nums !important;\n}\n\n#leaderboard-list .lb-v2-points,\n.lb-v2-points {\n  grid-column: 4 !important;\n  width: var(--lb-safe-pts-col) !important;\n  min-width: var(--lb-safe-pts-col) !important;\n  max-width: var(--lb-safe-pts-col) !important;\n  justify-self: end !important;\n  align-self: center !important;\n  margin: 0 !important;\n  padding: 0 !important;\n  text-align: right !important;\n  overflow: visible !important;\n  transform: none !important;\n  position: static !important;\n  z-index: 6 !important;\n}\n\n#leaderboard-list .lb-v2-points .points-num,\n.lb-v2-points .points-num {\n  display: block !important;\n  max-width: 100% !important;\n  text-align: right !important;\n  font-size: 22px !important;\n  line-height: .95 !important;\n  letter-spacing: -0.055em !important;\n  font-variant-numeric: tabular-nums !important;\n  overflow: visible !important;\n}\n\n#leaderboard-list .lb-v2-points .points-label,\n.lb-v2-points .points-label {\n  display: block !important;\n  text-align: right !important;\n  font-size: 7px !important;\n  padding-right: 1px !important;\n  overflow: visible !important;\n}\n\n@media (min-width: 390px) {\n  #leaderboard-list {\n    --lb-safe-rank-col: 72px;\n    --lb-safe-trend-col: 42px;\n    --lb-safe-pts-col: 54px;\n    --lb-safe-gap: 6px;\n  }\n  #leaderboard-list .lb-v2-rank-avatar,\n  .lb-v2-rank-avatar {\n    grid-template-columns: 28px 39px !important;\n    gap: 5px !important;\n  }\n  #leaderboard-list .lb-v2-rank-tile,\n  #leaderboard-list .lb-v2-medal-simple,\n  .lb-v2-rank-tile,\n  .lb-v2-medal-simple {\n    width: 28px !important;\n    height: 28px !important;\n    min-width: 28px !important;\n  }\n  #leaderboard-list .lb-v2-row .lb-avatar,\n  .lb-v2-row .lb-avatar {\n    width: 39px !important;\n    height: 39px !important;\n    min-width: 39px !important;\n    min-height: 39px !important;\n  }\n  #leaderboard-list .lb-v2-points .points-num,\n  .lb-v2-points .points-num {\n    font-size: 23px !important;\n  }\n}\n\n@media (max-width: 360px) {\n  #leaderboard-list {\n    --lb-safe-rank-col: 62px;\n    --lb-safe-trend-col: 36px;\n    --lb-safe-pts-col: 45px;\n    --lb-safe-gap: 4px;\n  }\n  #leaderboard-list .lb-v2-table-head,\n  .lb-v2-table-head,\n  #leaderboard-list .lb-row.lb-v2-row,\n  .lb-row.lb-v2-row {\n    padding-left: 6px !important;\n    padding-right: 6px !important;\n  }\n  #leaderboard-list .lb-v2-rank-avatar,\n  .lb-v2-rank-avatar {\n    grid-template-columns: 24px 34px !important;\n    gap: 4px !important;\n  }\n  #leaderboard-list .lb-v2-rank-tile,\n  #leaderboard-list .lb-v2-medal-simple,\n  .lb-v2-rank-tile,\n  .lb-v2-medal-simple {\n    width: 24px !important;\n    height: 24px !important;\n    min-width: 24px !important;\n    font-size: 11px !important;\n  }\n  #leaderboard-list .lb-v2-medal-shiny,\n  .lb-v2-medal-shiny {\n    width: 24px !important;\n    min-width: 24px !important;\n    max-width: 24px !important;\n  }\n  #leaderboard-list .lb-v2-row .lb-avatar,\n  .lb-v2-row .lb-avatar {\n    width: 34px !important;\n    height: 34px !important;\n    min-width: 34px !important;\n    min-height: 34px !important;\n  }\n  #leaderboard-list .lb-v2-trend .rank-trend,\n  .lb-v2-trend .rank-trend {\n    width: 31px !important;\n    min-width: 31px !important;\n    max-width: 31px !important;\n    font-size: 7.8px !important;\n    padding: 0 3px !important;\n  }\n  #leaderboard-list .lb-v2-points .points-num,\n  .lb-v2-points .points-num {\n    font-size: 20px !important;\n  }\n}\n';
+  function inject() {
+    const old = document.getElementById(STYLE_ID);
+    if (old) old.remove();
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
+  } else {
+    inject();
   }
 })();
