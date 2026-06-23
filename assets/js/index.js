@@ -3035,6 +3035,21 @@ function formatBracketHomeCountdown(lockAt) {
   return `${mins}m left`;
 }
 
+function getBracketHomeMetaRenderKey(meta) {
+  const lockAt = meta?.lockAt instanceof Date && !Number.isNaN(meta.lockAt.getTime())
+    ? meta.lockAt.toISOString()
+    : String(meta?.lockAt || '');
+
+  return [
+    normalizeBracketHomeStatus(meta?.status),
+    lockAt,
+    meta?.isPaid ? 'paid' : 'unpaid',
+    meta?.hasSubmitted ? 'submitted' : 'draft',
+    Number(meta?.entryCount || 0),
+    meta?.canPreviewHidden ? 'admin-preview' : 'public'
+  ].join('|');
+}
+
 async function fetchHomeBracketMeta(force = false) {
   const now = Date.now();
   if (!force && homeBracketStatusCache && now - homeBracketStatusLoadedAt < 12000) {
@@ -3232,6 +3247,7 @@ function renderHomeBracketCard(card, meta) {
   const isHiddenPreview = normalizedStatus === 'hidden' && !!meta?.canPreviewHidden;
   const isSecureCovered = normalizedStatus === 'coming_soon' || normalizedStatus === 'locked';
   const entryCount = Number(meta?.entryCount || 0);
+  const hasSubmitted = !!meta?.hasSubmitted;
 
   card.classList.toggle('admin-bracket-preview', isHiddenPreview);
   card.toggleAttribute('data-bracket-secure-covered', isSecureCovered);
@@ -3346,11 +3362,16 @@ async function ensureBracketChallengeHomeCard(force = false) {
       }
     }
 
-    // No-flash safety: cover the card before any async status fetch/re-render.
-    // We intentionally do NOT render the real bracket content as a placeholder.
-    card.setAttribute('data-bracket-rendering', 'true');
-    if (!homeBracketStatusCache && !card.innerHTML.trim()) {
+    // No-flash safety: cover ONLY the very first empty render.
+    // Do not cover/repaint the card on every realtime poll, because that creates
+    // the repeated white flash users were seeing on the Home tab.
+    const hasExistingCardMarkup = !!card.innerHTML.trim();
+    const shouldUseInitialRenderCover = !hasExistingCardMarkup;
+    if (shouldUseInitialRenderCover) {
+      card.setAttribute('data-bracket-rendering', 'true');
       card.innerHTML = '<div class="bracket-home-safe-placeholder" aria-hidden="true"></div>';
+    } else {
+      card.removeAttribute('data-bracket-rendering');
     }
 
     const meta = await fetchHomeBracketMeta(force);
@@ -3365,6 +3386,7 @@ async function ensureBracketChallengeHomeCard(force = false) {
       card.setAttribute('data-bracket-hidden-by-status', 'true');
       card.removeAttribute('data-bracket-rendering');
       card.removeAttribute('data-bracket-secure-covered');
+      delete card.dataset.bracketMetaKey;
       return;
     }
 
@@ -3374,6 +3396,22 @@ async function ensureBracketChallengeHomeCard(force = false) {
     card.removeAttribute('data-bracket-hidden-by-status');
     card.toggleAttribute('data-bracket-secure-covered', shouldSecureCover);
 
+    const metaRenderKey = getBracketHomeMetaRenderKey(meta);
+    if (card.dataset.bracketMetaKey === metaRenderKey && card.innerHTML.trim()) {
+      card.removeAttribute('data-bracket-rendering');
+      try {
+        if (typeof window.applyHomeBracketStatusOverlay === 'function') {
+          window.applyHomeBracketStatusOverlay();
+        } else {
+          document.body.classList.add('bracket-status-ready');
+        }
+      } catch (_) {
+        document.body.classList.add('bracket-status-ready');
+      }
+      return;
+    }
+
+    card.dataset.bracketMetaKey = metaRenderKey;
     renderHomeBracketCard(card, meta);
 
     if (normalizeBracketHomeStatus(meta?.status) === 'hidden' && meta?.canPreviewHidden && !card.querySelector(':scope > .admin-preview-badge')) {
@@ -3394,6 +3432,9 @@ async function ensureBracketChallengeHomeCard(force = false) {
       // Silent — overlay is a best-effort visual.
     } finally {
       // Remove the temporary render cover only after the real card/overlay exists.
+      if (typeof window.applyHomeBracketStatusOverlay !== 'function') {
+        document.body.classList.add('bracket-status-ready');
+      }
       card.removeAttribute('data-bracket-rendering');
     }
   } catch (e) {

@@ -29,7 +29,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/bracket-panel.css">
-  <link rel="stylesheet" href="/assets/css/bracket-challenge.css">
+  <link rel="stylesheet" href="/assets/css/bracket-challenge.css?v=bracket-home-flicker-fix-1">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
@@ -540,6 +540,60 @@
       background: linear-gradient(135deg, #FEE2E2, #FECACA);
       color: #7F1D1D; font-weight: 800; font-size: 12px;
       padding: 4px 10px; border-radius: 999px;
+    }
+
+
+    /* Achievement header compact fix — keeps title/subtitle from being crushed by streak/share */
+    .achievement-header {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .achievement-title-row,
+    .achievement-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+    .achievement-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .achievement-title-wrap h3 {
+      white-space: nowrap;
+    }
+    .achievement-see-all {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .achievement-meta-row {
+      padding-left: 54px;
+    }
+    .achievement-subtitle {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .achievement-meta-row #profile-streak:not(.hidden) {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      font-size: 11px;
+      padding: 4px 8px;
+    }
+    @media (max-width: 360px) {
+      .achievement-section-icon { width: 38px !important; height: 38px !important; border-radius: 14px !important; }
+      .achievement-title-wrap { gap: 10px !important; }
+      .achievement-meta-row { padding-left: 48px !important; gap: 8px !important; }
+      .achievement-meta-row #profile-streak:not(.hidden) { font-size: 10px !important; padding: 4px 7px !important; }
+      .achievement-see-all { padding-left: 6px !important; padding-right: 6px !important; }
     }
 
     /* ===== Preview mode ===== */
@@ -1262,7 +1316,7 @@ body.bracket-status-hidden .bracket-home-card {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 9999;
+      z-index: 2147483647;
       transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.5s;
     }
     .splash-screen.splash-exit {
@@ -8584,17 +8638,19 @@ html.dark-mode .profile-premium-card {
 <!-- Achievements (Premium Redesign) -->
   <div class="achievement-panel">
     <div class="relative z-[1]">
-      <div class="flex items-start justify-between gap-3 mb-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="achievement-section-icon">🏅</div>
-          <div class="min-w-0">
-            <h3 class="font-extrabold tracking-tight text-ink-900 leading-tight">Achievements</h3>
-            <p class="text-[12px] text-ink-500 mt-0.5">Your unlocked and upcoming badges</p>
+      <div class="achievement-header">
+        <div class="achievement-title-row">
+          <div class="achievement-title-wrap">
+            <div class="achievement-section-icon">🏅</div>
+            <div class="min-w-0">
+              <h3 class="font-extrabold tracking-tight text-ink-900 leading-tight">Achievements</h3>
+            </div>
           </div>
+          <button type="button" onclick="document.getElementById('profile-badges')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="achievement-see-all text-[12px] font-extrabold text-ink-700 flex items-center gap-1 tap px-2 py-1 rounded-full hover:bg-ink-900/5">See all <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="achievement-meta-row">
+          <p class="achievement-subtitle text-[12px] text-ink-500">Unlocked & upcoming badges</p>
           <span id="profile-streak" class="hidden"></span>
-          <button type="button" onclick="document.getElementById('profile-badges')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="text-[12px] font-extrabold text-ink-700 flex items-center gap-1 tap px-2 py-1 rounded-full hover:bg-ink-900/5">See all <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
         </div>
       </div>
       <div id="profile-badges" class="grid grid-cols-3 gap-2">
@@ -8990,7 +9046,7 @@ html.dark-mode .profile-premium-card {
 
 </style>
 
-  <script type="text/javascript" src="/assets/js/index.js?v=bonus-podium-polish-1"></script>
+  <script type="text/javascript" src="/assets/js/index.js?v=bracket-home-flicker-fix-1"></script>
 
   <!-- Auto-inject FIFA ranking badges into fixture cards -->
   <script>
@@ -10141,6 +10197,6 @@ async function confirmUseCard(cardId) {
       observer.observe(profileTab, { attributes: true, attributeFilter: ['class'] });
     })();
   </script>
-  <script src="/assets/js/bracket-challenge.js"></script>
+  <script src="/assets/js/bracket-challenge.js?v=bracket-home-flicker-fix-1"></script>
 </body>
 </html>

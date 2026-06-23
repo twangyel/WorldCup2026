@@ -2,987 +2,1217 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<title>Admin - Bracket League Management</title>
+<title>Admin — Bracket League</title>
 <style>
-/* ============================================
-   PREMIUM BRACKET ADMIN PANEL UI
-   Logic preserved. Only UI/UX + light safety improvements.
-   ============================================ */
+
 :root {
-  --bg-1: #170b2f;
-  --bg-2: #24104d;
-  --panel: rgba(255,255,255,.94);
-  --panel-soft: rgba(255,255,255,.72);
-  --ink: #111827;
-  --muted: #64748b;
-  --line: rgba(15,23,42,.09);
-  --brand: #7c3aed;
-  --brand-2: #4f46e5;
-  --danger: #ef4444;
+  --bg: #0f0f23;
+  --bg-elevated: #16162a;
+  --bg-card: #1a1a32;
+  --bg-card-hover: #1e1e3a;
+  --border: rgba(255,255,255,0.06);
+  --border-hover: rgba(255,255,255,0.12);
+  --text: #f0f0f5;
+  --text-secondary: #8b8b9e;
+  --text-muted: #5a5a6e;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --accent-glow: rgba(99,102,241,0.15);
+  --success: #22c55e;
+  --success-bg: rgba(34,197,94,0.12);
   --warning: #f59e0b;
-  --success: #16a34a;
-  --radius: 22px;
-  --shadow: 0 22px 60px rgba(15, 23, 42, .18);
+  --warning-bg: rgba(245,158,11,0.12);
+  --danger: #ef4444;
+  --danger-bg: rgba(239,68,68,0.12);
+  --info: #3b82f6;
+  --info-bg: rgba(59,130,246,0.12);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
-  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(124,58,237,.45), transparent 34%),
-    radial-gradient(circle at top right, rgba(14,165,233,.28), transparent 34%),
-    linear-gradient(145deg, var(--bg-1) 0%, var(--bg-2) 48%, #f7f2ee 48%, #f4eee8 100%);
-  background-attachment: fixed;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
-
-.admin-container {
-  width: min(920px, 100%);
+body::before {
+  content: '';
+  position: fixed;
+  top: -20%; right: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -10%; left: -5%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+.admin-wrapper {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 18px 16px 48px;
+  padding: 0 20px 40px;
+  position: relative; z-index: 1;
+}
+@media (max-width: 640px) {
+  .admin-wrapper { padding: 0 12px 32px; }
 }
 
-.admin-header {
-  position: relative;
-  overflow: hidden;
-  border-radius: 28px;
-  padding: 22px;
-  min-height: 170px;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.06)),
-    linear-gradient(135deg, #5b21b6, #7c3aed 45%, #0ea5e9);
-  color: white;
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255,255,255,.16);
-}
-.admin-header::before {
-  content: '';
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  right: -80px;
-  top: -90px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.18);
-}
-.admin-header::after {
-  content: '';
-  position: absolute;
-  inset: auto 18px 18px auto;
-  width: 110px;
-  height: 110px;
-  border: 1px solid rgba(255,255,255,.22);
-  border-radius: 28px;
-  transform: rotate(12deg);
-}
-.admin-header-top {
-  position: relative;
-  z-index: 1;
+/* Top Navigation */
+.top-nav {
+  position: sticky;
+  top: 0; z-index: 100;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-.admin-title-wrap { display: flex; gap: 14px; align-items: flex-start; }
-.admin-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 17px;
-  display: grid;
-  place-items: center;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.18);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.24);
-  flex-shrink: 0;
-}
-.admin-logo svg { width: 25px; height: 25px; }
-.admin-eyebrow {
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .14em;
-  opacity: .82;
-  margin-bottom: 5px;
-}
-.admin-header h1 {
-  font-size: clamp(22px, 6vw, 34px);
-  line-height: 1;
-  font-weight: 950;
-  letter-spacing: -.045em;
-}
-.admin-subtitle {
-  max-width: 520px;
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: rgba(255,255,255,.82);
-}
-.back-link {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  color: white;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 800;
-  padding: 10px 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.14);
-  border: 1px solid rgba(255,255,255,.18);
-  white-space: nowrap;
+  justify-content: space-between;
+  padding: 12px 0;
+  margin-bottom: 24px;
+  background: linear-gradient(180deg, var(--bg) 60%, transparent);
   backdrop-filter: blur(12px);
 }
-.back-link:hover { background: rgba(255,255,255,.22); }
-
-.sticky-admin-summary {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  margin: -28px 12px 16px;
-  padding: 12px;
-  border-radius: 20px;
-  background: rgba(255,255,255,.86);
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,.58);
-  box-shadow: 0 14px 35px rgba(15,23,42,.14);
-}
-.summary-row {
+.nav-left {
   display: flex;
-  gap: 9px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-.summary-row::-webkit-scrollbar { display: none; }
-.summary-pill {
-  min-width: 112px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: white;
-  border: 1px solid rgba(15,23,42,.08);
-}
-.summary-pill .stat-num {
-  font-size: 18px;
-  line-height: 1.1;
-  font-weight: 950;
-  letter-spacing: -.03em;
-  color: #111827;
-}
-.summary-pill .stat-label {
-  font-size: 10px;
-  font-weight: 850;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-top: 4px;
-}
-
-.quick-nav {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 4px 16px;
-  margin-bottom: 2px;
-  scrollbar-width: none;
-}
-.quick-nav::-webkit-scrollbar { display: none; }
-.quick-nav a {
-  flex: 0 0 auto;
-  text-decoration: none;
-  color: rgba(255,255,255,.92);
-  font-size: 12px;
-  font-weight: 850;
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.14);
-  border: 1px solid rgba(255,255,255,.16);
-  backdrop-filter: blur(14px);
-}
-.quick-nav a:hover { background: rgba(255,255,255,.22); }
-
-.success-banner,
-.error-banner {
-  position: sticky;
-  top: 84px;
-  z-index: 40;
-  padding: 13px 15px;
-  border-radius: 16px;
-  margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 850;
-  display: none;
-  box-shadow: 0 16px 34px rgba(15,23,42,.15);
-}
-.success-banner { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-.error-banner { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-.success-banner.show,
-.error-banner.show { display: block; }
-
-.admin-section { display: none; }
-.admin-section.active { display: block; }
-.admin-card {
-  position: relative;
-  overflow: hidden;
-  background: var(--panel);
-  border-radius: var(--radius);
-  padding: 20px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(255,255,255,.72);
-  box-shadow: 0 16px 36px rgba(15,23,42,.08);
-}
-.admin-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
-}
-.card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
 }
-.card-title { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
-.card-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  background: #f1efff;
-  color: #6d28d9;
-  flex-shrink: 0;
-}
-.card-icon svg { width: 20px; height: 20px; }
-.admin-card h2,
-.admin-card h3 {
-  font-size: 16px;
-  line-height: 1.2;
-  font-weight: 950;
-  color: #111827;
-  margin-bottom: 4px;
-  letter-spacing: -.02em;
-}
-.admin-card p {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-bottom: 13px;
-  line-height: 1.55;
-}
-.card-note {
-  font-size: 11px;
-  font-weight: 800;
-  color: #64748b;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 7px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.status-display {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 10px 0 14px;
-  padding: 13px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #f8fafc, #fff);
-  border: 1px solid #e2e8f0;
-  font-size: 13px;
-  font-weight: 800;
-  color: #334155;
-}
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 950;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  background: #e2e8f0;
-  color: #475569;
-}
-.status-badge.coming_soon { background: #f1f5f9; color: #64748b; }
-.status-badge.open { background: #dcfce7; color: #15803d; }
-.status-badge.locked { background: #fef3c7; color: #b45309; }
-.status-badge.live { background: #dbeafe; color: #1d4ed8; }
-.status-badge.completed { background: #ede9fe; color: #6d28d9; }
-
-.admin-btn-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
-  gap: 9px;
-}
-.admin-btn {
-  min-height: 42px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(124,58,237,.14);
-  background: linear-gradient(135deg, var(--brand), var(--brand-2));
-  color: white;
-  font-size: 12.5px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
-  box-shadow: 0 10px 20px rgba(124,58,237,.18);
-  font-family: inherit;
-}
-.admin-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 26px rgba(124,58,237,.23); }
-.admin-btn:active { transform: translateY(0); }
-.admin-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.admin-btn.warning { background: linear-gradient(135deg, #f59e0b, #d97706); border-color: rgba(245,158,11,.2); box-shadow: 0 10px 20px rgba(245,158,11,.18); }
-.admin-btn.success { background: linear-gradient(135deg, #22c55e, #16a34a); border-color: rgba(34,197,94,.2); box-shadow: 0 10px 20px rgba(34,197,94,.18); }
-.admin-btn.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); border-color: rgba(239,68,68,.22); box-shadow: 0 10px 20px rgba(239,68,68,.16); }
-
-.danger-zone {
-  background: linear-gradient(135deg, #fff7f7, #fff);
-  border-color: rgba(239,68,68,.2);
-}
-.danger-zone .card-icon { background: #fee2e2; color: #dc2626; }
-
-.team-edit-row,
-.result-row,
-.payment-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  margin-bottom: 9px;
-}
-.team-edit-row .slot-label {
-  font-size: 11px;
-  font-weight: 850;
-  color: #475569;
-  min-width: 178px;
-  flex-shrink: 0;
-  line-height: 1.35;
-}
-.team-edit-row input {
-  flex: 1;
-  padding: 10px 11px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  font-size: 12.5px;
-  min-width: 0;
-  font-family: inherit;
-  font-weight: 700;
-}
-.team-edit-row input:focus {
-  outline: none;
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 4px rgba(124,58,237,.10);
-}
-.team-edit-row input::placeholder { color: #cbd5e1; font-weight: 700; }
-.round-header-editor {
-  position: sticky;
-  top: 84px;
-  z-index: 2;
-  font-size: 11px;
-  font-weight: 950;
-  color: #6d28d9;
-  text-transform: uppercase;
-  letter-spacing: .11em;
-  margin: 20px 0 10px;
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: rgba(237,233,254,.94);
-  border: 1px solid rgba(124,58,237,.12);
-}
-
-.result-row { align-items: flex-start; }
-.result-row .match-info { flex: 1; min-width: 0; }
-.result-row .match-teams-text { font-size: 13px; font-weight: 950; color: #111827; }
-.result-row .match-round { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.35; }
-.result-row .winner-select { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-.result-row .winner-btn {
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  font-size: 12px;
-  font-weight: 850;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: inherit;
-  transition: all .18s ease;
-}
-.result-row .winner-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; transform: translateY(-1px); }
-.result-row .winner-btn.selected { background: #7c3aed; color: white; border-color: #7c3aed; }
-.result-row .winner-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.result-row .winner-btn.danger-mini { color: #dc2626; border-color: #fecaca; background: #fff7f7; }
-
-.payment-row { justify-content: space-between; }
-.payment-row .player-name,
-.payment-proof-topline .player-name {
-  font-size: 14px;
-  font-weight: 900;
-  color: #111827;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.payment-row .payment-status,
-.payment-status {
-  font-size: 10.5px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-weight: 950;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  flex-shrink: 0;
-}
-.status-pending { background: #fef3c7; color: #b45309; }
-.status-paid { background: #dcfce7; color: #15803d; }
-.status-rejected { background: #fee2e2; color: #dc2626; }
-.confirm-pay-btn,
-.reject-pay-btn {
-  padding: 8px 14px;
-  border-radius: 12px;
-  border: none;
-  color: white;
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: transform .18s ease, opacity .18s ease;
-  font-family: inherit;
-}
-.confirm-pay-btn { background: #16a34a; }
-.reject-pay-btn { background: #ef4444; }
-.confirm-pay-btn:hover,
-.reject-pay-btn:hover { transform: translateY(-1px); opacity: .92; }
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-.stat-box {
-  background: linear-gradient(135deg, #ffffff, #f8fafc);
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  padding: 18px 12px;
-  text-align: center;
-}
-.stat-num { font-size: 24px; font-weight: 950; color: #111827; letter-spacing: -.04em; }
-.stat-label { font-size: 11px; color: #64748b; margin-top: 5px; font-weight: 850; }
-.loading-text,
-.empty-state {
-  font-size: 13px;
-  color: #94a3b8;
-  padding: 20px;
-  text-align: center;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 16px;
-}
-.empty-state { font-style: italic; }
-
-.realtime-panel {
-  background: linear-gradient(135deg, #ecfeff 0%, #ffffff 74%);
-  border: 1px solid rgba(14, 165, 233, 0.24);
-}
-.realtime-panel .card-icon { background: #cffafe; color: #0891b2; }
-.realtime-panel h3,
-.realtime-panel .card-head { gap: 8px; }
-.realtime-status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #94a3b8;
-  display: inline-block;
-  margin-right: 6px;
-}
-.realtime-status-dot.connected { background: #22c55e; box-shadow: 0 0 0 6px rgba(34,197,94,.12); }
-.realtime-status-dot.error { background: #ef4444; }
-.realtime-status {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10.5px;
-  font-weight: 950;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  white-space: nowrap;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
-  padding: 7px 10px;
-}
-.realtime-feed { display: flex; flex-direction: column; gap: 8px; }
-.realtime-empty { font-size: 12px; color: #64748b; padding: 10px 0 0; }
-.realtime-item {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 11px;
-}
-.realtime-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 13px;
+.nav-logo {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef2ff;
-  color: #4f46e5;
-  flex-shrink: 0;
-  font-size: 16px;
+  box-shadow: 0 0 20px var(--accent-glow);
 }
-.realtime-title { font-size: 13px; font-weight: 950; color: #0f172a; }
-.realtime-meta { margin-top: 2px; font-size: 11px; color: #64748b; overflow-wrap: anywhere; line-height: 1.35; }
-.admin-live-toast {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 99999;
-  max-width: 330px;
-  background: #0f172a;
-  color: #fff;
-  border-radius: 18px;
-  padding: 14px 16px;
-  box-shadow: 0 18px 42px rgba(15,23,42,.25);
-  transform: translateY(16px);
-  opacity: 0;
-  transition: all .22s ease;
-  pointer-events: none;
+.nav-logo svg { width: 18px; height: 18px; color: white; }
+.nav-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
 }
-.admin-live-toast.show { transform: translateY(0); opacity: 1; }
-.admin-live-toast-title { font-size: 13px; font-weight: 950; margin-bottom: 3px; }
-.admin-live-toast-body { font-size: 12px; color: rgba(255,255,255,.78); }
-
-.payment-proof-row {
-  display: grid;
-  grid-template-columns: 1fr 96px;
-  gap: 12px;
-  padding: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  margin-bottom: 10px;
+.nav-title span {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 13px;
+  margin-left: 6px;
 }
-.payment-proof-main { min-width: 0; }
-.payment-proof-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
-.payment-proof-meta { font-size: 11px; color: #64748b; line-height: 1.45; overflow-wrap: anywhere; }
-.payment-proof-note,
-.payment-proof-reason {
-  margin-top: 7px;
-  font-size: 12px;
-  color: #334155;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 13px;
-  padding: 9px;
-}
-.payment-proof-reason { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
-.proof-thumb-link { display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; color: #7c3aed; font-size: 10px; font-weight: 950; }
-.proof-thumb { width: 96px; height: 96px; object-fit: cover; border-radius: 16px; border: 1px solid #cbd5e1; background: #fff; }
-.payment-proof-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
-
-.table-wrap { overflow-x: auto; margin: -4px; padding: 4px; }
-table.admin-table { width: 100%; font-size: 13px; border-collapse: separate; border-spacing: 0 7px; min-width: 560px; }
-table.admin-table th { padding: 8px 10px; text-align: left; font-size: 10.5px; color: #64748b; text-transform: uppercase; letter-spacing: .08em; }
-table.admin-table td { padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
-table.admin-table td:first-child { border-left: 1px solid #e2e8f0; border-radius: 14px 0 0 14px; font-weight: 950; }
-table.admin-table td:last-child { border-right: 1px solid #e2e8f0; border-radius: 0 14px 14px 0; }
-
-
-/* Top app bar + notification bell */
-.admin-topbar {
+.nav-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  position: relative;
-  z-index: 80;
+  gap: 10px;
 }
-.admin-topbar .back-link {
-  color: white;
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.18);
-  box-shadow: 0 10px 30px rgba(15,23,42,.12);
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
 }
+.nav-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+  background: var(--bg-card-hover);
+}
+.nav-btn svg { width: 16px; height: 16px; }
+
+/* Notification bell */
 .notify-wrap { position: relative; }
 .notify-bell {
-  width: 46px;
-  height: 46px;
-  border: 1px solid rgba(255,255,255,.18);
-  border-radius: 17px;
-  background: rgba(255,255,255,.14);
-  color: white;
-  display: grid;
-  place-items: center;
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 10px 30px rgba(15,23,42,.12);
+  transition: var(--transition);
+  position: relative;
 }
-.notify-bell:hover { background: rgba(255,255,255,.22); }
-.notify-bell svg { width: 21px; height: 21px; }
+.notify-bell:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+  background: var(--bg-card-hover);
+}
+.notify-bell svg { width: 18px; height: 18px; }
 .notify-count {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 18px;
-  height: 18px;
+  top: -4px; right: -4px;
+  min-width: 18px; height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #ef4444;
+  background: var(--danger);
   color: white;
   font-size: 10px;
-  font-weight: 950;
+  font-weight: 700;
   display: none;
   align-items: center;
   justify-content: center;
-  border: 2px solid #24104d;
+  border: 2px solid var(--bg);
 }
 .notify-count.show { display: flex; }
 .notify-menu {
   position: absolute;
-  right: 0;
-  top: 54px;
-  width: min(360px, calc(100vw - 32px));
-  background: rgba(255,255,255,.96);
-  border: 1px solid rgba(15,23,42,.10);
-  border-radius: 22px;
-  box-shadow: 0 28px 80px rgba(15,23,42,.25);
-  padding: 14px;
+  right: 0; top: 52px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0;
   display: none;
-  z-index: 120;
-  backdrop-filter: blur(18px);
+  z-index: 200;
+  overflow: hidden;
 }
 .notify-menu.open { display: block; }
 .notify-menu-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-  margin-bottom: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
 }
-.notify-menu-title { font-size: 13px; font-weight: 950; color: #0f172a; }
-.notify-menu-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
-.status-action-row {
+.notify-menu-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.notify-menu-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.realtime-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.realtime-status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: var(--transition);
+}
+.realtime-status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(34,197,94,0.4);
+}
+.realtime-status-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(239,68,68,0.4);
+}
+.realtime-feed {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+.realtime-feed::-webkit-scrollbar { width: 4px; }
+.realtime-feed::-webkit-scrollbar-track { background: transparent; }
+.realtime-feed::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+.realtime-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.realtime-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+  transition: var(--transition);
+}
+.realtime-item:hover { background: var(--bg-elevated); }
+.realtime-icon {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-glow);
+  color: var(--accent-light);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.realtime-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.realtime-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Header */
+.admin-header {
+  margin-bottom: 24px;
+}
+.header-title {
+  font-size: clamp(24px, 5vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.1;
+}
+.header-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 560px;
+  line-height: 1.6;
+}
+
+/* Stats Bar */
+.stats-bar {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
-.status-select-wrap {
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: var(--transition);
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0;
+  transition: var(--transition);
+}
+.stat-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.stat-card:hover::before { opacity: 1; }
+.stat-card.revenue::before { background: linear-gradient(90deg, var(--success), transparent); }
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.stat-value.revenue { color: var(--success); }
+@media (max-width: 768px) {
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .stat-card { padding: 16px; }
+  .stat-value { font-size: 24px; }
+}
+@media (max-width: 480px) {
+  .stats-bar { grid-template-columns: 1fr; }
+}
+
+/* Section Tabs */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.section-tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.tab-btn svg {
+  width: 14px; height: 14px;
+  opacity: 0.7;
+}
+@media (max-width: 640px) {
+  .tab-btn { padding: 8px 12px; font-size: 12px; }
+  .tab-btn svg { display: none; }
+}
+
+/* Sections */
+.section {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+.section.active { display: block; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 16px;
+  transition: var(--transition);
+}
+.card:hover { border-color: var(--border-hover); }
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.card-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+.card-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-glow);
+  color: var(--accent-light);
+  flex-shrink: 0;
+}
+.card-icon svg { width: 20px; height: 20px; }
+.card-icon.danger { background: var(--danger-bg); color: var(--danger); }
+.card-icon.success { background: var(--success-bg); color: var(--success); }
+.card-icon.warning { background: var(--warning-bg); color: var(--warning); }
+.card-icon.info { background: var(--info-bg); color: var(--info); }
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+.card-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.card-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+@media (max-width: 480px) {
+  .card { padding: 18px; }
+  .card-header { flex-wrap: wrap; }
+  .card-badge { display: none; }
+}
+
+/* Status Display */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.status-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.status-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-badge.hidden { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+.status-badge.coming_soon { background: var(--info-bg); color: var(--info); }
+.status-badge.open { background: var(--success-bg); color: var(--success); }
+.status-badge.locked { background: var(--warning-bg); color: var(--warning); }
+.status-badge.live { background: rgba(99,102,241,0.12); color: var(--accent-light); }
+.status-badge.completed { background: rgba(139,92,246,0.12); color: #a78bfa; }
+
+/* Form Elements */
+.form-group {
+  margin-bottom: 16px;
+}
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.form-select {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 40px 12px 14px;
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b8b9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.form-select option {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+.btn:active { transform: translateY(0); }
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+.btn-primary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  box-shadow: 0 0 30px var(--accent-glow);
+}
+.btn-success {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+.btn-success:hover {
+  background: #27d664;
+  border-color: #27d664;
+  box-shadow: 0 0 20px rgba(34,197,94,0.2);
+}
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+.btn-danger:hover {
+  background: #f55;
+  border-color: #f55;
+  box-shadow: 0 0 20px rgba(239,68,68,0.2);
+}
+.btn-warning {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: #0f0f23;
+}
+.btn-warning:hover {
+  background: #f6b03a;
+  border-color: #f6b03a;
+}
+.btn-sm { padding: 7px 12px; font-size: 12px; }
+.btn svg { width: 14px; height: 14px; }
+@media (max-width: 480px) {
+  .btn-group { flex-direction: column; }
+  .btn { width: 100%; }
+}
+
+/* Alerts */
+.alert {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  animation: slideDown 0.3s ease;
+}
+.alert.show { display: flex; }
+.alert-success {
+  background: var(--success-bg);
+  border: 1px solid rgba(34,197,94,0.2);
+  color: var(--success);
+}
+.alert-error {
+  background: var(--danger-bg);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: var(--danger);
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Team Editor */
+.round-section {
+  margin-bottom: 20px;
+}
+.round-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-light);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: var(--accent-glow);
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+.team-row {
+  display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px;
-  border-radius: 18px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: var(--transition);
 }
-.status-select-wrap label {
+.team-row:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+.team-label {
   font-size: 12px;
-  font-weight: 900;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 180px;
+  flex-shrink: 0;
+  line-height: 1.4;
 }
-.status-select {
-  width: 100%;
-  appearance: none;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: white;
-  color: #111827;
-  font: inherit;
+.team-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
   font-size: 13px;
-  font-weight: 850;
-  padding: 12px 42px 12px 12px;
-  outline: none;
-  cursor: pointer;
-}
-.status-select:focus { border-color: #7c3aed; box-shadow: 0 0 0 4px rgba(124,58,237,.10); }
-.status-select-wrap::after {
-  content: '⌄';
-  position: absolute;
-  right: 24px;
-  bottom: 21px;
-  color: #64748b;
-  font-weight: 950;
-  pointer-events: none;
-}
-.status-badge.hidden { background: #111827; color: #fff; }
-
-@media (max-width: 760px) {
-  .admin-container { padding: 12px 12px 42px; }
-  .admin-header { padding: 18px; min-height: 140px; border-radius: 24px; }
-  .admin-header-top { flex-direction: column; }
-  .admin-header .back-link { display: none; }
-  .admin-topbar .back-link { align-self: center; }
-  .notify-menu { right: 0; }
-  .sticky-admin-summary { margin: -22px 8px 14px; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .admin-card { padding: 16px; border-radius: 20px; }
-  .admin-btn-group { grid-template-columns: 1fr 1fr; }
-  .team-edit-row { flex-direction: column; align-items: stretch; }
-  .team-edit-row .slot-label { min-width: auto; }
-  .result-row { flex-direction: column; align-items: stretch; }
-  .result-row .winner-select { justify-content: stretch; margin-top: 4px; }
-  .result-row .winner-btn { flex: 1; }
-  .payment-proof-row { grid-template-columns: 1fr; }
-  .proof-thumb-link { align-items: flex-start; }
-  .card-note { display: none; }
-}
-@media (max-width: 430px) {
-  .admin-btn-group { grid-template-columns: 1fr; }
-  .summary-pill { min-width: 104px; }
-  .payment-proof-actions { flex-direction: column; }
-  .confirm-pay-btn, .reject-pay-btn { width: 100%; }
-}
-
-
-/* =========================================================
-   RESPONSIVE PATCH - removes diagonal clipping + improves 390px UX
-   ========================================================= */
-body {
-  overflow-x: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(124,58,237,.40), transparent 34%),
-    radial-gradient(circle at top right, rgba(14,165,233,.24), transparent 34%),
-    linear-gradient(180deg, #170b2f 0%, #24104d 310px, #f4eee8 310px, #f4eee8 100%) !important;
-}
-.admin-container {
-  width: 100%;
-  max-width: 920px;
-  padding-left: max(12px, env(safe-area-inset-left));
-  padding-right: max(12px, env(safe-area-inset-right));
-}
-.admin-topbar {
-  position: sticky;
-  top: 0;
-  padding: 8px 0;
-  margin: -8px 0 10px;
-  background: linear-gradient(180deg, rgba(23,11,47,.98), rgba(23,11,47,.72), transparent);
-  backdrop-filter: blur(10px);
-}
-.admin-topbar .back-link {
-  min-height: 40px;
-  padding: 9px 12px;
-}
-.admin-header {
-  min-height: auto;
-  padding-bottom: 46px;
-}
-.sticky-admin-summary {
-  top: 56px;
-  margin: -40px 8px 14px;
-}
-.quick-nav {
-  margin-left: -12px;
-  margin-right: -12px;
-  padding: 2px 12px 16px;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-}
-.quick-nav a {
-  scroll-snap-align: start;
-}
-.status-select-wrap {
-  grid-template-columns: minmax(0, 1fr) minmax(142px, auto);
-}
-.status-select {
+  font-weight: 600;
+  font-family: inherit;
+  transition: var(--transition);
   min-width: 0;
 }
-.card-head {
-  align-items: flex-start;
+.team-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
-.admin-card {
+.team-input::placeholder { color: var(--text-muted); }
+@media (max-width: 640px) {
+  .team-row { flex-direction: column; align-items: stretch; }
+  .team-label { min-width: auto; }
+}
+
+/* Result Entry */
+.match-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: var(--transition);
+}
+.match-row:hover { border-color: var(--border-hover); }
+.match-info { flex: 1; min-width: 0; }
+.match-teams {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.match-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.winner-select {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.winner-btn {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.winner-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+.winner-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.winner-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.winner-btn.clear {
+  color: var(--danger);
+  border-color: rgba(239,68,68,0.2);
+}
+.winner-btn.clear:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+@media (max-width: 640px) {
+  .match-row { flex-direction: column; align-items: stretch; }
+  .winner-select { justify-content: stretch; margin-top: 8px; }
+  .winner-btn { flex: 1; text-align: center; }
+}
+
+/* Payments */
+.payment-card {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  transition: var(--transition);
+}
+.payment-card:hover { border-color: var(--border-hover); }
+.payment-main { min-width: 0; }
+.payment-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.payment-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.payment-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.payment-status.pending { background: var(--warning-bg); color: var(--warning); }
+.payment-status.paid { background: var(--success-bg); color: var(--success); }
+.payment-status.rejected { background: var(--danger-bg); color: var(--danger); }
+.payment-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.payment-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.payment-reason {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--danger-bg);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--danger);
+}
+.payment-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.payment-thumb img {
+  width: 96px; height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.payment-thumb a {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-light);
+  text-decoration: none;
+}
+.payment-thumb a:hover { text-decoration: underline; }
+.payment-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .payment-card { grid-template-columns: 1fr; }
+  .payment-thumb { align-items: flex-start; }
+  .payment-actions { flex-direction: column; }
+  .payment-actions .btn { width: 100%; }
+}
+
+/* Leaderboard Table */
+.table-container {
+  overflow-x: auto;
+  margin: -4px;
+  padding: 4px;
+}
+.table-container::-webkit-scrollbar { height: 4px; }
+.table-container::-webkit-scrollbar-track { background: transparent; }
+.table-container::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+.data-table {
   width: 100%;
+  font-size: 13px;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  min-width: 500px;
 }
-.result-row,
-.payment-proof-row,
-.team-edit-row,
-.status-display,
-.status-select-wrap {
-  max-width: 100%;
+.data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+.data-table td:first-child {
+  border-left: 1px solid var(--border);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-weight: 700;
+  color: var(--accent-light);
+}
+.data-table td:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-weight: 700;
+  color: var(--accent-light);
+}
+.data-table tr:hover td {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
 }
 
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+.empty-state-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 12px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.empty-state-icon svg { width: 24px; height: 24px; }
+.empty-state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.empty-state-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Live Toast */
+.live-toast {
+  position: fixed;
+  right: 20px; bottom: 20px;
+  z-index: 99999;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+.live-toast.show {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+.live-toast-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.live-toast-title::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(34,197,94,0.5);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.live-toast-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+@media (max-width: 480px) {
+  .live-toast {
+    right: 12px; left: 12px;
+    max-width: none;
+  }
+}
+
+/* Danger Zone */
+.danger-zone {
+  border-color: rgba(239,68,68,0.15);
+}
+.danger-zone:hover {
+  border-color: rgba(239,68,68,0.25);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-title span { display: none; }
+  .nav-btn span { display: none; }
+  .nav-btn { padding: 8px; }
+}
 @media (max-width: 520px) {
-  body {
-    background:
-      radial-gradient(circle at top left, rgba(124,58,237,.38), transparent 38%),
-      linear-gradient(180deg, #170b2f 0%, #24104d 300px, #f4eee8 300px, #f4eee8 100%) !important;
-  }
-  .admin-container { padding: 8px 10px 42px; }
-  .admin-header {
-    border-radius: 22px;
-    padding: 16px 14px 44px;
-  }
-  .admin-title-wrap { gap: 10px; }
-  .admin-logo { width: 42px; height: 42px; border-radius: 15px; }
-  .admin-header h1 { font-size: 25px; line-height: 1.05; }
-  .admin-subtitle { font-size: 12px; line-height: 1.45; max-width: 100%; }
-  .sticky-admin-summary {
-    margin: -34px 6px 14px;
-    padding: 8px;
-    border-radius: 18px;
-  }
-  .summary-row { gap: 8px; }
-  .summary-pill { min-width: 98px; padding: 9px 10px; border-radius: 14px; }
-  .summary-pill .stat-num { font-size: 17px; }
-  .summary-pill .stat-label { font-size: 9px; }
-  .quick-nav { padding-bottom: 14px; }
-  .quick-nav a { font-size: 11px; padding: 8px 11px; }
-  .admin-card { padding: 14px; border-radius: 19px; margin-bottom: 14px; }
-  .card-icon { width: 34px; height: 34px; border-radius: 13px; }
-  .admin-card h2, .admin-card h3 { font-size: 15px; }
-  .admin-card p { font-size: 12px; }
-  .status-display {
-    padding: 11px;
-    border-radius: 16px;
-  }
-  .status-select-wrap {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 11px;
-    border-radius: 16px;
-  }
-  .status-select { width: 100%; padding: 11px 38px 11px 11px; }
-  .status-select-wrap::after { right: 24px; bottom: 21px; }
-  .notify-menu { width: calc(100vw - 20px); right: -2px; }
+  .notify-menu { width: calc(100vw - 24px); right: -4px; }
 }
 
-@media (max-width: 360px) {
-  .admin-header h1 { font-size: 22px; }
-  .summary-pill { min-width: 92px; }
-  .admin-container { padding-left: 8px; padding-right: 8px; }
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* Selection */
+::selection {
+  background: var(--accent-glow);
+  color: var(--accent-light);
+}
 </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
 
-<div class="admin-container">
+<div class="admin-wrapper">
 
-  <!-- Top Bar -->
-  <div class="admin-topbar">
-    <a href="/" target="_self" class="back-link">← Back to App</a>
-    <div class="notify-wrap">
-      <button type="button" class="notify-bell" id="notifyBellBtn" onclick="toggleNotifyMenu()" aria-label="Bracket alerts">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"></path></svg>
-        <span class="notify-count" id="notifyCount">0</span>
-      </button>
-      <div class="notify-menu" id="notifyMenu">
-        <div class="notify-menu-head">
-          <div>
-            <div class="notify-menu-title">Bracket Alerts</div>
-            <div class="notify-menu-sub">Payment proofs and submitted brackets</div>
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <div class="nav-left">
+      <div class="nav-logo">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4h10v4a5 5 0 01-5 5 5 5 0 01-5-5V4z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 13v8M5 6H3a3 3 0 003 3M19 6h2a3 3 0 01-3 3"/>
+        </svg>
+      </div>
+      <div class="nav-title">Bracket League <span>Admin</span></div>
+    </div>
+    <div class="nav-right">
+      <a href="/" target="_self" class="nav-btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span>Back to App</span>
+      </a>
+      <div class="notify-wrap">
+        <button type="button" class="notify-bell" id="notifyBellBtn" onclick="toggleNotifyMenu()" aria-label="Bracket alerts">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"/></svg>
+          <span class="notify-count" id="notifyCount">0</span>
+        </button>
+        <div class="notify-menu" id="notifyMenu">
+          <div class="notify-menu-head">
+            <div>
+              <div class="notify-menu-title">Live Alerts</div>
+              <div class="notify-menu-sub">Payment proofs &amp; bracket submissions</div>
+            </div>
+            <span class="realtime-status"><span class="realtime-status-dot" id="realtimeStatusDot"></span><span id="realtimeStatusText">Connecting</span></span>
           </div>
-          <span class="realtime-status"><span class="realtime-status-dot" id="realtimeStatusDot"></span><span id="realtimeStatusText">Connecting</span></span>
-        </div>
-        <div class="realtime-feed" id="realtimeFeed">
-          <div class="realtime-empty">Waiting for player activity…</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Premium Header -->
-  <div class="admin-header">
-    <div class="admin-header-top">
-      <div class="admin-title-wrap">
-        <div class="admin-logo" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4h10v4a5 5 0 01-5 5 5 5 0 01-5-5V4z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 13v8M5 6H3a3 3 0 003 3M19 6h2a3 3 0 01-3 3"></path>
-          </svg>
-        </div>
-        <div>
-          <div class="admin-eyebrow">World Cup Prediction League</div>
-          <h1>Bracket Control Center</h1>
-          <p class="admin-subtitle">Manage bracket status, payment approvals, teams, winners, auto-advance and leaderboard scoring from one focused admin workspace.</p>
+          <div class="realtime-feed" id="realtimeFeed">
+            <div class="realtime-empty">Waiting for player activity...</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Sticky Summary -->
-  <div class="sticky-admin-summary" aria-label="Bracket admin quick summary">
-    <div class="summary-row">
-      <div class="summary-pill">
-        <div class="stat-num" id="statTotal">0</div>
-        <div class="stat-label">Total Entries</div>
-      </div>
-      <div class="summary-pill">
-        <div class="stat-num" id="statPaid">0</div>
-        <div class="stat-label">Paid</div>
-      </div>
-      <div class="summary-pill">
-        <div class="stat-num" id="statSubmitted">0</div>
-        <div class="stat-label">Submitted</div>
-      </div>
-      <div class="summary-pill">
-        <div class="stat-num" id="statRevenue">Nu. 0</div>
-        <div class="stat-label">Revenue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quick Navigation -->
-  <nav class="quick-nav" aria-label="Admin shortcuts">
-    <a href="#status-control" target="_self">Status</a>
-    <a href="#payments" target="_self">Payments</a>
-    <a href="#teams" target="_self">Teams</a>
-    <a href="#results" target="_self">Results</a>
-    <a href="#leaderboard" target="_self">Leaderboard</a>
-    <a href="#setup" target="_self">Setup</a>
   </nav>
 
-  <!-- Messages -->
-  <div class="success-banner" id="successMsg"></div>
-  <div class="error-banner" id="errorMsg"></div>
+  <!-- Header -->
+  <header class="admin-header">
+    <h1 class="header-title">Control Center</h1>
+    <p class="header-subtitle">Manage bracket status, payments, teams, match results, and scoring from one unified workspace.</p>
+  </header>
 
-  <!-- Status Control -->
-  <section class="admin-card" id="status-control">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z"></path></svg>
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Total Entries</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Paid</div>
+      <div class="stat-value" id="statPaid">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Submitted</div>
+      <div class="stat-value" id="statSubmitted">0</div>
+    </div>
+    <div class="stat-card revenue">
+      <div class="stat-label">Revenue</div>
+      <div class="stat-value revenue" id="statRevenue">Nu. 0</div>
+    </div>
+  </div>
+
+  <!-- Section Tabs -->
+  <div class="section-tabs" id="sectionTabs">
+    <button class="tab-btn active" data-section="status" onclick="switchSection('status')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z"/></svg>
+      Status
+    </button>
+    <button class="tab-btn" data-section="payments" onclick="switchSection('payments')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-8 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      Payments
+    </button>
+    <button class="tab-btn" data-section="teams" onclick="switchSection('teams')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.1 2.1 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Teams
+    </button>
+    <button class="tab-btn" data-section="results" onclick="switchSection('results')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      Results
+    </button>
+    <button class="tab-btn" data-section="leaderboard" onclick="switchSection('leaderboard')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M7 17V9m5 8V5m5 12v-6"/></svg>
+      Leaderboard
+    </button>
+    <button class="tab-btn" data-section="setup" onclick="switchSection('setup')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      Setup
+    </button>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alert alert-success" id="successMsg"></div>
+  <div class="alert alert-error" id="errorMsg"></div>
+
+  <!-- Status Section -->
+  <section class="section active" id="status-section">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Status Control</div>
+            <div class="card-desc">Control what players can see and do in the bracket league.</div>
+          </div>
         </div>
-        <div>
-          <h3>Status Control</h3>
-          <p>Control what players can see and do in the bracket league.</p>
-        </div>
+        <span class="card-badge">High Impact</span>
       </div>
-      <span class="card-note">High impact</span>
-    </div>
-    <div class="status-display">
-      <span>Current bracket status</span>
-      <span class="status-badge" id="bracketStatusBadge">loading...</span>
-    </div>
-    <div class="status-action-row">
-      <div class="status-select-wrap">
-        <label for="bracketStatusSelect">Change status</label>
-        <select id="bracketStatusSelect" class="status-select" onchange="adminSetStatus(this.value)">
+      <div class="status-bar">
+        <span class="status-label">Current bracket status</span>
+        <span class="status-badge" id="bracketStatusBadge">loading...</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="bracketStatusSelect">Change status</label>
+        <select id="bracketStatusSelect" class="form-select" onchange="adminSetStatus(this.value)">
           <option value="hidden">Hide from app</option>
           <option value="coming_soon">Coming Soon</option>
           <option value="open">Open Bracket</option>
@@ -994,121 +1224,187 @@ body {
     </div>
   </section>
 
-  <!-- Payment Confirmations -->
-  <section class="admin-card" id="payments">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-8 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+  <!-- Payments Section -->
+  <section class="section" id="payments-section">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-8 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Payment Confirmations</div>
+            <div class="card-desc">Review screenshots, confirm paid entries, or reject unclear payment proofs.</div>
+          </div>
         </div>
-        <div>
-          <h3>Payment Confirmations</h3>
-          <p>Review screenshots, confirm paid entries, or reject unclear payment proofs.</p>
-        </div>
+        <span class="card-badge">Review First</span>
       </div>
-      <span class="card-note">Review first</span>
-    </div>
-    <div id="paymentList">
-      <div class="loading-text">Loading payment proofs…</div>
-    </div>
-    <div class="admin-btn-group" style="margin-top:12px">
-      <button class="admin-btn" onclick="loadPaymentList()">Refresh Payments</button>
+      <div id="paymentList">
+        <div class="loading"><div class="spinner"></div> Loading payment proofs...</div>
+      </div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="loadPaymentList()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh Payments
+        </button>
+      </div>
     </div>
   </section>
 
-  <!-- Team Editor -->
-  <section class="admin-card" id="teams">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.1 2.1 0 113 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+  <!-- Teams Section -->
+  <section class="section" id="teams-section">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.1 2.1 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Edit Teams</div>
+            <div class="card-desc">Replace placeholder slots after the group stage. Flags auto-detect from team names.</div>
+          </div>
         </div>
-        <div>
-          <h3>Edit Teams</h3>
-          <p>Replace placeholder slots after the group stage. Flags auto-detect from team names.</p>
+        <span class="card-badge">R32 to Champion</span>
+      </div>
+      <div id="teamEditor">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.1 2.1 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+          <div class="empty-state-title">No slots yet</div>
+          <div class="empty-state-desc">Click Refresh Teams to load bracket slots</div>
         </div>
       </div>
-      <span class="card-note">R32 → Champion</span>
-    </div>
-    <div id="teamEditor">
-      <div class="loading-text">Click Refresh Teams to view slots</div>
-    </div>
-    <div class="admin-btn-group" style="margin-top:12px">
-      <button class="admin-btn" onclick="loadTeamEditor()">Refresh Teams</button>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="loadTeamEditor()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh Teams
+        </button>
+      </div>
     </div>
   </section>
 
-  <!-- Winner Entry -->
-  <section class="admin-card" id="results">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+  <!-- Results Section -->
+  <section class="section" id="results-section">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon success">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Enter Match Results</div>
+            <div class="card-desc">Select the winning team after each knockout match. Auto-advance and scoring will update.</div>
+          </div>
         </div>
-        <div>
-          <h3>Enter Match Results</h3>
-          <p>Select the winning team after each knockout match. Auto-advance and scoring will update.</p>
+        <span class="card-badge">After Match</span>
+      </div>
+      <div id="resultEntry">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          </div>
+          <div class="empty-state-title">No matches loaded</div>
+          <div class="empty-state-desc">Click Refresh Results to view matches</div>
         </div>
       </div>
-      <span class="card-note">After match</span>
-    </div>
-    <div id="resultEntry">
-      <div class="loading-text">Click Refresh Results to view matches</div>
-    </div>
-    <div class="admin-btn-group" style="margin-top:12px">
-      <button class="admin-btn" onclick="loadResultEntry()">Refresh Results</button>
-      <button class="admin-btn success" onclick="adminRecalculateScores()">Recalculate Scores</button>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="loadResultEntry()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh Results
+        </button>
+        <button class="btn btn-success" onclick="adminRecalculateScores()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Recalculate Scores
+        </button>
+      </div>
     </div>
   </section>
 
-  <!-- Leaderboard -->
-  <section class="admin-card" id="leaderboard">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M7 17V9m5 8V5m5 12v-6"></path></svg>
-        </div>
-        <div>
-          <h3>Bracket Leaderboard</h3>
-          <p>View current points, champion picks and correct bracket picks.</p>
+  <!-- Leaderboard Section -->
+  <section class="section" id="leaderboard-section">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon info">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M7 17V9m5 8V5m5 12v-6"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Bracket Leaderboard</div>
+            <div class="card-desc">View current points, champion picks and correct bracket picks.</div>
+          </div>
         </div>
       </div>
-    </div>
-    <div id="leaderboardView">
-      <div class="loading-text">Click Refresh Leaderboard to view rankings</div>
-    </div>
-    <div class="admin-btn-group" style="margin-top:12px">
-      <button class="admin-btn" onclick="loadLeaderboard()">Refresh Leaderboard</button>
+      <div id="leaderboardView">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M7 17V9m5 8V5m5 12v-6"/></svg>
+          </div>
+          <div class="empty-state-title">No entries yet</div>
+          <div class="empty-state-desc">Click Refresh Leaderboard to view rankings</div>
+        </div>
+      </div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="loadLeaderboard()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh Leaderboard
+        </button>
+      </div>
     </div>
   </section>
 
-  <!-- Seed Slots -->
-  <section class="admin-card danger-zone" id="setup">
-    <div class="card-head">
-      <div class="card-title">
-        <div class="card-icon" aria-hidden="true">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path></svg>
+  <!-- Setup Section -->
+  <section class="section" id="setup-section">
+    <div class="card danger-zone">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon danger">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Setup &amp; Danger Zone</div>
+            <div class="card-desc">Seed bracket slots, configure auto-advance, or clear all slots. Use carefully.</div>
+          </div>
         </div>
-        <div>
-          <h3>Setup & Danger Zone</h3>
-          <p>Seed bracket slots, configure auto-advance, or clear all slots. Use carefully.</p>
-        </div>
+        <span class="card-badge">Admin Only</span>
       </div>
-      <span class="card-note">Admin only</span>
-    </div>
-    <div class="admin-btn-group">
-      <button class="admin-btn" onclick="adminSeedSlots()">Seed Bracket Slots</button>
-      <button class="admin-btn" onclick="adminConfigureAdvancement()">Configure Auto-Advance</button>
-      <button class="admin-btn danger" onclick="adminClearSlots()">Clear All Slots</button>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="adminSeedSlots()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          Seed Bracket Slots
+        </button>
+        <button class="btn btn-primary" onclick="adminConfigureAdvancement()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Configure Auto-Advance
+        </button>
+        <button class="btn btn-danger" onclick="adminClearSlots()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Clear All Slots
+        </button>
+      </div>
     </div>
   </section>
 
 </div>
 
-<!-- ============================================
-     JAVASCRIPT - SELF-CONTAINED
-     ============================================ -->
+<!-- Live Toast -->
+<div class="live-toast" id="adminLiveToast">
+  <div class="live-toast-title" id="liveToastTitle">Update</div>
+  <div class="live-toast-body" id="liveToastBody"></div>
+</div>
+
 <script>
+// ============================================
+// SECTION NAVIGATION
+// ============================================
+function switchSection(sectionId) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'))
+  document.getElementById(sectionId + '-section')?.classList.add('active')
+  document.querySelector(`[data-section="${sectionId}"]`)?.classList.add('active')
+}
+
+
 // ============================================
 // CONFIG
 // ============================================
@@ -1123,14 +1419,14 @@ const supabaseClient = window.supabaseClient || supabase.createClient(SUPABASE_U
 // ============================================
 function showSuccess(msg) {
   const el = document.getElementById('successMsg')
-  el.textContent = msg
+  el.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ${adminEscapeHtml(msg)}`
   el.classList.add('show')
   setTimeout(() => el.classList.remove('show'), 3000)
 }
 
 function showError(msg) {
   const el = document.getElementById('errorMsg')
-  el.textContent = msg
+  el.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg> ${adminEscapeHtml(msg)}`
   el.classList.add('show')
   setTimeout(() => el.classList.remove('show'), 5000)
   console.error(msg)
@@ -1635,16 +1931,17 @@ async function loadTeamEditor() {
       const roundSlots = slots.filter(s => s.round === round)
       if (!roundSlots.length) continue
 
-      html += `<div class="round-header-editor">${label}</div>`
+      html += `<div class="round-section"><div class="round-header">${label}</div>`
       html += roundSlots.map(slot => `
-        <div class="team-edit-row">
-          <div class="slot-label">${slot.slot_label}</div>
-          <input type="text" placeholder="Team A" value="${slot.team_a || ''}" 
+        <div class="team-row">
+          <div class="team-label">${slot.slot_label}</div>
+          <input type="text" class="team-input" placeholder="Team A" value="${slot.team_a || ''}" 
                  onchange="updateSlotTeam('${slot.id}', 'team_a', this.value)">
-          <input type="text" placeholder="Team B" value="${slot.team_b || ''}" 
+          <input type="text" class="team-input" placeholder="Team B" value="${slot.team_b || ''}" 
                  onchange="updateSlotTeam('${slot.id}', 'team_b', this.value)">
         </div>
       `).join('')
+      html += `</div>`
     }
     container.innerHTML = html
   } catch (err) {
@@ -1685,10 +1982,10 @@ async function loadResultEntry() {
     }
 
     container.innerHTML = matches.map(slot => `
-      <div class="result-row">
+      <div class="match-row">
         <div class="match-info">
-          <div class="match-teams-text">${slot.team_a || 'TBD'} vs ${slot.team_b || 'TBD'}</div>
-          <div class="match-round">${slot.slot_label} · ${slot.points_value} pts${slot.next_slot_id ? ' · advances to next round' : ''}</div>
+          <div class="match-teams">${slot.team_a || 'TBD'} vs ${slot.team_b || 'TBD'}</div>
+          <div class="match-meta">${slot.slot_label} · ${slot.points_value} pts${slot.next_slot_id ? ' · advances to next round' : ''}</div>
         </div>
         <div class="winner-select">
           <button class="winner-btn ${slot.winner === 'team_a' ? 'selected' : ''}" 
@@ -1697,7 +1994,7 @@ async function loadResultEntry() {
           <button class="winner-btn ${slot.winner === 'team_b' ? 'selected' : ''}" 
                   onclick="setWinner('${slot.id}', 'team_b')"
                   ${!slot.team_b ? 'disabled' : ''}>${slot.team_b || 'B'}</button>
-          ${slot.winner ? `<button class="winner-btn danger-mini" onclick="setWinner('${slot.id}', null)">Clear</button>` : ''}
+          ${slot.winner ? `<button class="winner-btn clear" onclick="setWinner('${slot.id}', null)">Clear</button>` : ''}
         </div>
       </div>
     `).join('')
@@ -1767,7 +2064,7 @@ async function loadPaymentList() {
 
     container.innerHTML = relevant.map(e => {
       const status = e.payment_status || 'pending'
-      const statusClass = status === 'rejected' ? 'status-rejected' : status === 'paid' ? 'status-paid' : 'status-pending'
+      const statusClass = status
       const proofUrl = e.payment_proof_url || ''
       const note = e.payment_note || ''
       const submitted = formatAdminDate(e.payment_submitted_at)
@@ -1775,27 +2072,29 @@ async function loadPaymentList() {
       const userLabel = getProfileDisplay(profile, e.user_id)
       const whatsapp = profile?.whatsapp || ''
       return `
-        <div class="payment-proof-row">
-          <div class="payment-proof-main">
-            <div class="payment-proof-topline">
-              <span class="player-name">${adminEscapeHtml(userLabel)}</span>
+        <div class="payment-card">
+          <div class="payment-main">
+            <div class="payment-topline">
+              <span class="payment-name">${adminEscapeHtml(userLabel)}</span>
               <span class="payment-status ${statusClass}">${adminEscapeHtml(status)}</span>
             </div>
-            <div class="payment-proof-meta">User ID: ${adminEscapeHtml(e.user_id || '-')}</div>
-            ${whatsapp ? `<div class="payment-proof-meta">WhatsApp: ${adminEscapeHtml(whatsapp)}</div>` : ''}
-            <div class="payment-proof-meta">Submitted: ${adminEscapeHtml(submitted)}</div>
-            ${note ? `<div class="payment-proof-note">Note: ${adminEscapeHtml(note)}</div>` : ''}
-            ${e.payment_rejected_reason ? `<div class="payment-proof-reason">Rejected reason: ${adminEscapeHtml(e.payment_rejected_reason)}</div>` : ''}
+            <div class="payment-meta">User ID: ${adminEscapeHtml(e.user_id || '-')}</div>
+            ${whatsapp ? `<div class="payment-meta">WhatsApp: ${adminEscapeHtml(whatsapp)}</div>` : ''}
+            <div class="payment-meta">Submitted: ${adminEscapeHtml(submitted)}</div>
+            ${note ? `<div class="payment-note">Note: ${adminEscapeHtml(note)}</div>` : ''}
+            ${e.payment_rejected_reason ? `<div class="payment-reason">Rejected reason: ${adminEscapeHtml(e.payment_rejected_reason)}</div>` : ''}
           </div>
           ${proofUrl ? `
-            <a href="${adminEscapeHtml(proofUrl)}" target="_blank" rel="noopener" class="proof-thumb-link">
-              <img src="${adminEscapeHtml(proofUrl)}" class="proof-thumb" alt="Payment proof">
-              <span>Open proof</span>
-            </a>
-          ` : '<div class="payment-proof-meta">No screenshot</div>'}
-          <div class="payment-proof-actions">
-            <button class="confirm-pay-btn" onclick="confirmPayment('${e.user_id}')">Confirm</button>
-            <button class="reject-pay-btn" onclick="rejectPayment('${e.user_id}')">Reject</button>
+            <div class="payment-thumb">
+              <a href="${adminEscapeHtml(proofUrl)}" target="_blank" rel="noopener">
+                <img src="${adminEscapeHtml(proofUrl)}" alt="Payment proof">
+              </a>
+              <a href="${adminEscapeHtml(proofUrl)}" target="_blank" rel="noopener">Open proof</a>
+            </div>
+          ` : '<div class="payment-meta">No screenshot</div>'}
+          <div class="payment-actions">
+            <button class="btn btn-success btn-sm" onclick="confirmPayment('${e.user_id}')">Confirm</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectPayment('${e.user_id}')">Reject</button>
           </div>
         </div>
       `
@@ -1974,6 +2273,7 @@ async function initAdmin() {
 
 // Run on load
 initAdmin()
+
 </script>
 
 </body>

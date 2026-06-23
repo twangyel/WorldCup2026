@@ -2384,7 +2384,7 @@
   position: absolute !important;
   top: 10px !important;
   right: 10px !important;
-  z-index: 2147483002 !important;
+  z-index: 20 !important;
   padding: 5px 10px !important;
   border-radius: 999px !important;
   background: linear-gradient(135deg, #f59e0b, #facc15) !important;
@@ -2440,7 +2440,7 @@
   content: '' !important;
   position: absolute !important;
   inset: -8px !important;
-  z-index: 2147483600 !important;
+  z-index: 12 !important;
   background: #f8fafc !important;
   opacity: 1 !important;
   visibility: visible !important;
@@ -2453,7 +2453,7 @@
   content: 'Loading…' !important;
   position: absolute !important;
   inset: 0 !important;
-  z-index: 2147483601 !important;
+  z-index: 13 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -2485,7 +2485,7 @@
 #homeBracketLeagueCard .bracket-home-status-overlay {
   position: absolute !important;
   inset: -8px !important;
-  z-index: 2147483000 !important;
+  z-index: 18 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -2518,4 +2518,12 @@
   opacity: 1 !important;
   visibility: visible !important;
   filter: none !important;
+}
+
+
+/* Bracket Home visibility guard: never let admin-preview badges escape above the splash/preload screen. */
+body:has(#loading-screen:not(.splash-exit)) .admin-preview-badge,
+#app-shell.hidden .admin-preview-badge,
+#app-shell.screen-preloading .admin-preview-badge {
+  display: none !important;
 }

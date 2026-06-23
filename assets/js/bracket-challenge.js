@@ -820,7 +820,7 @@ function applyHomeBracketStatusOverlay() {
 
     const overlayKey = `${status}:${hasSubmitted ? 'submitted' : 'not-submitted'}:${bracketState.settings?.lock_at || ''}`;
     if (existing && existing.dataset.overlayKey === overlayKey) {
-      existing.style.zIndex = '2147483000';
+      existing.style.zIndex = '20';
       existing.style.display = 'flex';
       existing.style.filter = 'none';
       if (shouldRunBracketCountdown()) startLiveCountdown(resolveBracketLockAt());
@@ -868,7 +868,7 @@ function applyHomeBracketStatusOverlay() {
     overlay.style.cssText = `
       position:absolute !important;
       inset:0 !important;
-      z-index:2147483000 !important;
+      z-index:20 !important;
       display:flex !important;
       align-items:center !important;
       justify-content:center !important;
@@ -884,7 +884,7 @@ function applyHomeBracketStatusOverlay() {
       pointer-events:auto !important;
     `;
     overlay.innerHTML = `
-      <div class="bracket-overlay-foreground" style="position:relative !important;z-index:2147483001 !important;display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;width:100% !important;max-width:290px !important;text-align:center !important;filter:none !important;opacity:1 !important;transform:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;">
+      <div class="bracket-overlay-foreground" style="position:relative !important;z-index:21 !important;display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;width:100% !important;max-width:290px !important;text-align:center !important;filter:none !important;opacity:1 !important;transform:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;">
         <div class="bracket-overlay-icon">${icon}</div>
         <div class="bracket-overlay-title">${title}</div>
         <div class="bracket-overlay-subtitle">${subtitle}</div>
@@ -1113,14 +1113,14 @@ async function renderBracketCard() {
   card.innerHTML = `
     ${showOverlay ? `
       <div class="bracket-locked-overlay ${isComingSoon ? 'coming-soon' : 'locked'}" style="
-        position:absolute; inset:-2px; z-index:9999;
+        position:absolute; inset:-2px; z-index:20;
         display:flex; flex-direction:column; align-items:center; justify-content:center;
         padding:22px; text-align:center; border-radius:0;
         background:${isComingSoon ? 'rgba(248,250,252,.985)' : 'rgba(241,245,249,.985)'};
         backdrop-filter:none; -webkit-backdrop-filter:none;
         color:#1e293b; box-sizing:border-box; border:0; box-shadow:none;
       ">
-        <div class="bracket-overlay-foreground" style="position:relative;z-index:100001;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;filter:none !important;opacity:1 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;transform:translateZ(0);">
+        <div class="bracket-overlay-foreground" style="position:relative;z-index:21;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;filter:none !important;opacity:1 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;transform:translateZ(0);">
           <div class="locked-icon" style="font-size:42px;margin-bottom:10px;line-height:1;filter:none !important;opacity:1 !important;">${overlayIcon}</div>
           <div class="locked-title" style="font-size:18px;font-weight:900;margin-bottom:6px;color:#1e293b;filter:none !important;opacity:1 !important;">${overlayTitle}</div>
           <div class="locked-subtitle" style="font-size:13px;color:#475569;line-height:1.45;margin-bottom:0;filter:none !important;opacity:1 !important;">${overlaySubtitle}</div>
