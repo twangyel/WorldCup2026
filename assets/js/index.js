@@ -10779,10 +10779,8 @@ loadRememberedEmail()
 
      .lb-row.lb-v2-row[data-rank="1"] .lb-v2-points .points-num,
       .lb-podium-player.rank-1 .lb-podium-points {
-        animation: lbPointsBreath 2.65s ease-in-out infinite !important;
         transform-origin: center !important;
-        will-change: transform, text-shadow !important;
-      }s
+      }
 
       @keyframes lbPointsBreath {
         0%, 100% { transform: translateZ(0) scale(1); text-shadow: 0 0 0 rgba(18,52,90,0); }
