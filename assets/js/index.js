@@ -1942,6 +1942,7 @@ return `
         })
       }
       updatePredictionCount()
+      refreshProfileHeaderIfVisible('prediction_saved')
       patchFixtureCardAfterPredictionSave(id, submittedAt)
     }
 
@@ -6201,6 +6202,7 @@ function schedulePostResultRefresh(reason = 'result') {
         ])
         if (typeof loadLeaderboard === 'function') await loadLeaderboard()
         if (typeof loadHome === 'function') loadHome()
+        if (typeof refreshProfileHeaderIfVisible === 'function') refreshProfileHeaderIfVisible(reason)
         if (delay >= 1200 && typeof loadFixtures === 'function') loadFixtures()
       } catch (e) {
         console.warn('[post-result-refresh] failed:', reason, e)
@@ -6270,7 +6272,7 @@ function schedulePostResultRefresh(reason = 'result') {
       // Also refresh social caches so Hot Takes pick up the new points.
       Promise.all([refreshMyResultsCache(), refreshSocialCaches()]).then(() => {
         invalidateSnapshotCache()
-        loadLeaderboard(); loadHome(); loadFixtures()
+        loadLeaderboard(); loadHome(); loadFixtures(); refreshProfileHeaderIfVisible('prediction_results')
         schedulePostResultRefresh('prediction_results')
       })
     })
@@ -6292,6 +6294,7 @@ function schedulePostResultRefresh(reason = 'result') {
       invalidateSnapshotCache()
       loadLeaderboard()
       loadHome()
+      refreshProfileHeaderIfVisible('fixtures')
       if (payload.eventType === 'UPDATE' && payload.new?.home_score !== null && payload.new?.away_score !== null) {
         schedulePostResultRefresh('fixtures')
       }
@@ -7040,24 +7043,46 @@ async function updateProfileHeader() {
   }
 
   try {
+    // Profile header stats must use the same live source as the main leaderboard.
+    // getLeaderboard() can read older profile/summary values, which made the Me-card
+    // rank and points drift away from the actual leaderboard after recalculation.
+    const leaderboardPromise = (typeof getLeaderboardFromResults === 'function')
+      ? getLeaderboardFromResults()
+      : getLeaderboard()
+
     const [{ data: stats }, { data: myPreds }] = await Promise.all([
-      getLeaderboard(),
+      leaderboardPromise,
       getMyPredictions()
     ])
 
-    let myIdx = stats?.findIndex(s => s.user_id === myId || s.id === myId) ?? -1
-    if (myIdx === -1 && stats?.length) myIdx = stats.findIndex(s => s.id === myId)
+    const rows = Array.isArray(stats) ? stats : []
+    const myIdx = rows.findIndex(s => (s.user_id || s.id) === myId)
+    const me = myIdx >= 0 ? rows[myIdx] : null
 
     const rankEl = document.getElementById('profile-header-rank')
     const ptsEl = document.getElementById('profile-header-points')
     const predEl = document.getElementById('profile-header-predictions')
 
+    // Rank + points = current leaderboard.
+    // Predictions = raw submitted picks, so upcoming saved picks are counted too.
+    const predictionCount = Array.isArray(myPreds) ? myPreds.length : (me?.total_predictions ?? 0)
+
     if (rankEl) rankEl.textContent = myIdx >= 0 ? '#' + (myIdx + 1) : '—'
-    if (ptsEl) ptsEl.textContent = stats?.[myIdx]?.points || '0'
-    if (predEl) predEl.textContent = myPreds?.length || '0'
+    if (ptsEl) ptsEl.textContent = String(Number(me?.points ?? 0) || 0)
+    if (predEl) predEl.textContent = String(Number(predictionCount) || 0)
   } catch (e) {
     console.warn('Could not load header stats:', e)
   }
+}
+
+function refreshProfileHeaderIfVisible(reason = 'update') {
+  const profileTab = document.getElementById('tab-profile')
+  if (!profileTab || profileTab.classList.contains('hidden') || previewMode) return
+  if (typeof updateProfileHeader !== 'function') return
+
+  updateProfileHeader().catch(e => {
+    console.warn('[profile] live header refresh failed:', reason, e)
+  })
 }
 
 async function updateProfileCards() {
