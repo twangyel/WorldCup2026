@@ -5633,40 +5633,65 @@ function buildLeaderboardFormDots(form = []) {
   return `<span class="lb-form-dots" title="${label}" aria-label="${label}">${values.map(v => `<span class="lb-form-dot ${escapeHtml(v || 'idle')}"></span>`).join('')}</span>`
 }
 
-function podiumName(name) {
-  // Podium has enough space for the real name. Keep it full and let CSS wrap to 2 lines.
-  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
-  return clean.split(/\s+/).map(part => {
-    if (!part) return part
-    if (part.length <= 2 && part === part.toUpperCase()) return part
-    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-  }).join(' ')
+function titleCaseNameToken(token) {
+  if (!token) return token
+
+  // Preserve short all-caps tokens like initials/department-style names.
+  if (token.length <= 2 && token === token.toUpperCase()) return token
+
+  const chars = Array.from(token)
+  if (!chars.length) return token
+  return chars[0].toUpperCase() + chars.slice(1).join('').toLowerCase()
 }
 
-function leaderboardDisplayName(name) {
-  const clean = String(name || 'Anonymous').trim() || 'Anonymous'
-  const parts = clean.split(/\s+/).filter(Boolean)
+function initialNameToken(token, withDot = false) {
+  const first = Array.from(String(token || '').trim())[0] || ''
+  return first ? `${first.toUpperCase()}${withDot ? '.' : ''}` : token
+}
 
-  // Keep short names and emoji-style names readable.
-  // Example: "Wolf 🐺 Prince" stays full because only 2 real word tokens exist.
+function compactPlayerDisplayName(name, options = {}) {
+  const clean = String(name || 'Anonymous').trim().replace(/\s+/g, ' ') || 'Anonymous'
+  const parts = clean.split(' ').filter(Boolean).map(titleCaseNameToken)
+
+  // Only count real word tokens, so emojis/symbols do not break the name rule.
   const wordLike = token => /[A-Za-zÀ-ÖØ-öø-ÿĀ-ſƀ-ɏ一-龯가-힣ぁ-ゟ゠-ヿ]/.test(token)
   const wordIndexes = parts
     .map((token, index) => ({ token, index }))
     .filter(item => wordLike(item.token))
     .map(item => item.index)
 
-  if (wordIndexes.length <= 2) return clean
+  if (wordIndexes.length <= 2) return parts.join(' ')
 
-  const shortened = parts.map((token, index) => {
+  const maxLen = Number(options.maxLen || 16)
+
+  // Normal compact rule requested: keep first two names, show the 3rd name onwards as initials.
+  // Example: "Sonam Tshewang Dorji" -> "Sonam Tshewang D".
+  const thirdInitialName = parts.map((token, index) => {
     const wordPosition = wordIndexes.indexOf(index)
-    if (wordPosition <= 1) return token
+    if (wordPosition === -1 || wordPosition <= 1) return token
+    return initialNameToken(token, false)
+  }).join(' ')
 
-    // For the 3rd real word onward, show initial only.
-    const first = Array.from(token)[0] || ''
-    return first ? `${first.toUpperCase()}.` : token
-  })
+  if (thirdInitialName.length <= maxLen) return thirdInitialName
 
-  return shortened.join(' ')
+  // Extra mobile fallback: if the first two names alone are too long, keep the first name
+  // and initials for the rest so CSS never shows "..." beside the trend column.
+  return parts.map((token, index) => {
+    const wordPosition = wordIndexes.indexOf(index)
+    if (wordPosition === -1 || wordPosition === 0) return token
+    return initialNameToken(token, false)
+  }).join(' ')
+}
+
+function podiumName(name) {
+  // Podium is wider, but still compact 3-word names so "YOU" does not wrap awkwardly.
+  return compactPlayerDisplayName(name, { maxLen: 18 })
+}
+
+function leaderboardDisplayName(name) {
+  // Mobile leaderboard rows: third name becomes first letter; if still too long,
+  // the second name also becomes an initial as a last-resort mobile fallback.
+  return compactPlayerDisplayName(name, { maxLen: 16 })
 }
 
 function leaderboardTop3Html(stats, myId) {
