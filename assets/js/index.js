@@ -3811,69 +3811,82 @@ recentEl.innerHTML = finished.map(f => {
     let _snapshotCacheAt = 0
     const SNAPSHOT_CACHE_MS = 60 * 1000  // refetch at most once a minute
 
-    async function getLatestRankSnapshot() {
-      if (_snapshotCache && Date.now() - _snapshotCacheAt < SNAPSHOT_CACHE_MS) {
-        return _snapshotCache
-      }
+async function getLatestRankSnapshot() {
+  if (_snapshotCache && Date.now() - _snapshotCacheAt < SNAPSHOT_CACHE_MS) {
+    return _snapshotCache
+  }
 
-      // Determine which baseline the leaderboard SHOULD diff against:
-      // it's the baseline keyed to the CURRENT matchday — i.e. the date of
-      // the latest finished fixture. The forward-stamp step at end of each
-      // publish creates baselines for FUTURE matchdays; we must not pick
-      // those, or every trend would be (current vs current) = no arrows.
-      let currentMatchKey = null
-      try {
-        const latestFinished = (fixtures || [])
-          .filter(f => f.home_score !== null && f.away_score !== null)
-          .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))[0]
-        if (latestFinished) {
-          currentMatchKey = new Date(latestFinished.kickoff).toDateString()
-        }
-      } catch (e) { /* fixtures not loaded yet — fall through to fallback */ }
-
-      let snapshot = null
-
-      if (currentMatchKey) {
-        const { data, error } = await supabaseClient
-          .from('rank_snapshots')
-          .select('match_key, ranks, stamped_at')
-          .eq('match_key', currentMatchKey)
-          .maybeSingle()
-        if (error) {
-          console.warn('[trend] snapshot fetch by match_key failed:', error.message)
-        } else if (data) {
-          snapshot = data
-        }
-      }
-
-      // Fallback: legacy "latest by stamped_at" — only when we can't determine
-      // the current matchday (e.g. fixtures not yet loaded) or no matching
-      // baseline exists. Logs a warning so the missing baseline is visible.
-      if (!snapshot) {
-        const { data, error } = await supabaseClient
-          .from('rank_snapshots')
-          .select('match_key, ranks, stamped_at')
-          .order('stamped_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (error) {
-          console.warn('[trend] snapshot fetch (fallback) failed:', error.message)
-          return null
-        }
-        snapshot = data || null
-        if (snapshot && currentMatchKey) {
-          console.warn(
-            `[trend] no baseline for current matchday "${currentMatchKey}"; ` +
-            `falling back to most recent stamp "${snapshot.match_key}". ` +
-            `Arrows may be off until the missing baseline is created.`
-          )
-        }
-      }
-
-      _snapshotCache = snapshot
-      _snapshotCacheAt = Date.now()
-      return _snapshotCache
+  // Determine which baseline the leaderboard should diff against.
+  //
+  // Design contract (see admin.html executeRecalcAll):
+  //   After publishing matchday N, the admin code forward-stamps a baseline
+  //   keyed to matchday N+1 containing the POST-recalc standings (= end of
+  //   matchday N state). This row is the baseline FOR matchday N+1.
+  //
+  // The leaderboard the user is looking at right now reflects "end of last
+  // published matchday" — which equals matchday N+1's baseline. So:
+  //   - currentMatchKey = date of the NEXT UPCOMING fixture (matchday N+1)
+  //   - Diffing live ranks against that row should yield mostly flat arrows
+  //     until matchday N+1 is itself published (at which point a NEW baseline
+  //     for N+2 gets stamped, and arrows reflect N+1's movement).
+  //
+  // The previous version of this function used the LATEST FINISHED fixture's
+  // date — that picks the pre-publish baseline of the just-published matchday,
+  // so arrows showed the movement caused by THIS publish, which is wrong:
+  // by the time a user opens the leaderboard, that movement is already baked
+  // into the current ranks they are viewing.
+  let currentMatchKey = null
+  try {
+    const nextUpcoming = (fixtures || [])
+      .filter(f => f.home_score === null && f.away_score === null)
+      .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0]
+    if (nextUpcoming) {
+      currentMatchKey = new Date(nextUpcoming.kickoff).toDateString()
     }
+  } catch (e) { /* fixtures not loaded yet — fall through to fallback */ }
+
+  let snapshot = null
+
+  if (currentMatchKey) {
+    const { data, error } = await supabaseClient
+      .from('rank_snapshots')
+      .select('match_key, ranks, stamped_at')
+      .eq('match_key', currentMatchKey)
+      .maybeSingle()
+    if (error) {
+      console.warn('[trend] snapshot fetch by match_key failed:', error.message)
+    } else if (data) {
+      snapshot = data
+    }
+  }
+
+  // Fallback: legacy "latest by stamped_at" — only when we can't determine
+  // the next matchday (e.g. tournament is over, or fixtures not yet loaded).
+  if (!snapshot) {
+    const { data, error } = await supabaseClient
+      .from('rank_snapshots')
+      .select('match_key, ranks, stamped_at')
+      .order('stamped_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) {
+      console.warn('[trend] snapshot fetch (fallback) failed:', error.message)
+      return null
+    }
+    snapshot = data || null
+    if (snapshot && currentMatchKey) {
+      console.warn(
+        `[trend] no baseline for next matchday "${currentMatchKey}"; ` +
+        `falling back to most recent stamp "${snapshot.match_key}". ` +
+        `Arrows may be off until the missing baseline is created.`
+      )
+    }
+  }
+
+  _snapshotCache = snapshot
+  _snapshotCacheAt = Date.now()
+  return _snapshotCache
+}
 
     function invalidateSnapshotCache() {
       _snapshotCache = null
@@ -12101,4 +12114,295 @@ loadRememberedEmail()
   } else {
     inject();
   }
+})();
+
+/* ============================================================
+   TRUE FINAL FIX — Leaderboard right columns
+   2026-06-24e
+   Uses absolute positioning for Trend and PTS so they cannot collide.
+   ============================================================ */
+(function installLeaderboardAbsoluteRightFix20260624e() {
+  const STYLE_ID = 'wcpl-leaderboard-absolute-right-fix-20260624e';
+  const CSS = `
+/* ============================================================
+   TRUE FINAL FIX — Leaderboard right columns
+   2026-06-24e
+   Uses absolute right-side columns so TREND and PTS cannot merge,
+   and the pill cannot touch the points number.
+   ============================================================ */
+#leaderboard-list {
+  --lb-abs-rank-col: 70px;
+  --lb-abs-right-pad: 142px;
+  --lb-abs-trend-right: 86px;
+  --lb-abs-points-right: 18px;
+  --lb-abs-trend-width: 42px;
+  --lb-abs-points-width: 56px;
+  padding-bottom: 116px !important;
+}
+
+#leaderboard-list .lb-v2-table-head,
+.lb-v2-table-head {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: var(--lb-abs-rank-col) minmax(0, 1fr) !important;
+  column-gap: 8px !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 10px !important;
+  padding-right: var(--lb-abs-right-pad) !important;
+  overflow: visible !important;
+}
+
+#leaderboard-list .lb-row.lb-v2-row,
+.lb-row.lb-v2-row {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: var(--lb-abs-rank-col) minmax(0, 1fr) !important;
+  column-gap: 8px !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding-left: 8px !important;
+  padding-right: var(--lb-abs-right-pad) !important;
+  overflow: hidden !important;
+}
+
+#leaderboard-list .lb-v2-table-head span,
+.lb-v2-table-head span {
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  letter-spacing: .08em !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(1),
+.lb-v2-table-head span:nth-child(1) {
+  grid-column: 1 !important;
+  justify-self: start !important;
+  text-align: left !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(2),
+.lb-v2-table-head span:nth-child(2) {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  text-align: left !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(3),
+.lb-v2-table-head span:nth-child(3) {
+  display: block !important;
+  position: absolute !important;
+  right: var(--lb-abs-trend-right) !important;
+  width: var(--lb-abs-trend-width) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  text-align: center !important;
+  justify-self: auto !important;
+  grid-column: auto !important;
+}
+
+#leaderboard-list .lb-v2-table-head span:nth-child(4),
+.lb-v2-table-head span:nth-child(4) {
+  display: block !important;
+  position: absolute !important;
+  right: var(--lb-abs-points-right) !important;
+  width: var(--lb-abs-points-width) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  text-align: center !important;
+  justify-self: auto !important;
+  grid-column: auto !important;
+  padding: 0 !important;
+}
+
+#leaderboard-list .lb-v2-rank-avatar,
+.lb-v2-rank-avatar {
+  grid-column: 1 !important;
+  width: var(--lb-abs-rank-col) !important;
+  max-width: var(--lb-abs-rank-col) !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+#leaderboard-list .lb-v2-main,
+.lb-v2-main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+#leaderboard-list .lb-v2-name-line,
+.lb-v2-name-line,
+#leaderboard-list .lb-v2-stats,
+.lb-v2-stats,
+#leaderboard-list .lb-v2-chips,
+.lb-v2-chips {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+#leaderboard-list .lb-v2-trend,
+.lb-v2-trend {
+  position: absolute !important;
+  right: var(--lb-abs-trend-right) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--lb-abs-trend-width) !important;
+  min-width: var(--lb-abs-trend-width) !important;
+  max-width: var(--lb-abs-trend-width) !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  grid-column: auto !important;
+  justify-self: auto !important;
+  z-index: 8 !important;
+  pointer-events: none !important;
+}
+
+#leaderboard-list .lb-v2-trend .rank-trend,
+.lb-v2-trend .rank-trend {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  height: 21px !important;
+  padding: 0 5px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 9.2px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
+  margin: 0 !important;
+}
+
+#leaderboard-list .lb-v2-points,
+.lb-v2-points {
+  position: absolute !important;
+  right: var(--lb-abs-points-right) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--lb-abs-points-width) !important;
+  min-width: var(--lb-abs-points-width) !important;
+  max-width: var(--lb-abs-points-width) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  grid-column: auto !important;
+  justify-self: auto !important;
+  text-align: right !important;
+  overflow: visible !important;
+  z-index: 8 !important;
+}
+
+#leaderboard-list .lb-v2-points .points-num,
+.lb-v2-points .points-num {
+  display: block !important;
+  text-align: right !important;
+  font-size: 25px !important;
+  line-height: .94 !important;
+  letter-spacing: -0.055em !important;
+  font-variant-numeric: tabular-nums !important;
+  overflow: visible !important;
+}
+
+#leaderboard-list .lb-v2-points .points-label,
+.lb-v2-points .points-label {
+  display: block !important;
+  text-align: right !important;
+  font-size: 7.5px !important;
+  line-height: 1 !important;
+  padding-right: 2px !important;
+  margin-top: 2px !important;
+  overflow: visible !important;
+}
+
+@media (min-width: 390px) {
+  #leaderboard-list {
+    --lb-abs-rank-col: 72px;
+    --lb-abs-right-pad: 150px;
+    --lb-abs-trend-right: 92px;
+    --lb-abs-points-right: 20px;
+    --lb-abs-trend-width: 44px;
+    --lb-abs-points-width: 58px;
+  }
+  #leaderboard-list .lb-v2-trend .rank-trend,
+  .lb-v2-trend .rank-trend {
+    width: 41px !important;
+    min-width: 41px !important;
+    max-width: 41px !important;
+    height: 21px !important;
+    font-size: 9.3px !important;
+  }
+  #leaderboard-list .lb-v2-points .points-num,
+  .lb-v2-points .points-num {
+    font-size: 26px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  #leaderboard-list {
+    --lb-abs-rank-col: 62px;
+    --lb-abs-right-pad: 120px;
+    --lb-abs-trend-right: 72px;
+    --lb-abs-points-right: 12px;
+    --lb-abs-trend-width: 36px;
+    --lb-abs-points-width: 48px;
+  }
+  #leaderboard-list .lb-v2-table-head,
+  .lb-v2-table-head,
+  #leaderboard-list .lb-row.lb-v2-row,
+  .lb-row.lb-v2-row {
+    padding-left: 6px !important;
+  }
+  #leaderboard-list .lb-v2-trend .rank-trend,
+  .lb-v2-trend .rank-trend {
+    width: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    height: 19px !important;
+    padding: 0 3px !important;
+    font-size: 8px !important;
+  }
+  #leaderboard-list .lb-v2-points .points-num,
+  .lb-v2-points .points-num {
+    font-size: 22px !important;
+  }
+}
+`;
+
+  function inject() {
+    const old = document.getElementById(STYLE_ID);
+    if (old) old.remove();
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
+  } else {
+    inject();
+  }
+
+  // Some older runtime leaderboard patches inject after first paint.
+  // Re-apply this as the last style so it wins the cascade.
+  setTimeout(inject, 50);
+  setTimeout(inject, 350);
+  setTimeout(inject, 900);
 })();
