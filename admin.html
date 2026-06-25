@@ -1291,23 +1291,30 @@ async function refundCardPlay(playId, userId, cardType) {
       .eq('id', playId)
     if (upErr) throw upErr
 
-    // 2. Refund the card to player_inventory (upsert: +1 quantity)
+    // 2. Return the card to the player. Availability is decided by used_at
+    //    (null = available) — play_card() never looks at quantity — so a refund
+    //    must CLEAR used_at (and the used_fixture/matchday stamps), not bump
+    //    quantity. Bumping quantity left used_at set and the card unplayable.
     const { data: existing, error: invErr } = await supabaseClient
       .from('player_inventory')
-      .select('id, quantity')
+      .select('id')
       .eq('player_id', userId)
       .eq('card_id', cardType)
       .maybeSingle()
     if (invErr) throw invErr
 
     if (existing) {
-      const { error: incErr } = await supabaseClient
+      const { error: clrErr } = await supabaseClient
         .from('player_inventory')
-        .update({ quantity: (existing.quantity || 0) + 1 })
+        .update({
+          used_at: null,
+          used_fixture_id: null,
+          used_matchday_key: null
+        })
         .eq('id', existing.id)
-      if (incErr) throw incErr
+      if (clrErr) throw clrErr
     } else {
-      // No row yet — create one with quantity 1
+      // No row yet — create a fresh, available one (used_at defaults null)
       const { error: insErr } = await supabaseClient
         .from('player_inventory')
         .insert({

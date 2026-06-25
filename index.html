@@ -2649,7 +2649,7 @@ async function renderInventoryCard() {
       try {
         const { data, error } = await supabaseClient
   .from('player_inventory')
-          .select('card_id, quantity')
+          .select('card_id, quantity, used_at')
           .eq('player_id', currentUser.id);
 
         if (error) {
@@ -2663,10 +2663,14 @@ async function renderInventoryCard() {
 
         if (data && data.length > 0) {
           data.forEach(row => {
+            // used_at is the one-time-use source of truth: a stamped card is
+            // unavailable regardless of quantity. play_card() stamps used_at;
+            // admin refund clears it. (quantity stays 1 throughout.)
+            const available = row.used_at ? 0 : (row.quantity || 0);
             if (row.card_id === 'double_points') {
-              _inventoryState.double_points = row.quantity || 0;
+              _inventoryState.double_points = available;
             } else if (row.card_id === 'double_pick') {
-              _inventoryState.double_pick = row.quantity || 0;
+              _inventoryState.double_pick = available;
             }
           });
         }
@@ -2876,8 +2880,11 @@ async function renderInventoryCard() {
     }
 
     /**
-     * Commit: insert card_plays row (RLS enforces all rules), then decrement
-     * inventory. The bonus engine reads card_plays when admin publishes results.
+     * Commit a card play via the play_card() RPC. The RPC atomically stamps
+     * player_inventory.used_at (gated by `WHERE used_at IS NULL`) AND inserts the
+     * card_plays row in one transaction — server-side, so it can't be bypassed
+     * or double-spent from the client. Direct client writes to either table are
+     * blocked by RLS, so this RPC is the only path.
      */
     async function executeCardPlay(cardId, fixtureId) {
       hideModal();
@@ -2886,37 +2893,38 @@ async function renderInventoryCard() {
       const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === fixtureId);
       if (!f) { showToast('Match not found', 'error'); return; }
 
-      const matchdayKey = matchdayKeyOf(f.kickoff);
+      // Single atomic call: consume inventory + record the play.
+      const { error: rpcErr } = await supabaseClient
+        .rpc('play_card', { p_card_id: cardId, p_fixture_id: fixtureId });
 
-      // 1. Insert card_plays row (RLS enforces inventory_enabled + uniqueness + kickoff>now)
-      const { error: playErr } = await supabaseClient
-        .from('card_plays')
-        .insert({
-          user_id: currentUser.id,
-          card_type: cardId,
-          fixture_id: fixtureId,
-          matchday_key: matchdayKey
-        });
-
-      if (playErr) {
-        const msg = String(playErr.message || '').toLowerCase();
-        if (msg.includes('duplicate') || msg.includes('unique')) {
-          showToast('You already have a card on this match or matchday.', 'error');
-        } else if (msg.includes('inventory_enabled') || msg.includes('check') || msg.includes('row-level')) {
-          showToast('Cards are not currently active.', 'error');
+      if (rpcErr) {
+        const m = String(rpcErr.message || '').toLowerCase();
+        let toast;
+        if (m.includes('already used') || m.includes('not owned') || m.includes('unavailable')) {
+          toast = "You've already used this card.";                 // P0004
+        } else if (m.includes('fixture locked') || m.includes('kicked off') || m.includes('already scored')) {
+          toast = 'This match is locked — predictions are closed.';  // P0003
+        } else if (m.includes('inventory not enabled')) {
+          toast = 'Cards are not currently active.';                 // P0001
+        } else if (m.includes('fixture not found')) {
+          toast = 'Match not found.';                                // P0002
+        } else if (m.includes('duplicate') || m.includes('unique')) {
+          toast = 'You already have a card on this match or matchday.'; // unique index
+        } else if (m.includes('not authenticated')) {
+          toast = 'Please sign in again.';                           // 28000
         } else {
-          showToast(playErr.message || 'Could not use card.', 'error');
+          toast = rpcErr.message || 'Could not use card.';
         }
+        showToast(toast, 'error');
         return;
       }
 
-      // 2. Decrement player_inventory
-      await consumeInventoryCard(cardId);
-
-      // 3. Toast + refresh prediction view so alt inputs / badge appear immediately
+      // Success. Refresh authoritative state from the DB (used_at now stamped).
       const cfg = INVENTORY_CONFIG.cards[cardId];
       showToast(`${cfg.emoji} ${cfg.name} armed on ${f.home_team} vs ${f.away_team}!`, 'success');
 
+      if (typeof loadPlayerInventory === 'function') await loadPlayerInventory();
+      if (typeof renderInventoryItems === 'function') renderInventoryItems();
       if (typeof loadMyCardPlays === 'function') await loadMyCardPlays();
       if (typeof renderFixtures === 'function') renderFixtures();
     }
@@ -2943,39 +2951,19 @@ async function confirmUseCard(cardId) {
 }
 
     /**
-     * Consume one card from inventory
+     * Consume one card from inventory — LOCAL STATE ONLY.
+     * The real consumption (stamping player_inventory.used_at + inserting the
+     * card_plays row) is done atomically server-side by the play_card() RPC in
+     * executeCardPlay(). Direct client writes to player_inventory are blocked by
+     * RLS, so this no longer touches the database. Kept for back-compat with any
+     * older call sites; safe to call.
      */
     async function consumeInventoryCard(cardId) {
       if (!currentUser || !currentUser.id) return;
-
-      try {
-        // Decrement in Supabase
-        const { error } = await supabaseClient
-  .from('player_inventory')
-          .update({ 
-            quantity: _inventoryState[cardId] - 1,
-            used_at: new Date().toISOString()
-          })
-          .eq('player_id', currentUser.id)
-          .eq('card_id', cardId);
-
-        if (error) {
-          console.error('[Inventory] Error consuming card:', error);
-          showToast('Failed to use card. Try again.', 'error');
-          return;
-        }
-
-        // Update local state
-        _inventoryState[cardId]--;
-        renderInventoryItems();
-
-        const card = INVENTORY_CONFIG.cards[cardId];
-        showToast(card.emoji + ' ' + card.name + ' activated!', 'success');
-
-      } catch (e) {
-        console.error('[Inventory] Exception consuming card:', e);
-        showToast('Something went wrong', 'error');
+      if (_inventoryState[cardId] != null) {
+        _inventoryState[cardId] = Math.max(0, _inventoryState[cardId] - 1);
       }
+      if (typeof renderInventoryItems === 'function') renderInventoryItems();
     }
 
     // ============================================================

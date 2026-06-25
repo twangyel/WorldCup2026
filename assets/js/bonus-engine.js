@@ -183,7 +183,8 @@ function createMatchResult({
   predAway,
   actualHome,
   actualAway,
-  basePoints,  // From calculatePoints()
+  basePoints,  // From calculatePoints() — ALWAYS raw/undoubled
+  doublePointsApplied = false,  // Double Points card: 2x is applied at the multiplied_base layer
   timestamp = new Date().toISOString()
 }) {
   // Input validation
@@ -202,7 +203,8 @@ function createMatchResult({
     matchday_key: matchdayKey,
     prediction: { home: predHome, away: predAway },
     result: { home: actualHome, away: actualAway },
-    base_points: basePoints,
+    base_points: basePoints,                       // raw, never doubled
+    double_points_applied: !!doublePointsApplied,  // carried into applyStageMultiplier
     stage_multiplier: 1,
     multiplied_base: basePoints,
     streak_bonus: 0,
@@ -476,8 +478,14 @@ function applyStageMultiplier(matchResult) {
 
   matchResult.stage_multiplier = multiplier;
 
-  // Apply multiplier to base points
-  let multiplied = matchResult.base_points * multiplier;
+  // Double Points card: the 2x is applied HERE, at the multiplied_base layer,
+  // NOT to base_points. base_points stays raw (so streak/combo logic is
+  // unaffected and exact-combo still keys off ===5). A 0-point match can't be
+  // doubled (0*2=0), so the flag only matters when base_points > 0.
+  const doubleFactor = (matchResult.double_points_applied && matchResult.base_points > 0) ? 2 : 1;
+
+  // Apply stage multiplier AND double factor to raw base points
+  let multiplied = matchResult.base_points * multiplier * doubleFactor;
 
   // Round if configured
   const roundTo = BONUS_CONFIG.stageMultiplier.roundToNearest;
@@ -487,12 +495,22 @@ function applyStageMultiplier(matchResult) {
 
   matchResult.multiplied_base = multiplied;
 
+  if (doubleFactor === 2) {
+    matchResult.bonus_breakdown.push({
+      type: 'double_points',
+      label: 'Double Points',
+      emoji: '✖️2️⃣',
+      value: matchResult.base_points * multiplier, // the extra points the card added
+      description: `Double Points card: 2x on ${matchResult.base_points * multiplier} pts`
+    });
+  }
+
   if (multiplier !== 1) {
     matchResult.bonus_breakdown.push({
       type: 'stage_multiplier',
       label: `${stage} Multiplier`,
       emoji: '🏆',
-      value: multiplied - matchResult.base_points,
+      value: (matchResult.base_points * multiplier) - matchResult.base_points,
       description: `${multiplier}x multiplier on base points`
     });
   }
@@ -813,17 +831,12 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
         }
       }
 
-      // --- Step 3: Double Points — multiply base
-      // Capture the raw base BEFORE doubling so we can store it cleanly.
-      // `basePoints` continues forward (doubled) for stage/streak/combo math,
-      // but `rawBaseBeforeDouble` is what we persist to prediction_results.base_points.
-      const rawBaseBeforeDouble = basePoints;
+      // --- Step 3: Double Points — flag only; the 2x is applied later inside
+      // applyStageMultiplier (multiplied_base layer). basePoints stays RAW so it
+      // can be persisted cleanly and so streak/combo logic is unaffected.
       const doublePointsApplied = hasDoublePoints && basePoints > 0;
-      if (hasDoublePoints) {
-        basePoints = basePoints * 2;
-      }
 
-      // --- Step 4: stage multiplier + streak + combo via existing pipeline
+      // --- Step 4: stage multiplier + double + streak + combo via existing pipeline
       const fullResult = calculateFullPoints({
         fixtureId: fixtureId,
         userId: pred.user_id,
@@ -834,7 +847,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
         predAway: winningAway,
         actualHome: actualHome,
         actualAway: actualAway,
-        basePoints: basePoints
+        basePoints: basePoints,            // RAW — never pre-doubled
+        doublePointsApplied: doublePointsApplied
       }, []); // <-- empty history on purpose; Phase 2 replays the chain
 
       // --- Step 5: persist winning pick back to predictions (best-effort)
@@ -855,8 +869,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
           home_prediction: winningHome,
           away_prediction: winningAway,
           stage: fixture.stage,
-          base_points: rawBaseBeforeDouble,            // ← raw, undoubled
-          double_points_applied: doublePointsApplied,  // ← new flag
+          base_points: basePoints,                     // ← raw, undoubled
+          double_points_applied: doublePointsApplied,  // ← 2x reapplied on every heal via this flag
           stage_multiplier: fullResult.stage_multiplier,
           multiplied_base: fullResult.multiplied_base,
           streak_bonus: fullResult.streak_bonus,
@@ -894,8 +908,8 @@ async function awardPointsWithBonuses(fixtureId, actualHome, actualAway) {
         cardUpdates.push({
           id: userCards.double_points.id,
           summary: {
-            base_before_double: doublePointsApplied ? basePoints / 2 : basePoints,
-            base_after_double: basePoints,
+            base_before_double: basePoints,
+            base_after_double: doublePointsApplied ? basePoints * 2 : basePoints,
             final_points: fullResult.final_points,
             wasted: !doublePointsApplied
           }
@@ -985,7 +999,8 @@ async function recalculateUserBonuses(userId) {
         predAway: r.away_prediction,
         actualHome: r.actual_home, // may be null if not stored — base_points already has the answer
         actualAway: r.actual_away,
-        basePoints: r.base_points
+        basePoints: r.base_points,
+        doublePointsApplied: r.double_points_applied  // ← reapply the 2x on heal (was being erased)
       }, rebuiltHistory);
 
       // Only write back if something actually changed (avoid churn)
@@ -1061,6 +1076,26 @@ async function recalculateAllBonuses() {
   const knockoutEnabled = await _loadKnockoutFlag();
   console.log(`[recalc-all] knockout_scoring_enabled = ${knockoutEnabled}`);
 
+  // Load all active double_points card plays once, so any row we RECREATE from
+  // scratch below still carries the 2x flag (closes the prior "recalc-all drops
+  // a card" residual). Keyed by `${user_id}|${fixture_id}`.
+  const doublePointsKeys = new Set();
+  try {
+    const { data: dpPlays, error: dpErr } = await supabaseClient
+      .from('card_plays')
+      .select('user_id, fixture_id, card_type, status')
+      .eq('card_type', 'double_points')
+      .neq('status', 'refunded')
+      .limit(10000);
+    if (dpErr) {
+      console.warn('[recalc-all] Could not load double_points plays (recreated rows may miss 2x):', dpErr);
+    } else {
+      (dpPlays || []).forEach(cp => doublePointsKeys.add(`${cp.user_id}|${cp.fixture_id}`));
+    }
+  } catch (e) {
+    console.warn('[recalc-all] double_points play load threw (recreated rows may miss 2x):', e);
+  }
+
   let totalCreated = 0, totalUpdated = 0, totalErrors = 0;
 
   for (const uid of uniqueUserIds) {
@@ -1121,6 +1156,7 @@ async function recalculateAllBonuses() {
           };
           const basePoints = _computeBase(predForCalc, f, knockoutEnabled);
           const matchdayKey = getMatchdayKey(f.kickoff);
+          const dpApplied = doublePointsKeys.has(`${uid}|${m.fixture_id}`) && basePoints > 0;
 
           const fullResult = calculateFullPoints({
             fixtureId: m.fixture_id,
@@ -1132,7 +1168,8 @@ async function recalculateAllBonuses() {
             predAway: m.away_prediction,
             actualHome: f.home_score,
             actualAway: f.away_score,
-            basePoints
+            basePoints,
+            doublePointsApplied: dpApplied
           }, []);
 
           // Match the engine's upsert pattern exactly (line 686-709).
@@ -1146,6 +1183,7 @@ async function recalculateAllBonuses() {
               away_prediction: m.away_prediction,
               stage: f.stage,
               base_points: fullResult.base_points,
+              double_points_applied: dpApplied,
               stage_multiplier: fullResult.stage_multiplier,
               multiplied_base: fullResult.multiplied_base,
               streak_bonus: fullResult.streak_bonus,
