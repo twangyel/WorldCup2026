@@ -2864,6 +2864,21 @@ async function renderInventoryCard() {
      */
     async function confirmCardPlay(cardId, fixtureId) {
       hideModal();
+
+      // GUARD (Double Points): consumes immediately and can't be undone, and it
+      // doubles the SAVED prediction — not whatever is merely typed. Require a saved
+      // scoreline on this match first, or the card could be spent on an empty pick.
+      if (cardId === 'double_points') {
+        const sp = (typeof getPrediction === 'function') ? getPrediction(fixtureId) : null;
+        const saved = sp
+          && sp.home_prediction !== null && sp.home_prediction !== undefined
+          && sp.away_prediction !== null && sp.away_prediction !== undefined;
+        if (!saved) {
+          showToast('Save your scoreline first, then use Double Points', 'warning');
+          return;
+        }
+      }
+
       const cfg = INVENTORY_CONFIG.cards[cardId];
       const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === fixtureId);
       const summary = f ? `${f.home_team} vs ${f.away_team}` : 'the selected match';
