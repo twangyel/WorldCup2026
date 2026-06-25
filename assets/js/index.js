@@ -1342,6 +1342,11 @@ let fixtures = []
 let predictions = []
 let pendingPredictions = {}
 
+// Double Pick: local arm intent (fixtureId -> card_id). The card is NOT consumed
+// here — play_card fires at save-time once both scorelines validate. An accidental
+// arm self-heals on reload because this is in-memory only.
+let dpArmedIntent = {}
+
 // Cache of this user's non-refunded card plays, keyed by fixture_id.
 // Refreshed on login + after executeCardPlay + via realtime subscription.
 let myCardPlaysByFixture = {};
@@ -1608,7 +1613,9 @@ function msToCountdown(ms) {
     const altH = pred?.alt_home_prediction ?? ''
     const altA = pred?.alt_away_prediction ?? ''
     const cardOnThisMatch = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[f.id] : null
-    const hasDoublePick   = cardOnThisMatch?.card_type === 'double_pick'
+    const dpIntent        = (typeof dpArmedIntent !== 'undefined') && !!dpArmedIntent[f.id]
+    const dpArmedNotSaved = dpIntent && !cardOnThisMatch          // armed locally, not yet spent
+    const hasDoublePick   = cardOnThisMatch?.card_type === 'double_pick' || dpIntent
     const hasDoublePoints = cardOnThisMatch?.card_type === 'double_points'
     const pts = getPointsForFixture(f.id)   // Bug 3: was pred?.points_awarded (never written)
 
@@ -1629,8 +1636,10 @@ function msToCountdown(ms) {
     // Score boxes (readonly or input) — with card badges + optional alt pick row
     const cardBadge = hasDoublePoints
       ? '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#FFC964,#E07A1F);color:#3A2410;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">⚡ DOUBLE POINTS ACTIVE</div>'
-      : hasDoublePick
-        ? '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7EC8FF,#2E6FBF);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">🎯 DOUBLE PICK ACTIVE</div>'
+     : hasDoublePick
+        ? (dpArmedNotSaved
+            ? '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#FFD27E,#E0921F);color:#3A2410;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">🎯 DOUBLE PICK ARMED — SAVE TO LOCK</div>'
+            : '<div style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7EC8FF,#2E6FBF);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:0.05em;margin-bottom:8px;">🎯 DOUBLE PICK ACTIVE</div>')
         : ''
 
     const primaryRow = locked
@@ -1655,9 +1664,9 @@ function msToCountdown(ms) {
              </div>`
           : `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-weight:700;">Alt pick (Double Pick)</div>
              <div class="fixture-score-row">
-               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${altH}" onchange="updatePrediction('${f.id}','alt_home',this.value)">
+               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" data-alt-score="${f.id}" data-alt-side="home" value="${altH}" onchange="updatePrediction('${f.id}','alt_home',this.value)">
                <span class="fixture-score-divider">:</span>
-               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" value="${altA}" onchange="updatePrediction('${f.id}','alt_away',this.value)">
+               <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" class="fixture-score-box active" data-alt-score="${f.id}" data-alt-side="away" value="${altA}" onchange="updatePrediction('${f.id}','alt_away',this.value)">
              </div>`)
       : ''
 
@@ -1711,9 +1720,29 @@ function msToCountdown(ms) {
          </div>`
       : ''
 
+    // Inline card activation — primary path to arm/use a booster, on editable
+    // fixtures that don't already have a card. Double Points consumes immediately
+    // (confirmCardPlay → confirm modal); Double Pick arms locally on a single tap
+    // (executeCardPlay defers consumption to save-time). Both fns live in index.html.
+    const _inv = (typeof _inventoryState !== 'undefined') ? _inventoryState : {}
+    const _dpArmedAnywhere = (typeof dpArmedIntent !== 'undefined') && Object.keys(dpArmedIntent).length > 0
+    const _offerCards = !locked && !previewMode && !hasDoublePick && !hasDoublePoints
+    const _ownDoublePoints = (_inv.double_points || 0) > 0
+    const _ownDoublePick   = (_inv.double_pick   || 0) > 0 && !_dpArmedAnywhere   // can't arm two at once
+    const cardActionRow = (_offerCards && (_ownDoublePoints || _ownDoublePick))
+      ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">`
+        + (_ownDoublePoints
+            ? `<button onclick="confirmCardPlay('double_points','${f.id}')" class="tap" style="flex:1;min-width:140px;padding:9px 12px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#FFC964,#E07A1F);color:#3A2410;">⚡ Use Double Points</button>`
+            : '')
+        + (_ownDoublePick
+            ? `<button onclick="executeCardPlay('double_pick','${f.id}')" class="tap" style="flex:1;min-width:140px;padding:9px 12px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#7EC8FF,#2E6FBF);color:#ffffff;">🎯 Use Double Pick</button>`
+            : '')
+        + `</div>`
+      : ''
+
     const scoreSection = cardBadge + (hasDoublePick
       ? `<div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;font-weight:700;">Primary pick</div>${primaryRow}${altRow}`
-      : primaryRow) + advEditableHtml + advLockedSummary
+      : primaryRow) + advEditableHtml + advLockedSummary + cardActionRow
 
     // Save button
     const saveBtn = !locked
@@ -1833,7 +1862,7 @@ return `
 
       // Only consider alt-draw if Double Pick is armed on this match.
       const cp = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
-      const hasDoublePick = cp?.card_type === 'double_pick'
+      const hasDoublePick = cp?.card_type === 'double_pick' || ((typeof dpArmedIntent !== 'undefined') && !!dpArmedIntent[id])
       const altDraw = hasDoublePick && ah !== '' && aa !== '' && Number(ah) === Number(aa)
 
       if (primaryDraw || altDraw) {
@@ -1876,6 +1905,36 @@ return `
       if (h === '' || h === undefined || a === '' || a === undefined) { showToast('Enter both scores', 'warning'); return }
       const home = parseInt(h), away = parseInt(a)
 
+      // If Double Pick is armed, the alt scoreline is mandatory.
+      // Block the save BEFORE savePrediction() so a one-time Double Pick cannot be
+      // wasted by saving only the primary prediction.
+      const cpForSave = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
+      const dpArmed = (cpForSave?.card_type === 'double_pick') || ((typeof dpArmedIntent !== 'undefined') && !!dpArmedIntent[id])
+      let altHomeSaved = null, altAwaySaved = null
+      if (dpArmed) {
+        const pp = pendingPredictions[id] || {}
+        const savedPred = (typeof getPrediction === 'function') ? getPrediction(id) : null
+        const hasPendingAltHome = Object.prototype.hasOwnProperty.call(pp, 'alt_home')
+        const hasPendingAltAway = Object.prototype.hasOwnProperty.call(pp, 'alt_away')
+        const altHraw = hasPendingAltHome ? pp.alt_home : savedPred?.alt_home_prediction
+        const altAraw = hasPendingAltAway ? pp.alt_away : savedPred?.alt_away_prediction
+        const altMissing = altHraw === '' || altHraw === undefined || altHraw === null ||
+                           altAraw === '' || altAraw === undefined || altAraw === null
+        if (altMissing) {
+          showToast('Double Pick is active — enter both alt scores before saving', 'warning')
+          const firstMissing = card?.querySelector(`[data-alt-score="${id}"][data-alt-side="${(altHraw === '' || altHraw === undefined || altHraw === null) ? 'home' : 'away'}"]`)
+          if (firstMissing && typeof firstMissing.focus === 'function') firstMissing.focus()
+          return
+        }
+
+        altHomeSaved = parseInt(altHraw, 10)
+        altAwaySaved = parseInt(altAraw, 10)
+        if (!Number.isFinite(altHomeSaved) || !Number.isFinite(altAwaySaved)) {
+          showToast('Double Pick alt scores must be valid numbers', 'warning')
+          return
+        }
+      }
+
       // -- Knockout validation: a draw prediction on a knockout fixture requires
       // an advance_pick (pen winner). Same rule applies to the alt prediction if
       // Double Pick is armed and the alt is also a draw. One advance_pick covers
@@ -1884,42 +1943,62 @@ return `
       const isKnockout = fxForCheck && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(fxForCheck.stage)
       if (isKnockout) {
         const primaryDraw = home === away
-        const cpCheck = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
-        const altDraw = (cpCheck?.card_type === 'double_pick')
-          && pending.alt_home !== undefined && pending.alt_home !== ''
-          && pending.alt_away !== undefined && pending.alt_away !== ''
-          && Number(pending.alt_home) === Number(pending.alt_away)
+        const altDraw = (cpForSave?.card_type === 'double_pick')
+          && altHomeSaved !== null && altAwaySaved !== null
+          && altHomeSaved === altAwaySaved
         if ((primaryDraw || altDraw) && !pending.advance_pick) {
           showToast('Knockout draw — pick which team wins on penalties', 'warning')
           return
         }
       }
 
+      // Double Pick deferred consumption: if armed via local intent (no card_play row
+      // yet), spend the card now — AFTER all validation, BEFORE writing the prediction.
+      // This guarantees the invariant: alt columns are written ⇒ the card was consumed.
+      if (dpArmed && (typeof dpArmedIntent !== 'undefined') && dpArmedIntent[id]) {
+        const { error: playErr } = await supabaseClient
+          .rpc('play_card', { p_card_id: dpArmedIntent[id], p_fixture_id: id })
+        if (playErr) {
+          const m = String(playErr.message || '').toLowerCase()
+          let t
+          if (m.includes('already used') || m.includes('not owned') || m.includes('unavailable')) t = "You've already used this card."
+          else if (m.includes('fixture locked') || m.includes('kicked off') || m.includes('already scored')) t = 'This match is locked — predictions are closed.'
+          else if (m.includes('inventory not enabled')) t = 'Cards are not currently active.'
+          else if (m.includes('fixture not found')) t = 'Match not found.'
+          else if (m.includes('duplicate') || m.includes('unique')) t = 'You already have a card on this match or matchday.'
+          else if (m.includes('not authenticated')) t = 'Please sign in again.'
+          else t = playErr.message || 'Could not use card.'
+          showToast(t, 'error')
+          return
+        }
+        delete dpArmedIntent[id]
+        if (typeof loadPlayerInventory === 'function') await loadPlayerInventory()
+        if (typeof loadMyCardPlays === 'function') await loadMyCardPlays()
+      }
+
       const { error } = await savePrediction(id, home, away)
       if (error) { showToast(error.message, 'error'); return }
 
-      // If Double Pick is armed on this match, persist alt scores
-      const cpForSave = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[id] : null
-      let altHomeSaved = null, altAwaySaved = null
+      // If Double Pick is armed on this match, persist alt scores.
       if (cpForSave?.card_type === 'double_pick') {
-        const pp = pendingPredictions[id] || {}
-        const altHraw = pp.alt_home
-        const altAraw = pp.alt_away
-        if (altHraw !== undefined && altHraw !== '' && altAraw !== undefined && altAraw !== '') {
-          altHomeSaved = parseInt(altHraw, 10)
-          altAwaySaved = parseInt(altAraw, 10)
-          try {
-            await supabaseClient
-              .from('predictions')
-              .update({
-                alt_home_prediction: altHomeSaved,
-                alt_away_prediction: altAwaySaved
-              })
-              .eq('user_id', getUser().id)
-              .eq('fixture_id', id)
-          } catch (e) { console.error('[double-pick] alt save failed:', e) }
-        } else {
-          showToast('Double Pick is armed — enter your alt scoreline too', 'warning')
+        try {
+          const { error: altSaveError } = await supabaseClient
+            .from('predictions')
+            .update({
+              alt_home_prediction: altHomeSaved,
+              alt_away_prediction: altAwaySaved
+            })
+            .eq('user_id', getUser().id)
+            .eq('fixture_id', id)
+          if (altSaveError) {
+            console.error('[double-pick] alt save failed:', altSaveError)
+            showToast('Could not save Double Pick alt scoreline. Try again.', 'error')
+            return
+          }
+        } catch (e) {
+          console.error('[double-pick] alt save failed:', e)
+          showToast('Could not save Double Pick alt scoreline. Try again.', 'error')
+          return
         }
       }
 
@@ -7216,6 +7295,33 @@ function togglePredictionHistory() {
   }
 }
 
+// Card badge resolver — shared across history + share cards.
+// Returns null, or { kind, icon, label }. For double_pick the kept line is read
+// from prediction_results.home/away_prediction (the line the engine actually scored).
+function resolveCardBadge(fixtureId, resultRow) {
+  const cp = (typeof myCardPlaysByFixture !== 'undefined') ? myCardPlaysByFixture[fixtureId] : null
+  const type = cp?.card_type
+  if (type === 'double_pick') {
+    const kh = resultRow?.home_prediction, ka = resultRow?.away_prediction
+    const kept = (kh !== null && kh !== undefined && ka !== null && ka !== undefined) ? (kh + '-' + ka) : null
+    return { kind: 'double_pick', icon: '🎯', label: kept ? ('KEPT ' + kept) : 'DOUBLE PICK' }
+  }
+  if (type === 'double_points' || resultRow?.double_points_applied) {
+    return { kind: 'double_points', icon: '⚡', label: '2×' }
+  }
+  return null
+}
+
+function cardBadgeHtml(b) {
+  if (!b) return ''
+  const isDp = b.kind === 'double_points'
+  const bg = isDp ? 'linear-gradient(135deg,#FFC964,#E07A1F)' : 'linear-gradient(135deg,#7EC8FF,#2E6FBF)'
+  const fg = isDp ? '#3A2410' : '#ffffff'
+  return '<span style="display:inline-flex;align-items:center;gap:3px;background:' + bg + ';color:' + fg +
+    ';font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:0.04em;vertical-align:middle;margin-left:4px;">' +
+    b.icon + ' ' + b.label + '</span>'
+}
+
 async function renderPredictionHistory() {
   const list = document.getElementById('history-list')
   const summary = document.getElementById('history-summary')
@@ -7367,7 +7473,7 @@ async function renderPredictionHistory() {
     if (!h.hasResult) {
       return '<div class="flex items-center gap-3 p-3 rounded-2xl bg-paper border border-paper-border">' + flags +
         '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="text-xs font-semibold text-ink-700 truncate">' + matchTitle + '</span>' +
-        '<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full shrink-0">PENDING</span></div>' +
+       '<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full shrink-0">PENDING</span>' + cardBadgeHtml(resolveCardBadge(f.id, null)) + '</div>' +
         '<div class="text-[11px] text-ink-500">' + dateStage + '</div>' +
         (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5">Predicted ' + submittedAt + '</div>' : '') +
         '<div class="mt-1 text-sm font-bold text-ink-900">Your pick: ' + h.home_prediction + ' – ' + h.away_prediction + '</div>' +
@@ -7437,7 +7543,7 @@ async function renderPredictionHistory() {
       '<div class="flex items-center gap-3">' + flags +
         '<div class="flex-1 min-w-0">' +
           '<div class="flex items-center gap-2"><span class="text-xs font-semibold text-ink-700 truncate">' + matchTitle + '</span>' +
-            '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' + meta.chip + ' shrink-0">' + meta.word + '</span></div>' +
+            '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' + meta.chip + ' shrink-0">' + meta.word + '</span>' + cardBadgeHtml(resolveCardBadge(f.id, r)) + '</div>' +
           '<div class="text-[11px] text-ink-500">' + dateStage + '</div>' +
         '</div>' + ptsPill +
       '</div>' +

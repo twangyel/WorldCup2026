@@ -1960,7 +1960,7 @@
 
   
 
-  <script type="text/javascript" src="/assets/js/index.js?v=leaderboard-absolute-right-shadow-safe-scroll-20260624f"></script>
+  <script type="text/javascript" src="/assets/js/index.js?v=double-pick-required-alt-20260625a"></script>
 
   <!-- Auto-inject FIFA ranking badges into fixture cards -->
   <script>
@@ -2893,7 +2893,17 @@ async function renderInventoryCard() {
       const f = (typeof fixtures !== 'undefined' ? fixtures : []).find(x => x.id === fixtureId);
       if (!f) { showToast('Match not found', 'error'); return; }
 
-      // Single atomic call: consume inventory + record the play.
+      // Double Pick: defer consumption to save-time. Arming is pure local intent —
+      // the card is only spent when a valid two-scoreline prediction is saved
+      // (see handleSavePrediction). An accidental arm self-heals on reload.
+      if (cardId === 'double_pick') {
+        if (typeof dpArmedIntent !== 'undefined') dpArmedIntent[fixtureId] = cardId;
+        showToast('🎯 Double Pick armed — enter BOTH scorelines, then Save to lock it in.', 'info');
+        if (typeof renderFixtures === 'function') renderFixtures();
+        return;
+      }
+
+      // Instant cards (double_points): consume immediately.
       const { error: rpcErr } = await supabaseClient
         .rpc('play_card', { p_card_id: cardId, p_fixture_id: fixtureId });
 
