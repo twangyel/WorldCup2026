@@ -3471,11 +3471,21 @@ document.getElementById('csv-input').value = '';
       const list = document.getElementById('admin-fixtures')
       const now = new Date()
 
-      // Find the single next upcoming match (not yet scored, earliest kickoff in future)
+      // Find the next editable SLOT, not a single match. World Cup group finals
+      // (and many knockout days) run 2+ matches at the EXACT same kickoff time,
+      // so "the next match" can legitimately be several simultaneous fixtures.
+      // Unlock every unscored fixture sharing the earliest unscored kickoff.
+      // Scoring stays order-safe: Publish Results recalculates streaks/combos in
+      // kickoff order regardless of the order you saved them.
       const upcoming = allFixtures
         .filter(f => f.home_score === null)
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const nextMatchId = upcoming[0]?.id || null
+      const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
+      const editableIds = new Set(
+        upcoming
+          .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
+          .map(f => f.id)
+      )
 
       let displayFixtures = allFixtures
       if (resultsFilter) {
@@ -3487,7 +3497,7 @@ document.getElementById('csv-input').value = '';
       }
       if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => {
-        const isNext = f.id === nextMatchId
+        const isNext = editableIds.has(f.id)
         const hasScore = f.home_score !== null && f.away_score !== null
         const timeLocked = new Date() >= new Date(f.kickoff)
         // Only the next unscored match is editable. Past-kickoff is FINE —
@@ -3515,7 +3525,9 @@ document.getElementById('csv-input').value = '';
         const nextBanner = isNext && !timeLocked
           ? `<div class="mb-3 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 flex items-center gap-2">
                <span class="text-sm">⚡</span>
-               <span class="text-xs font-bold text-brand-700">Next match — only this fixture is editable right now</span>
+               <span class="text-xs font-bold text-brand-700">${editableIds.size > 1
+                 ? `Next slot — ${editableIds.size} simultaneous fixtures are editable right now`
+                 : 'Next match — only this fixture is editable right now'}</span>
              </div>`
           : ''
 
@@ -3685,14 +3697,21 @@ document.getElementById('csv-input').value = '';
       const s = pendingScores[id] || {}
       if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
 
-      // Enforce: only the next upcoming match can be scored
+      // Enforce: only fixtures in the earliest unscored kickoff slot can be scored.
+      // Allows 2+ simultaneous matches (e.g. group finals) while still blocking
+      // out-of-order entry of later matchdays.
       const now = new Date()
       const upcoming = allFixtures
         .filter(f => f.home_score === null)
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const nextMatchId = upcoming[0]?.id
-      if (id !== nextMatchId) {
-        showToast('This match is locked. Only the next upcoming match can be scored.', 'error')
+      const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
+      const editableIds = new Set(
+        upcoming
+          .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
+          .map(f => f.id)
+      )
+      if (!editableIds.has(id)) {
+        showToast('This match is locked. Only the next upcoming match(es) can be scored.', 'error')
         return
       }
 
@@ -3813,14 +3832,19 @@ async function ensureMatchdayBaseline(fixtureKickoff) {
 
 
 async function executeSaveScore(id) {
-  // Double-check: only the next upcoming match can be scored
+  // Double-check: only fixtures in the earliest unscored kickoff slot can be scored
   const now = new Date()
   const upcoming = allFixtures
     .filter(f => f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-  const nextMatchId = upcoming[0]?.id
-  if (id !== nextMatchId) {
-    showToast('This match is locked. Only the next upcoming match can be scored.', 'error')
+  const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
+  const editableIds = new Set(
+    upcoming
+      .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
+      .map(f => f.id)
+  )
+  if (!editableIds.has(id)) {
+    showToast('This match is locked. Only the next upcoming match(es) can be scored.', 'error')
     return
   }
 
