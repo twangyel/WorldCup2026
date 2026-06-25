@@ -7196,7 +7196,6 @@ async function renderPredictionHistory() {
   }
 
   // Load this user's resolved results (with bonus breakdown) and index by fixture_id.
-  // Falls back silently if the table is empty / engine hasn't run yet.
   let resultsByFixture = {}
   try {
     const results = await getUserResults(myId)
@@ -7211,7 +7210,6 @@ async function renderPredictionHistory() {
       if (!f) return null
       const hasResult = f.home_score !== null && f.away_score !== null
       const resultRow = resultsByFixture[p.fixture_id] || null
-      // Prefer the engine's final_points if present; fall back to legacy points_awarded.
       const pts = resultRow?.final_points ?? p.points_awarded ?? 0
       return {
         ...p,
@@ -7227,89 +7225,183 @@ async function renderPredictionHistory() {
 
   const totalPredicted = history.filter(h => h.predicted).length
   const totalScored = history.filter(h => h.hasResult).length
-  const totalPoints = history.reduce((sum, h) => sum + h.pts, 0)
 
-  summary.textContent = totalPredicted + ' predicted · ' + totalScored + ' scored · ' + totalPoints + ' pts'
+  // number helper: 7.5 -> "7.5", 7.0 -> "7"
+  const fmt = n => String(Math.round(Number(n) * 100) / 100)
+
+  // Tier derived from the ACTUAL scoreline (not base_points) so the known
+  // Double-Points base_points doubling bug can never mislabel a row as "10 exact".
+  const tierOf = (h, f) => {
+    const hp = h.home_prediction, ap = h.away_prediction
+    const hs = f.home_score, as = f.away_score
+    if (hp === hs && ap === as) return 5
+    const pd = hp - ap, ad = hs - as
+    if (pd === ad) return 3
+    if (Math.sign(pd) === Math.sign(ad)) return 2
+    return 0
+  }
+  const tierMeta = t =>
+      t === 5 ? { word: 'Exact',     chip: 'bg-emerald-500 text-white' }
+    : t === 3 ? { word: 'Goal diff', chip: 'bg-blue-500 text-white' }
+    : t === 2 ? { word: 'Winner',    chip: 'bg-amber-500 text-white' }
+    :           { word: 'No points', chip: 'bg-gray-200 text-gray-500' }
+
+  // Totals that ALWAYS reconcile to the leaderboard:
+  // total = sum of final_points ; predictions bucket = sum of multiplied_base ; bonuses = remainder.
+  let totalPoints = 0, predPortion = 0
+  history.forEach(h => {
+    if (!h.hasResult || !h.predicted) return
+    const r = h.resultRow
+    const fin = Number(r?.final_points ?? h.pts ?? 0)
+    const mb  = Number(r?.multiplied_base ?? r?.base_points ?? fin)
+    totalPoints += fin
+    predPortion += mb
+  })
+  totalPoints = Math.round(totalPoints * 100) / 100
+  predPortion = Math.round(predPortion * 100) / 100
+  const bonusPortion = Math.round((totalPoints - predPortion) * 100) / 100
+
+  // collapsed-card subtitle
+  summary.textContent = totalPredicted + ' predicted · ' + totalScored + ' scored · ' + fmt(totalPoints) + ' pts'
 
   if (!history.length) {
     list.innerHTML = '<div class="text-center py-6"><div class="text-3xl mb-2 opacity-40">📋</div><div class="text-sm font-semibold text-ink-700">No predictions yet</div><p class="text-xs text-ink-500 mt-1">Start predicting to build your history</p></div>'
     return
   }
 
-  list.innerHTML = history.map(h => {
-    const f = h.fixture
-    const pts = h.pts
-    const predicted = h.predicted
-    const r = h.resultRow // may be null for legacy / unscored
+  // ---- Summary hero: answers "total points till now" + the why-split at a glance ----
+  const summaryCard =
+    '<div class="rounded-2xl p-4 mb-1" style="background:linear-gradient(180deg,rgba(212,162,76,0.10),rgba(212,162,76,0.04));border:1px solid rgba(212,162,76,0.25);">' +
+      '<div class="flex items-end justify-between">' +
+        '<div>' +
+          '<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-500">Total points</div>' +
+          '<div class="text-3xl font-extrabold text-ink-900 leading-none mt-0.5" style="font-variant-numeric:tabular-nums;">' + fmt(totalPoints) + '</div>' +
+        '</div>' +
+        '<div class="text-right text-[11px] text-ink-500 leading-tight">' +
+          totalPredicted + ' predicted<br>' + totalScored + ' scored' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex gap-2 mt-3">' +
+        '<div class="flex-1 rounded-xl bg-white/70 border border-paper-border px-3 py-2">' +
+          '<div class="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Predictions</div>' +
+          '<div class="text-base font-bold text-ink-900" style="font-variant-numeric:tabular-nums;">' + fmt(predPortion) + '</div>' +
+        '</div>' +
+        '<div class="flex-1 rounded-xl bg-white/70 border border-paper-border px-3 py-2">' +
+          '<div class="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Streaks &amp; bonuses</div>' +
+          '<div class="text-base font-bold ' + (bonusPortion > 0 ? 'text-emerald-600' : 'text-ink-400') + '" style="font-variant-numeric:tabular-nums;">' + (bonusPortion > 0 ? '+' : '') + fmt(bonusPortion) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
 
-    // NEW: Format submitted_at timestamp in Bhutan time
+  // ---- Per-fixture rows ----
+  const rows = history.map(h => {
+    const f = h.fixture
+    const r = h.resultRow
+
     const submittedAt = h.submitted_at
       ? new Date(h.submitted_at).toLocaleString('en-US', {
-          timeZone: 'Asia/Thimphu',
-          month: 'short', day: 'numeric',
+          timeZone: 'Asia/Thimphu', month: 'short', day: 'numeric',
           hour: '2-digit', minute: '2-digit'
         }) + ' (Bhutan)'
       : null
 
-    let statusBadge, scoreDisplay, breakdownLine = ''
+    const dateStage = new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage
+    const matchTitle = f.home_team + ' vs ' + f.away_team
+    const flags = '<div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 22) + '<span class="text-[10px] font-bold text-ink-300">vs</span>' + flagHtml(f.away_team, 22) + '</div>'
 
-    if (!predicted) {
-      statusBadge = '<span class="text-[10px] font-bold bg-gray-100 text-gray-400 px-2 py-1 rounded-full">MISSED</span>'
-      scoreDisplay = '<span class="text-xs text-ink-400">No prediction</span>'
-    } else if (!h.hasResult) {
-      statusBadge = '<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full">PENDING</span>'
-      scoreDisplay = '<span class="text-sm font-bold text-ink-900">' + h.home_prediction + ' – ' + h.away_prediction + '</span>'
-    } else {
-      // Badge tier should reflect prediction skill (base_points), not the multiplied total.
-      // An exact score in the Final = 12.5 final pts but still "EXACT" tier.
-      const basePts = r?.base_points ?? pts
-      const ptsColor = basePts === 5 ? 'bg-emerald-500 text-white'
-                     : basePts === 3 ? 'bg-blue-500 text-white'
-                     : basePts === 2 ? 'bg-amber-500 text-white'
-                     : 'bg-gray-200 text-gray-500'
-      // Show the FINAL number on the badge so players see the real points they earned
-      const ptsLabel = basePts === 5 ? '+' + pts + ' EXACT'
-                     : basePts === 3 ? '+' + pts + ' GD'
-                     : basePts === 2 ? '+' + pts + ' WIN'
-                     : '0 PTS'
-      statusBadge = '<span class="text-[10px] font-bold ' + ptsColor + ' px-2 py-1 rounded-full">' + ptsLabel + '</span>'
-      scoreDisplay = '<div class="flex items-center gap-2"><span class="text-sm font-bold ' + (pts > 0 ? 'text-ink-900' : 'text-ink-400') + '">' + h.home_prediction + ' – ' + h.away_prediction + '</span><span class="text-ink-300 text-xs">vs</span><span class="text-sm font-bold text-ink-900">' + f.home_score + ' – ' + f.away_score + '</span></div>'
-
-      // Build the breakdown line — show for EVERY scored prediction so players
-      // always understand where their points came from (or why they got zero).
-      if (r) {
-        const parts = []
-        const mult = r.stage_multiplier || 1
-        const multBase = r.multiplied_base ?? basePts
-
-        // Label the base tier so it's not just a bare number
-        let baseLabel
-        if (basePts === 5) baseLabel = '5 (exact)'
-        else if (basePts === 3) baseLabel = '3 (goal diff)'
-        else if (basePts === 2) baseLabel = '2 (winner)'
-        else baseLabel = '0 (wrong)'
-
-        if (mult !== 1 && basePts > 0) {
-          parts.push(baseLabel + ' × ' + mult + '× = ' + multBase)
-        } else {
-          parts.push(baseLabel)
-        }
-
-        // Bonuses (skip the 'stage_multiplier' entry — already shown above)
-        const bonusItems = (r.bonus_breakdown || []).filter(b => b.type !== 'stage_multiplier')
-        bonusItems.forEach(b => {
-          parts.push((b.emoji || '') + ' ' + b.label + ' +' + b.value)
-        })
-
-        breakdownLine = '<div class="text-[10px] text-ink-500 mt-1 leading-snug">' +
-          parts.join(' &nbsp;·&nbsp; ') +
-          ' &nbsp;=&nbsp; <b class="' + (pts > 0 ? 'text-ink-700' : 'text-ink-400') + '">' + pts + ' pts</b>' +
-          '</div>'
-      }
+    // MISSED — no prediction submitted
+    if (!h.predicted) {
+      return '<div class="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-80">' + flags +
+        '<div class="flex-1 min-w-0"><div class="text-xs font-semibold text-ink-600 truncate">' + matchTitle + '</div>' +
+        '<div class="text-[11px] text-ink-400">' + dateStage + '</div></div>' +
+        '<span class="text-[10px] font-bold bg-gray-100 text-gray-400 px-2 py-1 rounded-full shrink-0">MISSED</span></div>'
     }
 
-    return '<div class="flex items-center gap-3 p-3 rounded-2xl ' + (h.hasResult ? (h.pts > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') : 'bg-paper border border-paper-border') + '"><div class="flex items-center gap-1.5 shrink-0">' + flagHtml(f.home_team, 20) + '<span class="text-xs font-bold text-ink-400">vs</span>' + flagHtml(f.away_team, 20) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-ink-700 truncate">' + f.home_team + ' vs ' + f.away_team + '</span>' + statusBadge + '</div><div class="text-[11px] text-ink-500">' + new Date(f.kickoff).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + f.stage + '</div>' + (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Predicted: ' + submittedAt + '</div>' : '') + (predicted ? '<div class="mt-1">' + scoreDisplay + '</div>' : '') + breakdownLine + '</div></div>'
+    // PENDING — predicted but not scored yet
+    if (!h.hasResult) {
+      return '<div class="flex items-center gap-3 p-3 rounded-2xl bg-paper border border-paper-border">' + flags +
+        '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="text-xs font-semibold text-ink-700 truncate">' + matchTitle + '</span>' +
+        '<span class="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded-full shrink-0">PENDING</span></div>' +
+        '<div class="text-[11px] text-ink-500">' + dateStage + '</div>' +
+        (submittedAt ? '<div class="text-[10px] text-emerald-600 font-medium mt-0.5">Predicted ' + submittedAt + '</div>' : '') +
+        '<div class="mt-1 text-sm font-bold text-ink-900">Your pick: ' + h.home_prediction + ' – ' + h.away_prediction + '</div>' +
+        '</div></div>'
+    }
+
+    // SCORED
+    const fin = Number(r?.final_points ?? h.pts ?? 0)
+    const tier = tierOf(h, f)
+    const meta = tierMeta(tier)
+
+    const engineBase = Number(r?.base_points ?? tier)
+    const stageMult  = Number(r?.stage_multiplier ?? 1)
+    const multBase   = Number(r?.multiplied_base ?? (engineBase * (stageMult || 1)))
+
+    // Additive ledger that ALWAYS sums to fin (final_points = source of truth).
+    const lines = []
+    const baseInclCard = engineBase > tier  // flags the known base_points doubling bug inline
+    lines.push({
+      label: meta.word + (baseInclCard ? ' <span class="text-ink-400 font-normal">(incl. card)</span>' : ''),
+      value: engineBase,
+      strong: true
+    })
+    const stageDelta = Math.round((multBase - engineBase) * 100) / 100
+    if (stageMult > 1 && stageDelta !== 0) {
+      lines.push({ label: 'Stage \u00d7' + fmt(stageMult) + ' <span class="text-ink-400 font-normal">(' + f.stage + ')</span>', value: stageDelta })
+    }
+    const bonusItems = (r?.bonus_breakdown || []).filter(b => b && b.type !== 'stage_multiplier')
+    bonusItems.forEach(b => {
+      lines.push({ label: (b.emoji ? b.emoji + ' ' : '') + (b.label || 'Bonus'), value: Number(b.value || 0) })
+    })
+    // reconcile so the visible parts equal final_points exactly
+    const shown = lines.reduce((s, l) => s + Number(l.value || 0), 0)
+    const remainder = Math.round((fin - shown) * 100) / 100
+    if (Math.abs(remainder) >= 0.01) lines.push({ label: 'Other', value: remainder })
+
+    const pickVsResult =
+      '<div class="flex items-center gap-2 mt-1 text-sm">' +
+        '<span class="font-bold ' + (fin > 0 ? 'text-ink-900' : 'text-ink-400') + '">' + h.home_prediction + '\u2013' + h.away_prediction + '</span>' +
+        '<span class="text-[10px] text-ink-400 font-medium">your pick</span>' +
+        '<span class="text-ink-300">\u00b7</span>' +
+        '<span class="font-bold text-ink-900">' + f.home_score + '\u2013' + f.away_score + '</span>' +
+        '<span class="text-[10px] text-ink-400 font-medium">result</span>' +
+      '</div>'
+
+    const hasExtra = lines.length > 1
+    let ledger = ''
+    if (hasExtra) {
+      ledger = '<div class="mt-2 rounded-xl bg-white/60 border border-paper-border px-3 py-2 space-y-1">' +
+        lines.map(l =>
+          '<div class="flex items-center justify-between text-[11px]">' +
+            '<span class="' + (l.strong ? 'text-ink-700 font-semibold' : 'text-ink-500') + '">' + l.label + '</span>' +
+            '<span class="font-bold ' + (Number(l.value) < 0 ? 'text-rose-500' : 'text-ink-700') + '" style="font-variant-numeric:tabular-nums;">' + (Number(l.value) >= 0 ? '+' : '') + fmt(l.value) + '</span>' +
+          '</div>'
+        ).join('') +
+        '<div class="h-px bg-paper-border my-1"></div>' +
+        '<div class="flex items-center justify-between text-xs">' +
+          '<span class="font-bold text-ink-900">Total</span>' +
+          '<span class="font-extrabold ' + (fin > 0 ? 'text-emerald-600' : 'text-ink-400') + '" style="font-variant-numeric:tabular-nums;">' + fmt(fin) + ' pts</span>' +
+        '</div>' +
+      '</div>'
+    }
+
+    const ptsPill = '<span class="text-xs font-extrabold px-2.5 py-1 rounded-full shrink-0 ' + (fin > 0 ? meta.chip : 'bg-gray-200 text-gray-500') + '" style="font-variant-numeric:tabular-nums;">' + (fin > 0 ? '+' + fmt(fin) : '0') + '</span>'
+
+    return '<div class="p-3 rounded-2xl ' + (fin > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') + '">' +
+      '<div class="flex items-center gap-3">' + flags +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="flex items-center gap-2"><span class="text-xs font-semibold text-ink-700 truncate">' + matchTitle + '</span>' +
+            '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' + meta.chip + ' shrink-0">' + meta.word + '</span></div>' +
+          '<div class="text-[11px] text-ink-500">' + dateStage + '</div>' +
+        '</div>' + ptsPill +
+      '</div>' +
+      pickVsResult +
+      (submittedAt ? '<div class="text-[10px] text-ink-400 mt-1">Predicted ' + submittedAt + '</div>' : '') +
+      ledger +
+    '</div>'
   }).join('')
+
+  list.innerHTML = summaryCard + rows
 }
 
 async function shareRankOnWhatsApp() {
