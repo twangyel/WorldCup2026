@@ -1995,19 +1995,24 @@ async function stampMatchdaySnapshot(opts = {}) {
       return
     }
 
-    const { data: finished } = await supabaseClient
+ // Match the key convention used by index.js getLatestRankSnapshot():
+    // the baseline is keyed to the NEXT UPCOMING fixture's date, because that
+    // is the row the public leaderboard reads from. Writing under
+    // "latest finished" (the old convention) means the client never sees the
+    // manual stamp and arrows do not clear.
+    const { data: upcoming } = await supabaseClient
       .from('fixtures')
-      .select('kickoff, home_score, away_score')
-      .not('home_score', 'is', null)
-      .not('away_score', 'is', null)
-      .order('kickoff', { ascending: false })
+      .select('kickoff')
+      .is('home_score', null)
+      .is('away_score', null)
+      .order('kickoff', { ascending: true })
       .limit(1)
 
-    if (!finished || finished.length === 0) {
-      if (!silent) alert('No finished matches yet — nothing to stamp')
+    if (!upcoming || upcoming.length === 0) {
+      if (!silent) alert('No upcoming matches — nothing to baseline')
       return
     }
-    const matchKey = new Date(finished[0].kickoff).toDateString()
+    const matchKey = new Date(upcoming[0].kickoff).toDateString()
 
     const ranks = {}
     stats.forEach((s, i) => {
