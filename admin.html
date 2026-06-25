@@ -1937,8 +1937,14 @@ function confirmRecalcAll() {
 // same BonusEngine aggregation, same tiebreaker chain. Critical that this
 // stays in sync with the public render path.
 async function _adminFetchOverallStandings() {
-  const [{ data: results }, { data: profiles }] = await Promise.all([
-    supabaseClient.from('prediction_results').select('*'),
+  // CRITICAL: must use fetchAllPredictionResults (paginates past PostgREST's 1000-row
+  // default), NOT a direct .from('prediction_results').select('*'). A direct select
+  // silently truncates at 1000 rows, which under-counts users whose high-scoring
+  // matches happen to fall in the truncated tail — producing baselines that don't
+  // match the public leaderboard. This is the exact divergence the trend arrows
+  // exposed (e.g. sherab 67 pts in admin vs 125 pts publicly).
+  const [results, { data: profiles }] = await Promise.all([
+    fetchAllPredictionResults('*'),
     supabaseClient.from('profiles')
       .select('id, full_name, department, name, fee_paid, avatar_url')
       .eq('fee_paid', true)
