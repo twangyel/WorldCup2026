@@ -1946,29 +1946,24 @@ async function _adminFetchOverallStandings() {
 
   if (!profiles || profiles.length === 0) return []
 
+// Sum final_points directly from prediction_results — this matches the public
+  // leaderboard exactly. We previously delegated to BonusEngine.aggregateUserStats,
+  // but its `points` output diverged from final_points (likely reading base_points
+  // before bonuses, or hitting the base_points doubling bug). Since the public
+  // leaderboard is the source of truth for what players see, baselines must use
+  // the same number — otherwise trend arrows compare against a phantom ranking.
   const stats = profiles.map(profile => {
     const uid = profile.id
     const userResults = (results || []).filter(r => r.user_id === uid)
-    let engineStats
-    try {
-      if (typeof BonusEngine !== 'undefined' && BonusEngine.aggregateUserStats) {
-        engineStats = BonusEngine.aggregateUserStats(uid, userResults)
-      } else {
-        let points = 0, exact = 0, gd = 0, result = 0
-        userResults.forEach(r => {
-          points += r.final_points || r.points_awarded || 0
-          const base = (r.base_points != null) ? r.base_points : (r.points_awarded || 0)
-          if (base === 5) exact++
-          else if (base === 3) gd++
-          else if (base === 2) result++
-        })
-        engineStats = { points, exact, gd, result, total_predictions: userResults.length }
-      }
-    } catch (e) {
-      console.warn('[admin stamp] BonusEngine failed for', uid, e)
-      engineStats = { points: 0, exact: 0, gd: 0, result: 0 }
-    }
-    return { user_id: uid, ...engineStats }
+    let points = 0, exact = 0, gd = 0, result = 0
+    userResults.forEach(r => {
+      points += Number(r.final_points || r.points_awarded || 0)
+      const base = (r.base_points != null) ? Number(r.base_points) : Number(r.points_awarded || 0)
+      if (base === 5) exact++
+      else if (base === 3) gd++
+      else if (base === 2) result++
+    })
+    return { user_id: uid, points, exact, gd, result, total_predictions: userResults.length }
   })
 
   // Same tiebreaker chain as getLeaderboardFromResults: points → exact → gd → result
