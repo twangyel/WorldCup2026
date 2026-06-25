@@ -521,26 +521,72 @@ async function enablePushNotifications(role = 'user') {
     
 
     // ============== MODAL ==============
+    let modalHideTimer = null
+
     function showModal({ icon, title, message, messageHtml, actions }) {
       const overlay = document.getElementById('modal-overlay')
       const panel = document.getElementById('modal-content')
-      document.getElementById('modal-icon').textContent = icon
-      document.getElementById('modal-title').textContent = title
+      const iconEl = document.getElementById('modal-icon')
+      const titleEl = document.getElementById('modal-title')
       const msgEl = document.getElementById('modal-message')
+      const actionsEl = document.getElementById('modal-actions')
+
+      if (!overlay || !panel || !iconEl || !titleEl || !msgEl || !actionsEl) return
+
+      // Important for chained modals: hideModal() closes after the sheet animation.
+      // If a new modal opens before that timer fires, cancel the old close timer so
+      // the new modal is not hidden a split second later.
+      if (modalHideTimer) {
+        clearTimeout(modalHideTimer)
+        modalHideTimer = null
+      }
+
+      iconEl.textContent = icon || ''
+      titleEl.textContent = title || ''
+
       if (messageHtml !== undefined) {
         msgEl.innerHTML = messageHtml
       } else {
-        msgEl.textContent = message
+        msgEl.textContent = message || ''
       }
-      document.getElementById('modal-actions').innerHTML = actions.map(b => `<button onclick="${b.onclick}" class="flex-1 py-4 rounded-2xl font-semibold text-sm tap ${b.class}">${b.text}</button>`).join('')
+
+      actionsEl.innerHTML = ''
+      ;(actions || []).forEach((b) => {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.className = `flex-1 py-4 rounded-2xl font-semibold text-sm tap ${b.class || ''}`
+        btn.textContent = b.text || ''
+
+        if (typeof b.onclick === 'function') {
+          btn.addEventListener('click', b.onclick)
+        } else if (typeof b.onclick === 'string' && b.onclick.trim()) {
+          btn.addEventListener('click', () => {
+            Function(b.onclick)()
+          })
+        }
+
+        actionsEl.appendChild(btn)
+      })
+
       overlay.classList.remove('hidden')
       requestAnimationFrame(() => panel.classList.add('shown'))
     }
+
     function hideModal() {
       const overlay = document.getElementById('modal-overlay')
       const panel = document.getElementById('modal-content')
+      if (!overlay || !panel) return
+
+      if (modalHideTimer) {
+        clearTimeout(modalHideTimer)
+        modalHideTimer = null
+      }
+
       panel.classList.remove('shown')
-      setTimeout(() => overlay.classList.add('hidden'), 320)
+      modalHideTimer = setTimeout(() => {
+        overlay.classList.add('hidden')
+        modalHideTimer = null
+      }, 320)
     }
     document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') hideModal() })
 
