@@ -1752,7 +1752,7 @@ function msToCountdown(ms) {
     const _ownAnyCard = (_inv.double_points || 0) > 0 || (_inv.double_pick || 0) > 0
     const cardActionRow = (_offerCards && _ownAnyCard)
       ? `<button type="button"
-                 onclick="switchTab('profile'); setTimeout(()=>{document.getElementById('inventory-card')?.scrollIntoView({behavior:'smooth', block:'center'})}, 250)"
+                 onclick="armInventoryForFixture('${f.id}')"
                  class="tap"
                  style="margin-top:14px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;border-radius:14px;border:1px dashed #D4A24C;background:linear-gradient(135deg,#FFFBF2,#FDF3DD);color:#8A5A12;font-size:13px;font-weight:800;letter-spacing:0.01em;">
            <span style="font-size:15px;">🃏</span>
@@ -2091,6 +2091,47 @@ return `
       refreshProfileHeaderIfVisible('prediction_saved')
       patchFixtureCardAfterPredictionSave(id, submittedAt)
     }
+
+  // ---- Inventory deep-link (Issues 7 & 8) ----------------------------------
+  // When a player taps "Use a card on this match" on a fixture card we stash that
+  // fixture id so the inventory picker can target it directly (no re-picking),
+  // and so we can bounce the player back to the match after they pick a card.
+  window.pendingCardFixtureId = window.pendingCardFixtureId || null
+
+  function armInventoryForFixture(fixtureId) {
+    window.pendingCardFixtureId = fixtureId
+    if (typeof switchTab === 'function') switchTab('profile')
+    setTimeout(() => {
+      document.getElementById('inventory-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 250)
+  }
+
+  // Bounce the player to the Predict tab and focus the fixture they just carded
+  // so they can immediately enter their scoreline(s). focusAlt=true targets the
+  // Double Pick alt boxes (the ones still empty after arming).
+  function focusFixtureForPrediction(fixtureId, opts) {
+    opts = opts || {}
+    if (typeof switchTab === 'function') switchTab('predictions')
+    const tryFocus = (attempt) => {
+      attempt = attempt || 0
+      const safeId = String(fixtureId).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const card = document.querySelector(`[data-fixture="${safeId}"]`)
+      if (!card) {
+        if (attempt < 8) return setTimeout(() => tryFocus(attempt + 1), 120)
+        return
+      }
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const target = opts.focusAlt
+        ? card.querySelector('[data-alt-score][data-alt-side="home"]')
+        : card.querySelector('input.fixture-score-box')
+      if (target && typeof target.focus === 'function') {
+        setTimeout(() => { try { target.focus({ preventScroll: true }) } catch (e) { target.focus() } }, 350)
+      }
+    }
+    setTimeout(() => tryFocus(0), 60)
+  }
+  window.armInventoryForFixture = armInventoryForFixture
+  window.focusFixtureForPrediction = focusFixtureForPrediction
 
   function patchFixtureCardAfterPredictionSave(id, submittedAt) {
     // Do NOT re-render the whole fixture list after a save.

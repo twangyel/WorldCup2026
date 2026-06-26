@@ -2695,8 +2695,8 @@ async function renderInventoryCard() {
       if (!grid) return;
 
       const doubleCount = _inventoryState.double_points || 0;
-      const streakCount = _inventoryState.double_pick || 0;
-      const totalAvailable = doubleCount + streakCount;
+      // Double Pick retired — only Double Points is issued now.
+      const totalAvailable = doubleCount;
 
       if (totalCount) {
         totalCount.textContent = totalAvailable + ' item' + (totalAvailable !== 1 ? 's' : '');
@@ -2704,7 +2704,6 @@ async function renderInventoryCard() {
 
       grid.innerHTML = '';
       grid.appendChild(buildFlipCard('double_points', doubleCount));
-      grid.appendChild(buildFlipCard('double_pick', streakCount));
 
       // Empty state only matters if there are zero rows at all — but we always
       // show 2 cards now (spent ones included), so we keep this hidden unless
@@ -2796,6 +2795,8 @@ async function renderInventoryCard() {
      * to keep the bottom-sheet aesthetic consistent.
      */
     async function openCardTargetPicker(cardId) {
+      // Double Pick retired — ignore any stray entry point.
+      if (cardId === 'double_pick') return;
       const cfg = INVENTORY_CONFIG.cards[cardId];
       const cardName = cfg.name;
       const emoji = cfg.emoji;
@@ -2836,6 +2837,15 @@ async function renderInventoryCard() {
       if (open.length === 0) {
         showToast('No eligible matches. You may have already used a card on every open fixture.', 'info');
         return;
+      }
+
+      // Issue 7: if the player arrived here from a specific fixture card, target
+      // that match directly instead of making them pick it again. Clear the hint
+      // either way so a stale id can never leak into a later manual open.
+      const _wantedFixture = window.pendingCardFixtureId;
+      window.pendingCardFixtureId = null;
+      if (_wantedFixture && open.some(f => f.id === _wantedFixture)) {
+        return confirmCardPlay(cardId, _wantedFixture);
       }
 
       const optionsHtml = open.map(f => {
@@ -2921,10 +2931,8 @@ async function renderInventoryCard() {
       // Double Pick: defer consumption to save-time. Arming is pure local intent —
       // the card is only spent when a valid two-scoreline prediction is saved
       // (see handleSavePrediction). An accidental arm self-heals on reload.
+      // Double Pick retired — no-op guard in case a stale UI path calls in.
       if (cardId === 'double_pick') {
-        if (typeof dpArmedIntent !== 'undefined') dpArmedIntent[fixtureId] = cardId;
-        showToast('🎯 Double Pick armed — enter BOTH scorelines, then Save to lock it in.', 'info');
-        if (typeof renderFixtures === 'function') renderFixtures();
         return;
       }
 
@@ -2962,6 +2970,10 @@ async function renderInventoryCard() {
       if (typeof renderInventoryItems === 'function') renderInventoryItems();
       if (typeof loadMyCardPlays === 'function') await loadMyCardPlays();
       if (typeof renderFixtures === 'function') renderFixtures();
+      // Issue 8: take the player to the match they just boosted.
+      if (typeof focusFixtureForPrediction === 'function') {
+        focusFixtureForPrediction(fixtureId);
+      }
     }
 
     /**
@@ -3020,7 +3032,7 @@ async function confirmUseCard(cardId) {
   .from('player_inventory')
           .select('card_id')
           .eq('player_id', playerId)
-          .in('card_id', ['double_points', 'double_pick']);
+          .eq('card_id', 'double_points');
 
         if (checkError) {
           console.error('[Inventory] Error checking existing cards:', checkError);
@@ -3033,19 +3045,12 @@ async function confirmUseCard(cardId) {
           return;
         }
 
-        // Issue 1x Double Points + 1x Double Pick
+        // Issue 1x Double Points only. (Double Pick retired.)
         const now = new Date().toISOString();
         const inserts = [
           {
             player_id: playerId,
             card_id: 'double_points',
-            quantity: 1,
-            issued_at: now,
-            source: 'starter_pack'
-          },
-          {
-            player_id: playerId,
-            card_id: 'double_pick',
             quantity: 1,
             issued_at: now,
             source: 'starter_pack'
@@ -3064,7 +3069,7 @@ async function confirmUseCard(cardId) {
         console.log('[Inventory] Starter cards issued to player:', playerId);
 
         // Show welcome toast
-        showToast('🎒 Welcome! You received 2 starter cards. Check your inventory!', 'success');
+        showToast('🎒 Welcome! You received a Double Points card. Check your inventory!', 'success');
 
         // Refresh inventory display
         await loadPlayerInventory();
