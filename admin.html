@@ -2075,6 +2075,20 @@ async function stampMatchdaySnapshot(opts = {}) {
   }
 }
 
+// Bounds an await so a stalled backend (e.g. throttled project, hung Edge
+// Function) can never freeze the UI forever. Rejects after `ms`; callers
+// turn that into a clean toast + button reset instead of an infinite spinner.
+function withTimeout(promise, ms, label = 'Operation') {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)),
+      ms
+    )
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 async function executeRecalcAll() {
   const btn = document.getElementById('recalc-all-btn')
   const label = document.getElementById('recalc-all-label')
@@ -2099,7 +2113,12 @@ async function executeRecalcAll() {
       catch (e) { console.warn('[publish] baseline stamp failed (continuing):', e) }
     }
 
-    const result = await BonusEngine.recalculateAllBonuses()
+    // 3 min ceiling: generous enough for a slow/throttled run of all users,
+    // but guarantees the button can never spin forever. recalc is idempotent,
+    // so a timeout is safe to retry.
+    const result = await withTimeout(
+      BonusEngine.recalculateAllBonuses(), 180000, 'Scoring rebuild'
+    )
     const { users = 0, updated = 0, errors = 0 } = result || {}
 
     // ───────── Forward-stamp baseline for the NEXT matchday ─────────
@@ -2131,7 +2150,9 @@ async function executeRecalcAll() {
             .limit(1)
             .maybeSingle()
 
-          const postStats = await _adminFetchOverallStandings()
+          const postStats = await withTimeout(
+            _adminFetchOverallStandings(), 30000, 'Standings fetch'
+          )
           if (postStats && postStats.length > 0) {
             const postRanks = {}
             postStats.forEach((s, i) => { if (s.user_id) postRanks[s.user_id] = i + 1 })
@@ -2192,7 +2213,9 @@ async function executeRecalcAll() {
     if (errors > 0) {
   showToast(`Done with ${errors} error${errors === 1 ? '' : 's'}. ${updated} row${updated === 1 ? '' : 's'} updated across ${users} player${users === 1 ? '' : 's'}. Check console.`, 'error')
 } else {
-  await sendUserPush(
+  // Fire-and-forget: a slow/hung send-push Edge Function must never freeze
+  // the publish. sendUserPush already swallows its own errors internally.
+  sendUserPush(
     '🏁 Results Published',
     'Latest match results and points are now updated. Check your standing!',
     '/index.html'
