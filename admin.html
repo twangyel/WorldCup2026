@@ -16,6 +16,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/knockout-scoring.js"></script>
   <script src="/assets/js/bonus-engine.js"></script>
   
   <script>
@@ -4073,6 +4074,23 @@ async function executeSaveScore(id) {
   if (!editableIds.has(id)) {
     showToast('This match is locked. Only the next upcoming match(es) can be scored.', 'error')
     return
+  }
+
+  // Prize-money safety: never persist a knockout DRAW score without a pen winner,
+  // regardless of entry path (fresh save, overwrite modal, or any future caller).
+  // saveScore() guards before showing the overwrite modal, but that modal calls
+  // executeSaveScore() directly — so we re-assert the invariant at the write source.
+  {
+    const fGuard = allFixtures.find(x => x.id === id)
+    const sGuard = pendingScores[id] || {}
+    const koGuard = fGuard && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(fGuard.stage)
+    const gHome = sGuard.home !== undefined ? sGuard.home : fGuard?.home_score
+    const gAway = sGuard.away !== undefined ? sGuard.away : fGuard?.away_score
+    const gFilled = gHome !== null && gHome !== undefined && gAway !== null && gAway !== undefined
+    if (koGuard && gFilled && gHome === gAway && !sGuard.penaltyWinner) {
+      showToast('Knockout draw — pick the penalty shootout winner before saving.', 'error')
+      return
+    }
   }
 
   const s = pendingScores[id] || {}

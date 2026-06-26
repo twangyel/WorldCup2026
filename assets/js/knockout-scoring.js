@@ -32,26 +32,35 @@
   // Group stages: 'Group A' through 'Group L'.
   // Values are compared case-insensitively (lowercased + trimmed).
   // Add alternate slug forms below if seed scripts or imports ever use them.
+  // normalizeStage collapses case, dashes, underscores, and runs of
+  // whitespace to a single canonical form. This is what lets a single set
+  // entry like 'quarter final' match 'Quarter-Final', 'Quarter_Final',
+  // 'quarter   final', etc. — so a seed/import that writes a spaced or
+  // hyphenated variant can never silently fall back to legacy scoring.
+  function normalizeStage(stage) {
+    return String(stage || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+
   const KNOCKOUT_STAGES = new Set([
-    // Production values (case-insensitive match via toLowerCase below)
-    'round of 32',
-    'round of 16',
-    'quarterfinal',
-    'semifinal',
-    'third place',
-    'final',
-    // Defensive aliases — accept slug forms too in case any import script
-    // ever writes them. Cheap to include; prevents silent failures.
-    'round_of_32', 'r32',
-    'round_of_16', 'r16',
-    'quarter_final', 'qf',
-    'semi_final', 'sf',
-    'third_place'
+    // All values are stored post-normalizeStage (lowercased, dashes/underscores
+    // → space, collapsed whitespace). Production values plus every alias seen
+    // in the wild; both the compact ('quarterfinal') and spaced
+    // ('quarter final') forms are listed because they normalize differently.
+    'round of 32', 'r32',
+    'round of 16', 'r16',
+    'quarterfinal', 'quarter final', 'qf',
+    'semifinal', 'semi final', 'sf',
+    'third place', '3rd place',
+    'final'
   ]);
 
   function isKnockoutStage(stage) {
     if (!stage) return false;
-    return KNOCKOUT_STAGES.has(String(stage).toLowerCase().trim());
+    return KNOCKOUT_STAGES.has(normalizeStage(stage));
   }
 
   // ---------------------------------------------------------------------------
@@ -148,24 +157,45 @@
 
     if (ph === null || pa === null || ah === null || aa === null) return 0;
 
-    // Tier 1: Exact scoreline (5 pts)
-    // Uses the RECORDED scoreline (90'/ET), so pen results never grant exact.
-    if (ph === ah && pa === aa) return 5;
+    const isKO = isKnockoutStage(fixture && fixture.stage);
+    const actualDraw = (ah === aa);
+    const predDraw = (ph === pa);
 
+    // Guard A — knockout draw with no recorded pen winner is incomplete/unsafe
+    // data: we cannot know who advanced, so nothing scores. Prevents an exact
+    // 1-1 collecting 5 before a pen winner has been entered.
+    if (isKO && actualDraw && !fixture.penalty_winner) return 0;
+
+    // Guard B — a DRAW prediction on a DECISIVE knockout result scores 0.
+    // advance_pick only adjudicates an actual shootout; it cannot rescue a draw
+    // prediction when the match did not end level. (e.g. predict 1-1 + home,
+    // match ends 2-1 → 0, NOT 2.)
+    if (isKO && predDraw && !actualDraw) return 0;
+
+    // WINNER GATE FIRST — before the exact tier. This is the critical ordering
+    // fix: on a shootout, an exact recorded draw (1-1) with a wrong or missing
+    // advance_pick must score 0, never 5. We therefore confirm the predicted
+    // advancing team matches the effective (pen) winner BEFORE awarding exact.
     const predictedWinner = getPredictedWinner(prediction, fixture);
     const effectiveWinner = getEffectiveWinner(fixture);
 
     if (!predictedWinner || !effectiveWinner) return 0;
     if (predictedWinner !== effectiveWinner) return 0; // wrong winner → 0
 
-    // Tier 2: Goal difference (3 pts)
+    // Tier 1: Exact scoreline (5 pts).
+    // Uses the RECORDED scoreline (90'/ET), so pen results never grant exact.
+    // Reached only once the winner gate has passed, so a 1-1 exact only earns 5
+    // when the player also picked the correct pen winner.
+    if (ph === ah && pa === aa) return 5;
+
+    // Tier 2: Goal difference (3 pts).
     // Compares recorded GDs. In shootout matches, actual GD is always 0,
     // so only draw predictions can qualify for GD tier in shootouts.
     const predictedGd = ph - pa;
     const actualGd = ah - aa;
     if (predictedGd === actualGd) return 3;
 
-    // Tier 3: Correct winner only (2 pts)
+    // Tier 3: Correct winner only (2 pts).
     return 2;
   }
 

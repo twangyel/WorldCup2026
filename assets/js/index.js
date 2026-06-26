@@ -1943,7 +1943,7 @@ return `
       const isKnockout = fxForCheck && window.KnockoutScoring && window.KnockoutScoring.isKnockoutStage(fxForCheck.stage)
       if (isKnockout) {
         const primaryDraw = home === away
-        const altDraw = (cpForSave?.card_type === 'double_pick')
+        const altDraw = dpArmed
           && altHomeSaved !== null && altAwaySaved !== null
           && altHomeSaved === altAwaySaved
         if ((primaryDraw || altDraw) && !pending.advance_pick) {
@@ -1980,7 +1980,7 @@ return `
       if (error) { showToast(error.message, 'error'); return }
 
       // If Double Pick is armed on this match, persist alt scores.
-      if (cpForSave?.card_type === 'double_pick') {
+      if (dpArmed) {
         try {
           const { error: altSaveError } = await supabaseClient
             .from('predictions')
@@ -2010,7 +2010,7 @@ return `
       let advancePickSaved = null
       if (isKnockout) {
         const primaryDrawFinal = home === away
-        const altDrawFinal = (cpForSave?.card_type === 'double_pick')
+        const altDrawFinal = dpArmed
           && altHomeSaved !== null && altAwaySaved !== null
           && altHomeSaved === altAwaySaved
         const shouldWritePick = (primaryDrawFinal || altDrawFinal) && pending.advance_pick
