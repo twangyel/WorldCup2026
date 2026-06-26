@@ -7325,7 +7325,7 @@ function cardBadgeHtml(b) {
   const bg = isDp ? 'linear-gradient(135deg,#FFC964,#E07A1F)' : 'linear-gradient(135deg,#7EC8FF,#2E6FBF)'
   const fg = isDp ? '#3A2410' : '#ffffff'
   return '<span style="display:inline-flex;align-items:center;gap:3px;background:' + bg + ';color:' + fg +
-    ';font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:0.04em;vertical-align:middle;margin-left:4px;">' +
+    ';font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:0.04em;white-space:nowrap;flex-shrink:0;vertical-align:middle;margin-left:4px;">' +
     b.icon + ' ' + b.label + '</span>'
 }
 
@@ -7544,15 +7544,16 @@ async function renderPredictionHistory() {
       '</div>'
     }
 
-    const ptsPill = '<span class="text-xs font-extrabold px-2.5 py-1 rounded-full shrink-0 ' + (fin > 0 ? meta.chip : 'bg-gray-200 text-gray-500') + '" style="font-variant-numeric:tabular-nums;">' + (fin > 0 ? '+' + fmt(fin) : '0') + '</span>'
+   const ptsPill = '<span class="text-xs font-extrabold px-2.5 py-1 rounded-lg shrink-0 ' + (fin > 0 ? meta.chip : 'bg-gray-200 text-gray-500') + '" style="font-variant-numeric:tabular-nums;">' + (fin > 0 ? '+' + fmt(fin) : '0') + '</span>'
 
     return '<div class="p-3 rounded-2xl ' + (fin > 0 ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-gray-50 border border-gray-100') + '">' +
       '<div class="flex items-center gap-3">' + flags +
         '<div class="flex-1 min-w-0">' +
           '<div class="flex items-center gap-2"><span class="text-xs font-semibold text-ink-700 truncate">' + matchTitle + '</span>' +
-            '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' + meta.chip + ' shrink-0">' + meta.word + '</span>' + cardBadgeHtml(resolveCardBadge(f.id, r)) + '</div>' +
+            '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ' + meta.chip + ' shrink-0">' + meta.word + '</span>' +
+            '<span class="flex items-center gap-1.5 ml-auto shrink-0">' + cardBadgeHtml(resolveCardBadge(f.id, r)) + ptsPill + '</span></div>' +
           '<div class="text-[11px] text-ink-500">' + dateStage + '</div>' +
-        '</div>' + ptsPill +
+        '</div>' +
       '</div>' +
       pickVsResult +
       (submittedAt ? '<div class="text-[10px] text-ink-400 mt-1">Predicted ' + submittedAt + '</div>' : '') +
