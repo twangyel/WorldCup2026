@@ -266,23 +266,23 @@ async function recalculateScores() {
 
 async function seedBracketSlots() {
   const slots = [
-    // ROUND OF 32 (16 matches)
-    { round: 'r32', match_number: 1,  slot_label: 'R32-M1: 1st A vs 3rd B/C/D',     points_value: 2 },
-    { round: 'r32', match_number: 2,  slot_label: 'R32-M2: 2nd C vs 2nd D',          points_value: 2 },
-    { round: 'r32', match_number: 3,  slot_label: 'R32-M3: 1st E vs 3rd A/B/C/F',    points_value: 2 },
-    { round: 'r32', match_number: 4,  slot_label: 'R32-M4: 2nd G vs 2nd H',          points_value: 2 },
-    { round: 'r32', match_number: 5,  slot_label: 'R32-M5: 1st B vs 3rd A/D/E/F',    points_value: 2 },
-    { round: 'r32', match_number: 6,  slot_label: 'R32-M6: 2nd A vs 2nd B',          points_value: 2 },
-    { round: 'r32', match_number: 7,  slot_label: 'R32-M7: 1st D vs 3rd B/E/F/G',    points_value: 2 },
-    { round: 'r32', match_number: 8,  slot_label: 'R32-M8: 2nd E vs 2nd F',          points_value: 2 },
-    { round: 'r32', match_number: 9,  slot_label: 'R32-M9: 1st C vs 3rd D/E/F/G',    points_value: 2 },
-    { round: 'r32', match_number: 10, slot_label: 'R32-M10: 2nd I vs 2nd J',         points_value: 2 },
-    { round: 'r32', match_number: 11, slot_label: 'R32-M11: 1st G vs 3rd A/B/C/H',   points_value: 2 },
-    { round: 'r32', match_number: 12, slot_label: 'R32-M12: 2nd K vs 2nd L',         points_value: 2 },
-    { round: 'r32', match_number: 13, slot_label: 'R32-M13: 1st F vs 3rd C/D/E/H',   points_value: 2 },
-    { round: 'r32', match_number: 14, slot_label: 'R32-M14: 2nd M vs 2nd N',         points_value: 2 },
-    { round: 'r32', match_number: 15, slot_label: 'R32-M15: 1st H vs 3rd E/F/G/I',   points_value: 2 },
-    { round: 'r32', match_number: 16, slot_label: 'R32-M16: 2nd O vs 2nd P',         points_value: 2 },
+   // ROUND OF 32 (16 matches) — World Cup 2026 official structure
+{ round: 'r32', match_number: 1,  slot_label: 'R32-M1 / Match 73: 2nd A vs 2nd B',                 points_value: 2 },
+{ round: 'r32', match_number: 2,  slot_label: 'R32-M2 / Match 74: 1st E vs 3rd A/B/C/D/F',          points_value: 2 },
+{ round: 'r32', match_number: 3,  slot_label: 'R32-M3 / Match 75: 1st F vs 2nd C',                  points_value: 2 },
+{ round: 'r32', match_number: 4,  slot_label: 'R32-M4 / Match 76: 1st C vs 2nd F',                  points_value: 2 },
+{ round: 'r32', match_number: 5,  slot_label: 'R32-M5 / Match 77: 1st I vs 3rd C/D/F/G/H',          points_value: 2 },
+{ round: 'r32', match_number: 6,  slot_label: 'R32-M6 / Match 78: 2nd E vs 2nd I',                  points_value: 2 },
+{ round: 'r32', match_number: 7,  slot_label: 'R32-M7 / Match 79: 1st A vs 3rd C/E/F/H/I',          points_value: 2 },
+{ round: 'r32', match_number: 8,  slot_label: 'R32-M8 / Match 80: 1st L vs 3rd E/H/I/J/K',          points_value: 2 },
+{ round: 'r32', match_number: 9,  slot_label: 'R32-M9 / Match 81: 1st D vs 3rd B/E/F/I/J',          points_value: 2 },
+{ round: 'r32', match_number: 10, slot_label: 'R32-M10 / Match 82: 1st G vs 3rd A/E/H/I/J',         points_value: 2 },
+{ round: 'r32', match_number: 11, slot_label: 'R32-M11 / Match 83: 2nd K vs 2nd L',                 points_value: 2 },
+{ round: 'r32', match_number: 12, slot_label: 'R32-M12 / Match 84: 1st H vs 2nd J',                 points_value: 2 },
+{ round: 'r32', match_number: 13, slot_label: 'R32-M13 / Match 85: 1st B vs 3rd E/F/G/I/J',         points_value: 2 },
+{ round: 'r32', match_number: 14, slot_label: 'R32-M14 / Match 86: 1st J vs 2nd H',                 points_value: 2 },
+{ round: 'r32', match_number: 15, slot_label: 'R32-M15 / Match 87: 1st K vs 3rd D/E/I/J/L',         points_value: 2 },
+{ round: 'r32', match_number: 16, slot_label: 'R32-M16 / Match 88: 2nd D vs 2nd G',                 points_value: 2 },
 
     // ROUND OF 16 (8 matches)
     { round: 'r16', match_number: 1,  slot_label: 'R16-M1: W R32-M1 vs W R32-M2',   points_value: 3 },

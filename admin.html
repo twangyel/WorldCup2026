@@ -1011,6 +1011,39 @@ function flagHtml(name, size = 24) {
     let prizeSettings = { currency: 'Nu.', entry_fee: 0, manual_override: false, manual_amount: 0, house_fee_pct: 0, house_fee_note: 'Organizing & hosting', split_1st: 50, split_2nd: 30, split_3rd: 20 }
     const pendingScores = {}
     const pendingKickoffs = {}
+    let editingFixtureId = null
+
+    // Small local escaping helpers for admin-rendered fixture edit fields.
+    // The older admin page interpolates several values directly, but the edit
+    // form should not introduce any new injection surface while admins type
+    // team/stage names into the database.
+    function adminEscapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function adminEscapeJs(value) {
+      return String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+    }
+
+    function formatDatetimeLocal(value) {
+      const d = new Date(value)
+      if (Number.isNaN(d.getTime())) return ''
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    }
+
+    function fixtureHasScore(fixture) {
+      return fixture?.home_score !== null && fixture?.home_score !== undefined
+          || fixture?.away_score !== null && fixture?.away_score !== undefined
+    }
 
     // ============== CHIME ==============
     // Browsers block sound until the admin has interacted with the page once.
@@ -3300,38 +3333,202 @@ document.getElementById('add-user-form').addEventListener('submit', async (e) =>
       document.getElementById('fix-count').textContent = `${allFixtures.length} fixture${allFixtures.length === 1 ? '' : 's'}`
       if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => {
-               const d = new Date(f.kickoff)
-        const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-        const locked = f.home_score !== null
+        const localIso = formatDatetimeLocal(f.kickoff)
+        const locked = fixtureHasScore(f)
+        const isEditing = editingFixtureId === f.id
+        const safeId = adminEscapeJs(f.id)
+        const safeHome = adminEscapeHtml(f.home_team || '')
+        const safeAway = adminEscapeHtml(f.away_team || '')
+        const safeStage = adminEscapeHtml(f.stage || '')
+        const editPanel = isEditing && !locked ? `
+          <div class="rounded-2xl border border-brand-500/30 bg-brand-50/60 p-3 space-y-3">
+            <div class="flex items-start gap-2 text-[11px] text-ink-600 leading-relaxed">
+              <span class="mt-0.5">🛡️</span>
+              <span>Safe edit: this updates the existing fixture row. Predictions/cards stay linked to this same fixture ID. If any already exist, you will get a warning before saving.</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="fld-label">Home Team</label>
+                <input type="text" id="edit-home-${f.id}" class="fld text-sm py-3" value="${safeHome}" placeholder="e.g. Argentina">
+              </div>
+              <div>
+                <label class="fld-label">Away Team</label>
+                <input type="text" id="edit-away-${f.id}" class="fld text-sm py-3" value="${safeAway}" placeholder="e.g. TBD">
+              </div>
+            </div>
+            <div>
+              <label class="fld-label">Stage</label>
+              <input type="text" id="edit-stage-${f.id}" class="fld text-sm py-3" value="${safeStage}" placeholder="e.g. Round of 32">
+            </div>
+            <div>
+              <label class="fld-label">Kickoff</label>
+              <input type="datetime-local" id="edit-kickoff-${f.id}" class="fld text-sm py-3" value="${localIso}">
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button onclick="cancelFixtureEdit()" class="flex-1 bg-paper border border-paper-border text-ink-700 text-xs font-semibold px-4 py-3 rounded-xl tap">Cancel</button>
+              <button onclick="saveFixtureEdit('${safeId}')" class="flex-1 bg-emerald-700 text-white text-xs font-semibold px-4 py-3 rounded-xl tap">Save Fixture</button>
+            </div>
+          </div>
+        ` : ''
+
         return `
         <div class="px-5 py-4 space-y-3">
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-sm flex items-start gap-1.5 flex-wrap leading-tight">
                 ${flagHtml(f.home_team, 20)}
-                <span class="line-clamp-2">${f.home_team}</span>
+                <span class="line-clamp-2">${safeHome}</span>
                 <span class="text-ink-300 mt-0.5">vs</span>
                 ${flagHtml(f.away_team, 20)}
-                <span class="line-clamp-2">${f.away_team}</span>
+                <span class="line-clamp-2">${safeAway}</span>
               </div>
-              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${f.stage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}</div>
+              <div class="text-[11px] text-ink-500 mt-0.5 uppercase tracking-wider font-semibold">${safeStage}${locked ? ` · FT ${f.home_score}–${f.away_score}` : ''}</div>
             </div>
-            <button onclick="confirmDeleteFixture('${f.id}')" class="text-ink-400 hover:text-red-500 p-1.5 tap shrink-0">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
-            </button>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="toggleFixtureEdit('${safeId}')" ${locked ? 'disabled title="Scored fixtures cannot be edited safely"' : ''} class="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-paper-border ${locked ? 'opacity-30 text-ink-400' : 'text-brand-700 bg-brand-50 hover:bg-brand-100'} tap">
+                ${isEditing ? 'Close' : 'Edit'}
+              </button>
+              <button onclick="confirmDeleteFixture('${safeId}')" class="text-ink-400 hover:text-red-500 p-1.5 tap">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+              </button>
+            </div>
           </div>
           <div class="flex items-center gap-2">
-  <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${f.id}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}">
-  <button onclick="saveKickoff('${f.id}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
-</div>
+            <input type="datetime-local" value="${localIso}" ${locked ? 'disabled' : ''} onchange="pendingKickoffs['${safeId}']=this.value" class="fld flex-1 text-xs py-2.5 ${locked ? 'opacity-50' : ''}">
+            <button onclick="saveKickoff('${safeId}')" ${locked ? 'disabled' : ''} class="bg-ink-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl tap ${locked ? 'opacity-30' : ''}">Save</button>
+          </div>
+
+          ${editPanel}
 
 ${!locked ? `
-  <button onclick="sendMatchReminder('${f.id}')" class="btn-ghost tap text-xs py-2.5">
+  <button onclick="sendMatchReminder('${safeId}')" class="btn-ghost tap text-xs py-2.5">
     🔔 Send Match Reminder
   </button>
 ` : ''}
         </div>`
       }).join('')
+    }
+
+    function toggleFixtureEdit(id) {
+      const f = allFixtures.find(x => x.id === id)
+      if (!f) return showToast('Fixture not found', 'error')
+      if (fixtureHasScore(f)) return showToast('Scored fixtures cannot be edited safely', 'warning')
+      editingFixtureId = editingFixtureId === id ? null : id
+      renderFixturesManage()
+    }
+
+    function cancelFixtureEdit() {
+      editingFixtureId = null
+      renderFixturesManage()
+    }
+
+    function readFixtureEditValue(id, field) {
+      return (document.getElementById(`edit-${field}-${id}`)?.value || '').trim()
+    }
+
+    async function getFixtureLinkedCounts(id) {
+      const counts = { predictions: 0, cardPlays: 0, predictionResults: 0 }
+      const checks = [
+        ['predictions', 'predictions'],
+        ['card_plays', 'cardPlays'],
+        ['prediction_results', 'predictionResults']
+      ]
+
+      const results = await Promise.allSettled(checks.map(([table]) =>
+        supabaseClient.from(table).select('id', { count: 'exact', head: true }).eq('fixture_id', id)
+      ))
+
+      results.forEach((result, idx) => {
+        const key = checks[idx][1]
+        if (result.status !== 'fulfilled') {
+          console.warn(`[fixture edit] ${checks[idx][0]} count failed:`, result.reason)
+          return
+        }
+        if (result.value?.error) {
+          console.warn(`[fixture edit] ${checks[idx][0]} count failed:`, result.value.error)
+          return
+        }
+        counts[key] = result.value?.count || 0
+      })
+
+      return counts
+    }
+
+    async function saveFixtureEdit(id, force = false) {
+      const f = allFixtures.find(x => x.id === id)
+      if (!f) return showToast('Fixture not found', 'error')
+      if (fixtureHasScore(f)) return showToast('Scored fixtures cannot be edited safely', 'warning')
+
+      const home = readFixtureEditValue(id, 'home')
+      const away = readFixtureEditValue(id, 'away')
+      const stage = readFixtureEditValue(id, 'stage')
+      const kickoffValue = readFixtureEditValue(id, 'kickoff')
+
+      if (!home || !away || !stage || !kickoffValue) {
+        showToast('Home, away, stage and kickoff are required', 'warning')
+        return
+      }
+
+      const kickoffDate = new Date(kickoffValue)
+      if (Number.isNaN(kickoffDate.getTime())) {
+        showToast('Invalid kickoff date/time', 'error')
+        return
+      }
+
+      const updates = {
+        home_team: home,
+        away_team: away,
+        stage,
+        kickoff: kickoffDate.toISOString()
+      }
+
+      const changed =
+        (f.home_team || '') !== updates.home_team ||
+        (f.away_team || '') !== updates.away_team ||
+        (f.stage || '') !== updates.stage ||
+        new Date(f.kickoff).toISOString() !== updates.kickoff
+
+      if (!changed) {
+        showToast('No changes to save', 'warning')
+        return
+      }
+
+      if (!force) {
+        const counts = await getFixtureLinkedCounts(id)
+        const linkedTotal = counts.predictions + counts.cardPlays + counts.predictionResults
+        if (linkedTotal > 0) {
+          showModal({
+            icon: '⚠️',
+            title: 'Fixture has linked data',
+            message: `This fixture already has ${counts.predictions} prediction(s), ${counts.cardPlays} card play(s), and ${counts.predictionResults} result row(s). Updating teams/stage/kickoff keeps the same fixture ID, so linked data stays attached. Continue only if this is the correct slot.`,
+            actions: [
+              { text: 'Cancel', onclick: 'hideModal()', class: 'bg-paper border border-paper-border text-ink-700' },
+              { text: 'Save Anyway', onclick: `hideModal(); saveFixtureEdit('${adminEscapeJs(id)}', true)`, class: 'bg-amber-600 text-white' }
+            ]
+          })
+          return
+        }
+      }
+
+      const { data, error } = await supabaseClient
+        .from('fixtures')
+        .update(updates)
+        .eq('id', id)
+        .select('*')
+        .single()
+
+      if (error) {
+        console.error('[fixture edit] update failed:', error)
+        showToast(error.message || 'Fixture update failed', 'error')
+        return
+      }
+
+      Object.assign(f, data || updates)
+      delete pendingKickoffs[id]
+      editingFixtureId = null
+      renderFixturesManage()
+      renderResults()
+      showToast('Fixture updated safely', 'success')
     }
 
     async function saveKickoff(id) {

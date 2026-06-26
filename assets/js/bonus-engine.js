@@ -153,7 +153,7 @@ const BONUS_CONFIG = {
       'Group A': 1, 'Group B': 1, 'Group C': 1, 'Group D': 1,
       'Group E': 1, 'Group F': 1, 'Group G': 1, 'Group H': 1,
       'Group I': 1, 'Group J': 1, 'Group K': 1, 'Group L': 1,
-      'Round of 32': 1,
+      'Round of 32': 1.5,
       'Round of 16': 1.5,
       'Quarter Final': 1.5,
       'Quarter-Final': 1.5,
@@ -163,7 +163,7 @@ const BONUS_CONFIG = {
       'Third Place': 1.5,
       '3rd Place': 1.5
     },
-    roundToNearest: 1  // 7.5 stays 7.5, or set to 1 to round to whole numbers
+    roundToNearest: 1  // 1 = round to nearest whole point. All fractional values are X.5, so Math.round always rounds UP (7.5→8, 12.5→13). Set to 0 to preserve half-points.
   }
 };
 
