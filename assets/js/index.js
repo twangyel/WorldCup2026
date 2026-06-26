@@ -10772,6 +10772,21 @@ async function loadLeagueLeaderboardView(leagueId) {
 // safe and intentionally omit sensitive card/bracket inference.
 // ============================================================
 (function () {
+  // LAUNCH STABILITY SWITCH:
+  // Global Activity Feed is disabled for Sunday launch to stop background
+  // activity_feed reads, realtime channel subscription, and the 60s polling loop.
+  // Keep these no-op globals because other leaderboard code safely calls them.
+  const GLOBAL_ACTIVITY_FEED_ENABLED = false;
+  if (!GLOBAL_ACTIVITY_FEED_ENABLED) {
+    window.ensureGlobalActivityFeedUI = function () {};
+    window.updateGlobalActivityFeed = function () {};
+    window.setGlobalActivityFeedOpen = function () {};
+    window.refreshActivityFeed = function () { return Promise.resolve(); };
+    try { document.body && document.body.classList.remove('ga-feed-open'); } catch (_) {}
+    console.log('[activity_feed] Global Activity Feed disabled for launch stability.');
+    return;
+  }
+
   const FEED_ROOT_ID = 'global-activity-feed-root';
   const FAB_POS_KEY = 'wcpl-ga-fab-position-v2';
   const FILTERS = [

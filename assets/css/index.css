@@ -11253,3 +11253,31 @@ html.dark-mode .fixture-card-action-btn-pick {
   box-shadow: none !important;
 }
 
+
+/* ============================================================
+   LAUNCH STABILITY: Global Activity Feed disabled
+   ------------------------------------------------------------
+   JS disables Supabase reads/realtime. This CSS hides any leftover
+   panel/FAB markup if an older cached script created it.
+   ============================================================ */
+#global-activity-feed-root,
+#global-activity-fab,
+#global-activity-panel,
+#global-activity-backdrop,
+#globalActivityFeed,
+#activityFeed,
+#activityFeedRoot,
+#feedRoot,
+#globalFeedFab,
+.feed-fab,
+.activity-feed,
+.global-activity-feed,
+.global-activity-panel,
+.global-activity-backdrop {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+body.ga-feed-open {
+  overflow: auto !important;
+}
