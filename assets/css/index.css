@@ -6440,6 +6440,13 @@ body.bracket-status-hidden .bracket-home-card {
       margin-top: 14px;
 }
 
+/* Single-card inventory (Double Pick retired): center one card instead of
+   leaving it pinned to the left column of a 2-up grid. */
+.inv-grid.is-single {
+  grid-template-columns: min(220px, 70%);
+  justify-content: center;
+}
+
 .inv-flip {
   position: relative;
       

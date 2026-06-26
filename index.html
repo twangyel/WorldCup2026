@@ -1582,7 +1582,7 @@
               <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl">🎒</div>
               <div>
                 <div class="text-sm font-bold text-ink-900">Inventory</div>
-                <div class="text-[11px] text-ink-500 mt-0.5">Boosters & Double Pick</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">Booster cards</div>
               </div>
             </button>
           </div>
@@ -1778,14 +1778,14 @@
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xl border border-white/20 shadow-sm">🎒</div>
                 <div>
                   <h3 class="font-bold tracking-tight text-ink-900">Your Inventory</h3>
-                  <p class="text-[11px] text-ink-500 mt-0.5">Boosters & Insurance cards</p>
+                  <p class="text-[11px] text-ink-500 mt-0.5">Booster cards</p>
                 </div>
               </div>
               <span id="inventory-total-count" class="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full">0 items</span>
             </div>
 
             <!-- Boosters + Insurance as a 2-col flip-card grid -->
-            <div id="inventory-card-grid" class="inv-grid">
+            <div id="inventory-card-grid" class="inv-grid is-single">
               <!-- Populated by JS -->
             </div>
 
@@ -1803,33 +1803,20 @@
               <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl border border-white/15 backdrop-blur-sm">🎒</div>
               <div>
                 <h3 class="font-bold tracking-tight text-white">Your Inventory</h3>
-                <p class="text-[11px] text-white/50 mt-0.5">Boosters & Double Pick cards</p>
+                <p class="text-[11px] text-white/50 mt-0.5">Booster cards</p>
               </div>
             </div>
 
             <!-- Same flip-card grid as live, but locked. No flip, no sheen, dimmed. -->
-            <div class="inv-grid relative z-10">
+            <div class="inv-grid is-single relative z-10">
               <div class="inv-flip is-locked" aria-hidden="true">
                 <div class="inv-flip-inner">
                   <div class="inv-face inv-face-front is-booster">
                     <span class="inv-corner tl">WC 26</span>
                     <span class="inv-corner tr">⚡</span>
                     <span class="inv-pill">BOOSTER</span>
-                    <div class="inv-glyph">🔗</div>
+                    <div class="inv-glyph">⚡</div>
                     <div class="inv-title">Double Points</div>
-                    <div class="inv-subtitle">One-time use</div>
-                    <span class="inv-corner br">WC 26</span>
-                  </div>
-                </div>
-              </div>
-              <div class="inv-flip is-locked" aria-hidden="true">
-                <div class="inv-flip-inner">
-                  <div class="inv-face inv-face-front is-insurance">
-                    <span class="inv-corner tl">WC 26</span>
-                    <span class="inv-corner tr">🎯</span>
-                    <span class="inv-pill">BOOSTER</span>
-                    <div class="inv-glyph">🎯</div>
-                    <div class="inv-title">Double Pick</div>
                     <div class="inv-subtitle">One-time use</div>
                     <span class="inv-corner br">WC 26</span>
                   </div>

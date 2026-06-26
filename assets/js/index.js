@@ -8868,6 +8868,54 @@ window.replayChampionCelebration = function() {
   checkAndCelebrateTournamentEnd({ trigger: 'manual', force: true })
 }
 
+// ---- Booster card announcement -------------------------------------------
+// One-time intro for the Double Points booster. Appears from Sunday 9:00 AM
+// Bhutan (UTC+6) the next time a player opens the app. Dismiss via the button,
+// by tapping outside, or it auto-hides after a few seconds. Shown once per
+// device (localStorage), so it never nags on every open.
+function maybeShowBoosterAnnouncement() {
+  try {
+    const SEEN_KEY = 'boosterLaunchAnnounceSeen_v1'
+    const ANNOUNCE_TITLE = 'Booster Card Incoming!'
+
+    let seen = false
+    try { seen = localStorage.getItem(SEEN_KEY) === '1' } catch (_) {}
+    if (seen) return
+    if (typeof showModal !== 'function') return
+
+    const markSeen = () => { try { localStorage.setItem(SEEN_KEY, '1') } catch (_) {} }
+
+    showModal({
+      icon: '\u26A1',
+      title: ANNOUNCE_TITLE,
+      messageHtml:
+        '<div class="text-sm text-ink-700" style="line-height:1.55;">' +
+          'A new <b>Double Points</b> booster card goes live <b>this Sunday at 9:00 AM</b>. ' +
+          'Play it on any one upcoming match to <b>double your base points</b> for that game \u2014 ' +
+          'your streak and combo bonuses still stack on top.' +
+          '<div style="margin-top:10px;color:#6B7280;font-size:12px;">' +
+            'It\'ll appear in <b>Profile \u2192 Your Inventory</b> the moment it launches. One-time use, so pick your match wisely.' +
+          '</div>' +
+        '</div>',
+      actions: [
+        { text: 'Got it!', onclick: () => { markSeen(); hideModal() }, class: 'bg-ink-900 text-white' }
+      ]
+    })
+    // Mark as seen the moment it's shown, so closing via outside-tap also counts.
+    markSeen()
+
+    // Fallback auto-hide after 14s — but only if it's still THIS modal on screen.
+    setTimeout(() => {
+      const overlay = document.getElementById('modal-overlay')
+      const titleEl = document.getElementById('modal-title')
+      if (overlay && !overlay.classList.contains('hidden') &&
+          titleEl && titleEl.textContent === ANNOUNCE_TITLE) {
+        hideModal()
+      }
+    }, 14000)
+  } catch (e) { console.error('[announce] booster announcement failed:', e) }
+}
+
 async function showApp() {
   try {
     document.getElementById('auth-screen').classList.add('hidden')
@@ -8960,6 +9008,10 @@ async function showApp() {
 
     // After the app is up, check whether the tournament has ended.
     try { checkAndCelebrateTournamentEnd({ trigger: 'app-load' }) } catch (e) { console.error('[champion] check on load failed:', e) }
+
+    // One-time booster intro (from Sunday 9 AM Bhutan). Slight delay so it lands
+    // after the home tab settles and never races the champion celebration.
+    setTimeout(() => { try { maybeShowBoosterAnnouncement() } catch (_) {} }, 1200)
   } catch (err) {
     console.error('showApp error:', err)
     showToast('Something went wrong loading the app. Please refresh.', 'error')
