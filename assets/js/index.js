@@ -1730,14 +1730,21 @@ function msToCountdown(ms) {
     const _ownDoublePoints = (_inv.double_points || 0) > 0
     const _ownDoublePick   = (_inv.double_pick   || 0) > 0 && !_dpArmedAnywhere   // can't arm two at once
     const cardActionRow = (_offerCards && (_ownDoublePoints || _ownDoublePick))
-      ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">`
+      ? `<div class="fixture-card-panel">
+           <div class="fixture-card-panel-label">Optional cards</div>
+           <div class="fixture-card-actions">`
         + (_ownDoublePoints
-            ? `<button onclick="confirmCardPlay('double_points','${f.id}')" class="tap" style="flex:1;min-width:140px;padding:9px 12px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#FFC964,#E07A1F);color:#3A2410;">⚡ Use Double Points</button>`
+            ? `<button onclick="confirmCardPlay('double_points','${f.id}')" class="fixture-card-action-btn fixture-card-action-btn-points tap" type="button">
+                 <span class="fixture-card-action-icon">⚡</span><span>Double Points</span>
+               </button>`
             : '')
         + (_ownDoublePick
-            ? `<button onclick="executeCardPlay('double_pick','${f.id}')" class="tap" style="flex:1;min-width:140px;padding:9px 12px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#7EC8FF,#2E6FBF);color:#ffffff;">🎯 Use Double Pick</button>`
+            ? `<button onclick="executeCardPlay('double_pick','${f.id}')" class="fixture-card-action-btn fixture-card-action-btn-pick tap" type="button">
+                 <span class="fixture-card-action-icon">🎯</span><span>Double Pick</span>
+               </button>`
             : '')
-        + `</div>`
+        + `</div>
+         </div>`
       : ''
 
     const scoreSection = cardBadge + (hasDoublePick

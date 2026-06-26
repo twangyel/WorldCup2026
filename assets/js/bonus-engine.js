@@ -1096,6 +1096,27 @@ async function recalculateAllBonuses() {
     console.warn('[recalc-all] double_points play load threw (recreated rows may miss 2x):', e);
   }
 
+  // Load all active double_pick card plays once, so any row we RECREATE from
+  // scratch below scores primary-vs-alt correctly instead of dropping the alt.
+  // Keyed by `${user_id}|${fixture_id}`. Without this, recreate scored the
+  // primary scoreline only — a Double Pick that should win on its alt scored 0.
+  const doublePickKeys = new Set();
+  try {
+    const { data: dpkPlays, error: dpkErr } = await supabaseClient
+      .from('card_plays')
+      .select('user_id, fixture_id, card_type, status')
+      .eq('card_type', 'double_pick')
+      .neq('status', 'refunded')
+      .limit(10000);
+    if (dpkErr) {
+      console.warn('[recalc-all] Could not load double_pick plays (recreated rows may drop alt):', dpkErr);
+    } else {
+      (dpkPlays || []).forEach(cp => doublePickKeys.add(`${cp.user_id}|${cp.fixture_id}`));
+    }
+  } catch (e) {
+    console.warn('[recalc-all] double_pick play load threw (recreated rows may drop alt):', e);
+  }
+
   let totalCreated = 0, totalUpdated = 0, totalErrors = 0;
 
   for (const uid of uniqueUserIds) {
@@ -1109,6 +1130,8 @@ async function recalculateAllBonuses() {
           fixture_id,
           home_prediction,
           away_prediction,
+          alt_home_prediction,
+          alt_away_prediction,
           advance_pick,
           fixtures!inner(home_score, away_score, stage, kickoff, penalty_winner, penalty_home_score, penalty_away_score)
         `)
@@ -1148,14 +1171,43 @@ async function recalculateAllBonuses() {
       for (const m of missingRows) {
         try {
           const f = m.fixtures;
-          // Build a prediction-shaped object so _computeBase can read advance_pick.
-          const predForCalc = {
+
+          // --- Double Pick: score primary AND alt, keep the higher. Mirrors
+          // awardPointsWithBonuses (the live scorer) so a row recreated here is
+          // scored identically. Without this, recreate read the primary scoreline
+          // only and silently dropped the alt — a Double Pick that should win on
+          // its alt would have scored its (often losing) primary instead.
+          const hasDoublePick = doublePickKeys.has(`${uid}|${m.fixture_id}`)
+                             && m.alt_home_prediction != null
+                             && m.alt_away_prediction != null;
+
+          const primaryBase = _computeBase({
             home_prediction: m.home_prediction,
             away_prediction: m.away_prediction,
             advance_pick: m.advance_pick
-          };
-          const basePoints = _computeBase(predForCalc, f, knockoutEnabled);
+          }, f, knockoutEnabled);
+
+          let basePoints  = primaryBase;
+          let winningHome = m.home_prediction;
+          let winningAway = m.away_prediction;
+          let winningPick = hasDoublePick ? 'primary' : null;
+
+          if (hasDoublePick) {
+            const altBase = _computeBase({
+              home_prediction: m.alt_home_prediction,
+              away_prediction: m.alt_away_prediction,
+              advance_pick: m.advance_pick
+            }, f, knockoutEnabled);
+            if (altBase > primaryBase) {
+              basePoints  = altBase;
+              winningHome = m.alt_home_prediction;
+              winningAway = m.alt_away_prediction;
+              winningPick = 'alt';
+            }
+          }
+
           const matchdayKey = getMatchdayKey(f.kickoff);
+          // dpApplied uses the FINAL (post-Double-Pick) base, exactly like the live scorer.
           const dpApplied = doublePointsKeys.has(`${uid}|${m.fixture_id}`) && basePoints > 0;
 
           const fullResult = calculateFullPoints({
@@ -1164,13 +1216,23 @@ async function recalculateAllBonuses() {
             stage: f.stage,
             kickoff: f.kickoff,
             matchdayKey,
-            predHome: m.home_prediction,
-            predAway: m.away_prediction,
+            predHome: winningHome,
+            predAway: winningAway,
             actualHome: f.home_score,
             actualAway: f.away_score,
             basePoints,
             doublePointsApplied: dpApplied
           }, []);
+
+          // Persist the winning pick back to predictions so history badges stay
+          // correct after a recreate (best-effort; mirrors the live scorer).
+          if (winningPick) {
+            try {
+              await supabaseClient.from('predictions')
+                .update({ winning_pick: winningPick })
+                .eq('id', m.id);
+            } catch (e) { /* non-fatal */ }
+          }
 
           // Match the engine's upsert pattern exactly (line 686-709).
           const { error: upsertErr } = await supabaseClient
@@ -1179,8 +1241,8 @@ async function recalculateAllBonuses() {
               prediction_id: m.id,
               user_id: uid,
               fixture_id: m.fixture_id,
-              home_prediction: m.home_prediction,
-              away_prediction: m.away_prediction,
+              home_prediction: winningHome,
+              away_prediction: winningAway,
               stage: f.stage,
               base_points: fullResult.base_points,
               double_points_applied: dpApplied,
