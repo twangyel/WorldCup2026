@@ -1521,12 +1521,42 @@ function msToCountdown(ms) {
       const { data: predData } = await getMyPredictions()
       fixtures = fxData || []
       predictions = predData || []
+      // Keep the per-fixture "+N pts" badge in sync with published results even when
+      // this render is triggered WITHOUT a realtime results event (e.g. a plain tab
+      // switch). Previously the badge read a stale myResultsByFixture cache, so newly
+      // published points (incl. carded matches) didn't appear on the fixture card
+      // until the next realtime event or a full page reload.
+      if (typeof refreshMyResultsCache === 'function') {
+        try { await refreshMyResultsCache() } catch (e) { /* non-fatal, render anyway */ }
+      }
       renderFixtures()
       updatePredictionCount()
     }
 
     function getPrediction(id) { return predictions.find(p => p.fixture_id === id) }
     function isLocked(kickoff) { return new Date() >= new Date(kickoff) }
+
+    // SINGLE SOURCE OF TRUTH for which upcoming fixtures are OPEN for prediction.
+    // Used by the Predict tab (renderFixtures), the prediction counter
+    // (updatePredictionCount), the Predict-tab auto-scroll, and the booster-card
+    // match picker (index.html) — so all of them ALWAYS agree on the open set and
+    // can never drift apart again.
+    // Open = the next BATCH_SIZE upcoming matches, PLUS anything kicking off within
+    // BATCH_HOURS — whichever covers more. Only future, unscored fixtures qualify.
+    function getOpenFixtureIds(now = new Date()) {
+      const BATCH_SIZE = 3        // always keep at least this many matches open
+      const BATCH_HOURS = 48      // also keep anything kicking off within this window
+      const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
+      const ids = new Set()
+      ;(Array.isArray(fixtures) ? fixtures : [])
+        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+        .forEach((f, i) => {
+          if (i < BATCH_SIZE) ids.add(f.id)
+          if (new Date(f.kickoff) <= batchDeadline) ids.add(f.id)
+        })
+      return ids
+    }
 
     function renderFixtures() {
   const c = document.getElementById('fixtures-list')
@@ -1539,18 +1569,9 @@ function msToCountdown(ms) {
     .filter(f => new Date(f.kickoff) > now && f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
 
-  // Build the set of open match IDs
-  const openMatchIds = new Set()
-  const BATCH_SIZE = 3           // minimum number of open matches
-  const BATCH_HOURS = 48         // hours ahead to keep open
-  const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
-
-  upcoming.forEach((f, i) => {
-    // Always include the first BATCH_SIZE matches
-    if (i < BATCH_SIZE) openMatchIds.add(f.id)
-    // Also include any match within BATCH_HOURS
-    if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
-  })
+  // Build the set of open match IDs (shared with the prediction counter and the
+  // booster-card match picker — see getOpenFixtureIds, the single source of truth).
+  const openMatchIds = getOpenFixtureIds(now)
 
   // The "next" match is the earliest one (for warning banner focus)
   const nextMatchId = upcoming[0]?.id || null
@@ -1720,31 +1741,24 @@ function msToCountdown(ms) {
          </div>`
       : ''
 
-    // Inline card activation — primary path to arm/use a booster, on editable
-    // fixtures that don't already have a card. Double Points consumes immediately
-    // (confirmCardPlay → confirm modal); Double Pick arms locally on a single tap
-    // (executeCardPlay defers consumption to save-time). Both fns live in index.html.
+    // Card activation shortcut. The two inline arm/use buttons used to live here,
+    // but activating a card directly from the fixture card was unreliable, so the
+    // Inventory section on the profile tab is now the SINGLE place to play a card.
+    // This button is a pure navigation shortcut — it consumes nothing. It only shows
+    // on an editable, card-free fixture when the player actually owns a usable card
+    // (otherwise it would nudge toward an empty inventory).
     const _inv = (typeof _inventoryState !== 'undefined') ? _inventoryState : {}
-    const _dpArmedAnywhere = (typeof dpArmedIntent !== 'undefined') && Object.keys(dpArmedIntent).length > 0
     const _offerCards = !locked && !previewMode && !hasDoublePick && !hasDoublePoints
-    const _ownDoublePoints = (_inv.double_points || 0) > 0
-    const _ownDoublePick   = (_inv.double_pick   || 0) > 0 && !_dpArmedAnywhere   // can't arm two at once
-    const cardActionRow = (_offerCards && (_ownDoublePoints || _ownDoublePick))
-      ? `<div class="fixture-card-panel">
-           <div class="fixture-card-panel-label">Optional cards</div>
-           <div class="fixture-card-actions">`
-        + (_ownDoublePoints
-            ? `<button onclick="confirmCardPlay('double_points','${f.id}')" class="fixture-card-action-btn fixture-card-action-btn-points tap" type="button">
-                 <span class="fixture-card-action-icon">⚡</span><span>Double Points</span>
-               </button>`
-            : '')
-        + (_ownDoublePick
-            ? `<button onclick="executeCardPlay('double_pick','${f.id}')" class="fixture-card-action-btn fixture-card-action-btn-pick tap" type="button">
-                 <span class="fixture-card-action-icon">🎯</span><span>Double Pick</span>
-               </button>`
-            : '')
-        + `</div>
-         </div>`
+    const _ownAnyCard = (_inv.double_points || 0) > 0 || (_inv.double_pick || 0) > 0
+    const cardActionRow = (_offerCards && _ownAnyCard)
+      ? `<button type="button"
+                 onclick="switchTab('profile'); setTimeout(()=>{document.getElementById('inventory-card')?.scrollIntoView({behavior:'smooth', block:'center'})}, 250)"
+                 class="tap"
+                 style="margin-top:14px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;border-radius:14px;border:1px dashed #D4A24C;background:linear-gradient(135deg,#FFFBF2,#FDF3DD);color:#8A5A12;font-size:13px;font-weight:800;letter-spacing:0.01em;">
+           <span style="font-size:15px;">🃏</span>
+           <span>Use a card on this match</span>
+           <span style="opacity:0.55;font-weight:700;">→ Inventory</span>
+         </button>`
       : ''
 
     const scoreSection = cardBadge + (hasDoublePick
@@ -2119,15 +2133,8 @@ return `
     .filter(f => new Date(f.kickoff) > now && f.home_score === null)
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
 
-  // Same batch window logic as renderFixtures
-  const BATCH_SIZE = 3
-  const BATCH_HOURS = 48
-  const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
-  const openMatchIds = new Set()
-  upcoming.forEach((f, i) => {
-    if (i < BATCH_SIZE) openMatchIds.add(f.id)
-    if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
-  })
+  // Same open-set logic as the Predict tab — see getOpenFixtureIds.
+  const openMatchIds = getOpenFixtureIds(now)
 
   const openMatches = upcoming.filter(f => openMatchIds.has(f.id))
   const predictedCount = openMatches.filter(f => getPrediction(f.id)).length
@@ -9010,14 +9017,7 @@ function switchTab(tab, pushHistory = true) {
       const upcoming = fixtures
         .filter(f => new Date(f.kickoff) > now && f.home_score === null)
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const BATCH_SIZE = 3
-      const BATCH_HOURS = 48
-      const batchDeadline = new Date(now.getTime() + BATCH_HOURS * 3600 * 1000)
-      const openMatchIds = new Set()
-      upcoming.forEach((f, i) => {
-        if (i < BATCH_SIZE) openMatchIds.add(f.id)
-        if (new Date(f.kickoff) <= batchDeadline) openMatchIds.add(f.id)
-      })
+      const openMatchIds = getOpenFixtureIds(now)
       const firstOpen = upcoming.find(f => openMatchIds.has(f.id))
       if (firstOpen) {
         const el = document.getElementById(`fixture-${firstOpen.id}`)

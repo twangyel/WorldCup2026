@@ -2818,18 +2818,27 @@ async function renderInventoryCard() {
       } catch (e) { /* fail open */ }
 
       const now = new Date();
-      const open = (typeof fixtures !== 'undefined' && Array.isArray(fixtures) ? fixtures : [])
-        .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+      // Mirror the Predict tab EXACTLY: a fixture is only an eligible card target if
+      // it is currently OPEN for prediction. getOpenFixtureIds() (index.js) is the
+      // single source of truth, so this picker can never drift from the Predict tab
+      // again. Then drop fixtures already carded (per the rules above).
+      const openIds = (typeof getOpenFixtureIds === 'function')
+        ? getOpenFixtureIds(now)
+        : new Set((Array.isArray(fixtures) ? fixtures : [])
+            .filter(f => new Date(f.kickoff) > now && f.home_score === null)
+            .map(f => f.id));
+      const open = (Array.isArray(fixtures) ? fixtures : [])
+        .filter(f => openIds.has(f.id))
         .filter(f => !blockedFixtures.has(f.id))
         .filter(f => !blockedMatchdaysForCard.has(matchdayKeyOf(f.kickoff)))
         .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
 
       if (open.length === 0) {
-        showToast('No eligible matches. You may have already used a card on every upcoming fixture.', 'info');
+        showToast('No eligible matches. You may have already used a card on every open fixture.', 'info');
         return;
       }
 
-      const optionsHtml = open.slice(0, 10).map(f => {
+      const optionsHtml = open.map(f => {
         const k = new Date(f.kickoff);
         const when = k.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
           + ' · ' + k.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
