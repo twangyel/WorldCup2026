@@ -3695,6 +3695,50 @@ document.getElementById('csv-input').value = '';
     }
 
     // ============== RESULTS ==============
+
+    // How many of the most-recently-finished fixtures stay editable, so the admin
+    // can correct a wrong scoreline after the fact. Editing a saved result only
+    // rewrites the fixture row — the leaderboard does NOT move until Publish — so
+    // unlocking recent results is safe.
+    const RECENT_FINISHED_EDITABLE = 4
+
+    // IDs of every UNSCORED fixture sharing the earliest unscored kickoff — the
+    // "next slot". World Cup group finals / knockout days run 2+ matches at the
+    // exact same kickoff, so several fixtures can legitimately unlock together.
+    function getNextSlotFixtureIds() {
+      const upcoming = allFixtures
+        .filter(f => f.home_score === null)
+        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+      const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
+      return new Set(
+        upcoming
+          .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
+          .map(f => f.id)
+      )
+    }
+
+    // IDs of the N most-recently-finished fixtures (both scores set), newest
+    // kickoff first. These stay editable for after-the-fact corrections.
+    function getRecentFinishedFixtureIds() {
+      return new Set(
+        allFixtures
+          .filter(f => f.home_score !== null && f.away_score !== null)
+          .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff))
+          .slice(0, RECENT_FINISHED_EDITABLE)
+          .map(f => f.id)
+      )
+    }
+
+    // Single source of truth for "which fixtures can the admin score/edit right
+    // now": the next unscored slot PLUS the last few finished results. All three
+    // gate sites (renderResults, confirmSaveScore, executeSaveScore) use this so
+    // the UI and the write-source guards can never disagree.
+    function getEditableFixtureIds() {
+      const ids = getNextSlotFixtureIds()
+      getRecentFinishedFixtureIds().forEach(id => ids.add(id))
+      return ids
+    }
+
     function renderResults() {
       const list = document.getElementById('admin-fixtures')
       const now = new Date()
@@ -3705,15 +3749,14 @@ document.getElementById('csv-input').value = '';
       // Unlock every unscored fixture sharing the earliest unscored kickoff.
       // Scoring stays order-safe: Publish Results recalculates streaks/combos in
       // kickoff order regardless of the order you saved them.
-      const upcoming = allFixtures
-        .filter(f => f.home_score === null)
-        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
-      const editableIds = new Set(
-        upcoming
-          .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
-          .map(f => f.id)
-      )
+      //
+      // We also keep the last few FINISHED fixtures editable (see
+      // getEditableFixtureIds) so a wrong scoreline can be corrected after the
+      // fact. `nextSlotIds` is tracked separately so the "next match" banner and
+      // highlight only fire for the upcoming slot, not for recent corrections.
+      const nextSlotIds = getNextSlotFixtureIds()
+      const recentFinishedIds = getRecentFinishedFixtureIds()
+      const editableIds = getEditableFixtureIds()
 
       let displayFixtures = allFixtures
       if (resultsFilter) {
@@ -3725,36 +3768,36 @@ document.getElementById('csv-input').value = '';
       }
       if (!displayFixtures.length) { list.innerHTML = '<div class="px-5 py-10 text-center"><div class="text-2xl mb-2 opacity-60">⚽</div><div class="text-sm font-semibold text-ink-700">No fixtures found</div><p class="text-xs text-ink-500 mt-1">Try clearing your search</p></div>'; return }
       list.innerHTML = displayFixtures.map(f => {
-        const isNext = editableIds.has(f.id)
+        const isNextSlot = nextSlotIds.has(f.id)
+        const isRecentEditable = recentFinishedIds.has(f.id)
         const hasScore = f.home_score !== null && f.away_score !== null
         const timeLocked = new Date() >= new Date(f.kickoff)
-        // Only the next unscored match is editable. Past-kickoff is FINE —
-        // that's exactly when you'd be entering the result. `timeLocked` is
-        // kept only for the visual "PAST — needs score" badge.
-        const locked = !isNext
+        // Editable when in the next unscored slot OR among the recent finished
+        // fixtures we keep open for corrections. Everything else is locked.
+        const locked = !editableIds.has(f.id)
 
         // Status badge
         let statusBadge
         if (hasScore) {
-          statusBadge = `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
+          statusBadge = isRecentEditable
+            ? `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span><span class="text-[11px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full ml-1.5">✏️ editable</span>`
+            : `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
         } else if (locked) {
           if (timeLocked && !hasScore) {
             statusBadge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">⏱ PAST — needs score</span>`
-          } else if (!isNext) {
-            statusBadge = `<span class="text-[11px] font-bold bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
           } else {
-            statusBadge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
+            statusBadge = `<span class="text-[11px] font-bold bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">🔒 LOCKED</span>`
           }
         } else {
           statusBadge = `<span class="text-[11px] font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full">✏️ OPEN</span>`
         }
 
         // Next-match highlight banner
-        const nextBanner = isNext && !timeLocked
+        const nextBanner = isNextSlot && !timeLocked
           ? `<div class="mb-3 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 flex items-center gap-2">
                <span class="text-sm">⚡</span>
-               <span class="text-xs font-bold text-brand-700">${editableIds.size > 1
-                 ? `Next slot — ${editableIds.size} simultaneous fixtures are editable right now`
+               <span class="text-xs font-bold text-brand-700">${nextSlotIds.size > 1
+                 ? `Next slot — ${nextSlotIds.size} simultaneous fixtures are editable right now`
                  : 'Next match — only this fixture is editable right now'}</span>
              </div>`
           : ''
@@ -3833,7 +3876,7 @@ document.getElementById('csv-input').value = '';
              </div>${penEditableHtml}`
 
         return `
-        <div class="px-5 py-4 ${isNext && !timeLocked ? 'bg-brand-50/30' : ''}">
+        <div class="px-5 py-4 ${isNextSlot && !timeLocked ? 'bg-brand-50/30' : ''}">
           <div class="mb-3 flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-sm flex items-start gap-1.5 flex-wrap leading-tight">
@@ -3925,21 +3968,13 @@ document.getElementById('csv-input').value = '';
       const s = pendingScores[id] || {}
       if (s.home === undefined && s.away === undefined) return showToast('No changes', 'warning')
 
-      // Enforce: only fixtures in the earliest unscored kickoff slot can be scored.
-      // Allows 2+ simultaneous matches (e.g. group finals) while still blocking
-      // out-of-order entry of later matchdays.
-      const now = new Date()
-      const upcoming = allFixtures
-        .filter(f => f.home_score === null)
-        .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-      const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
-      const editableIds = new Set(
-        upcoming
-          .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
-          .map(f => f.id)
-      )
+      // Enforce: only fixtures in the next unscored slot OR among the recent
+      // finished results (see getEditableFixtureIds) can be scored/edited. This
+      // allows 2+ simultaneous matches and after-the-fact corrections while still
+      // blocking out-of-order entry of far-future matchdays.
+      const editableIds = getEditableFixtureIds()
       if (!editableIds.has(id)) {
-        showToast('This match is locked. Only the next upcoming match(es) can be scored.', 'error')
+        showToast('This match is locked. Only the next match(es) and recent results can be edited.', 'error')
         return
       }
 
@@ -4060,19 +4095,12 @@ async function ensureMatchdayBaseline(fixtureKickoff) {
 
 
 async function executeSaveScore(id) {
-  // Double-check: only fixtures in the earliest unscored kickoff slot can be scored
-  const now = new Date()
-  const upcoming = allFixtures
-    .filter(f => f.home_score === null)
-    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
-  const nextKickoffMs = upcoming[0] ? new Date(upcoming[0].kickoff).getTime() : null
-  const editableIds = new Set(
-    upcoming
-      .filter(f => new Date(f.kickoff).getTime() === nextKickoffMs)
-      .map(f => f.id)
-  )
+  // Double-check at the write source: only the next unscored slot OR a recent
+  // finished result (see getEditableFixtureIds) may be written. Mirrors the
+  // confirmSaveScore gate so the overwrite-modal path can't bypass it.
+  const editableIds = getEditableFixtureIds()
   if (!editableIds.has(id)) {
-    showToast('This match is locked. Only the next upcoming match(es) can be scored.', 'error')
+    showToast('This match is locked. Only the next match(es) and recent results can be edited.', 'error')
     return
   }
 
