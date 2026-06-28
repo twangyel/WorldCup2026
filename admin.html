@@ -3717,6 +3717,21 @@ document.getElementById('csv-input').value = '';
       )
     }
 
+    // IDs of every UNSCORED fixture whose kickoff is already in the past. These
+    // are real, played matches that still need a result — it is always safe (and
+    // necessary) to score them, in any order, no matter how many earlier games
+    // were missed. This is the fix for "a whole matchday went by unscored and the
+    // next round opened, stranding the missed games as Locked". Publish still
+    // recalculates streaks/combos in kickoff order regardless of save order.
+    function getPastUnscoredFixtureIds() {
+      const nowMs = Date.now()
+      return new Set(
+        allFixtures
+          .filter(f => f.home_score === null && new Date(f.kickoff).getTime() <= nowMs)
+          .map(f => f.id)
+      )
+    }
+
     // IDs of the N most-recently-finished fixtures (both scores set), newest
     // kickoff first. These stay editable for after-the-fact corrections.
     function getRecentFinishedFixtureIds() {
@@ -3730,11 +3745,15 @@ document.getElementById('csv-input').value = '';
     }
 
     // Single source of truth for "which fixtures can the admin score/edit right
-    // now": the next unscored slot PLUS the last few finished results. All three
-    // gate sites (renderResults, confirmSaveScore, executeSaveScore) use this so
-    // the UI and the write-source guards can never disagree.
+    // now":
+    //   • the next unscored slot (upcoming game, scoreable as it kicks off),
+    //   • every PAST unscored fixture (missed results — score them any time),
+    //   • the last few finished results (corrections).
+    // All three gate sites (renderResults, confirmSaveScore, executeSaveScore)
+    // use this so the UI and the write-source guards can never disagree.
     function getEditableFixtureIds() {
       const ids = getNextSlotFixtureIds()
+      getPastUnscoredFixtureIds().forEach(id => ids.add(id))
       getRecentFinishedFixtureIds().forEach(id => ids.add(id))
       return ids
     }
@@ -3772,8 +3791,9 @@ document.getElementById('csv-input').value = '';
         const isRecentEditable = recentFinishedIds.has(f.id)
         const hasScore = f.home_score !== null && f.away_score !== null
         const timeLocked = new Date() >= new Date(f.kickoff)
-        // Editable when in the next unscored slot OR among the recent finished
-        // fixtures we keep open for corrections. Everything else is locked.
+        // Editable when in the next unscored slot, a missed PAST unscored game,
+        // or one of the recent finished results kept open for corrections.
+        // Everything else is locked.
         const locked = !editableIds.has(f.id)
 
         // Status badge
@@ -3782,6 +3802,9 @@ document.getElementById('csv-input').value = '';
           statusBadge = isRecentEditable
             ? `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span><span class="text-[11px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full ml-1.5">✏️ editable</span>`
             : `<span class="text-[11px] font-bold bg-ink-900 text-white px-2.5 py-1 rounded-full">FT ${f.home_score}–${f.away_score}</span>`
+        } else if (!locked && timeLocked) {
+          // Played but never scored, and editable right now — actionable.
+          statusBadge = `<span class="text-[11px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full">⏱ PAST — enter score</span>`
         } else if (locked) {
           if (timeLocked && !hasScore) {
             statusBadge = `<span class="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-1 rounded-full">⏱ PAST — needs score</span>`
